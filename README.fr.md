@@ -2,6 +2,8 @@
 
 [![smoke](https://github.com/AKKO-p/akko-sandbox/actions/workflows/smoke.yml/badge.svg)](https://github.com/AKKO-p/akko-sandbox/actions/workflows/smoke.yml)
 
+<p align="center"><img src="docs/demo.gif" alt="demo.sh : carol_analyst et alice_admin posent la même question par MCP et obtiennent deux réponses différentes" width="900"></p>
+
 **Deux comptes, une question, deux réponses.** Un bac à sable de cinq minutes pour
 [akko-mcp-trino](https://github.com/AKKO-p/akko-mcp-trino), le serveur MCP open
 source qui donne aux agents d'IA un accès en lecture seule à Trino, chaque
@@ -14,19 +16,6 @@ jeton de chacun et le transmet à Trino. Trino le vérifie à son tour, exécute
 requête au nom de cet utilisateur et demande à une politique ce qu'il peut voir.
 L'analyste obtient cinq clients européens aux adresses e-mail masquées ;
 l'administratrice obtient les dix, en clair. Le serveur ne décide rien de tout cela.
-
-```
-3. Two answers, decided by the policy in Trino
-   carol_analyst                                    alice_admin
-   ----------------------------------------------   ----------------------------------------------
-   Lena Vogel      ***@example.com             DE   Lena Vogel      lena.vogel@example.com      DE
-   Hugo Martin     ***@example.com             FR   Hugo Martin     hugo.martin@example.com     FR
-   Sofia Ruiz      ***@example.org             ES   Sofia Ruiz      sofia.ruiz@example.org      ES
-   Giulia Conti    ***@example.org             IT   Noah Bennett    noah.bennett@example.com    US
-   Emma de Vries   ***@example.org             NL   Giulia Conti    giulia.conti@example.org    IT
-                                                    Kenji Sato      kenji.sato@example.com      JP
-   ...
-```
 
 ## Démarrer
 
