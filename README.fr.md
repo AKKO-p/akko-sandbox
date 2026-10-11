@@ -4,7 +4,7 @@
 
 <p align="center"><img src="docs/demo.gif" alt="demo.sh : carol_analyst et alice_admin posent la même question par MCP et obtiennent deux réponses différentes" width="900"></p>
 
-**Deux comptes, une question, deux réponses.** Un bac à sable de cinq minutes pour
+**Deux comptes, une question, deux réponses.** Un sandbox de cinq minutes pour
 [akko-mcp-trino](https://github.com/AKKO-p/akko-mcp-trino), le serveur MCP open
 source qui donne aux agents d'IA un accès en lecture seule à Trino, chaque
 utilisateur avec ses propres droits.
@@ -12,7 +12,7 @@ utilisateur avec ses propres droits.
 [English](README.md)
 
 Deux utilisateurs posent la même question par MCP. akko-mcp-trino vérifie le
-jeton de chacun et le transmet à Trino. Trino le vérifie à son tour, exécute la
+token de chacun et le transmet à Trino. Trino le vérifie à son tour, exécute la
 requête au nom de cet utilisateur et demande à une politique ce qu'il peut voir.
 L'analyste obtient cinq clients européens aux adresses e-mail masquées ;
 l'administratrice obtient les dix, en clair. Le serveur ne décide rien de tout cela.
@@ -30,16 +30,16 @@ docker compose up -d --wait
 ```
 
 Le premier démarrage télécharge les images (environ 1,7 Go sur disque). Ensuite,
-le bac à sable est prêt en une minute environ. Pour tout arrêter et tout
+le sandbox est prêt en une minute environ. Pour tout arrêter et tout
 supprimer : `docker compose down -v`.
 
 ## Ce que montre `demo.sh`
 
 1. La même question SQL, envoyée par le client MCP officiel à l'outil `execute_query`.
-2. `SELECT current_user` : Trino exécute chaque requête au nom de l'utilisateur dont il a reçu le jeton.
+2. `SELECT current_user` : Trino exécute chaque requête au nom de l'utilisateur dont il a reçu le token.
 3. Les deux réponses côte à côte : e-mails masqués et filtre de lignes pour l'analyste, tout pour l'administratrice.
 4. Un troisième utilisateur, `dave_viewer`, refusé par la politique.
-5. Une requête sans jeton, puis une autre avec une signature falsifiée : les deux refusées par un `401`.
+5. Une requête sans token, puis une autre avec une signature falsifiée : les deux refusées par un `401`.
 
 `./demo.sh --check` joue les mêmes étapes sous forme d'assertions.
 
@@ -68,7 +68,7 @@ La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 | `mcp` | `akkoai/akko-mcp-trino:0.5.3` | le serveur MCP, mode d'identité `jwt`, strict | 256 Mo |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | l'Inspector MCP officiel | 384 Mo |
 
-Mesuré sur un hôte Linux avec `docker stats` : entre 1,3 et 1,4 Go utilisés au
+Mesuré sur une machine Linux avec `docker stats` : entre 1,3 et 1,4 Go utilisés au
 repos, environ 1,5 Go au plus fort de la démo. Trino et Keycloak en prennent l'essentiel.
 
 Seuls Keycloak (`8080`), le serveur MCP (`3000`) et l'Inspector (`6274`) sont
@@ -79,7 +79,7 @@ publiés, et sur `127.0.0.1` seulement. `KEYCLOAK_PORT`, `MCP_PORT` et
 
 ```mermaid
 flowchart LR
-    Client["Client MCP<br/>(demo.sh, Inspector, votre hôte)"]
+    Client["Client MCP<br/>(demo.sh, Inspector, votre host)"]
     KC["Keycloak"]
     MCP["akko-mcp-trino<br/>(mode jwt)"]
     Trino["Trino<br/>(https, JWT)"]
@@ -87,18 +87,18 @@ flowchart LR
     PG[("PostgreSQL")]
 
     Client -- "1. utilisateur + mot de passe" --> KC
-    KC -- "2. jeton d'accès" --> Client
-    Client -- "3. appel d'outil + jeton Bearer" --> MCP
+    KC -- "2. token d'accès" --> Client
+    Client -- "3. tool call + bearer token" --> MCP
     MCP -. "vérifie la signature (JWKS)" .-> KC
-    MCP -- "4. SQL en lecture + le même jeton" --> Trino
+    MCP -- "4. SQL read-only + le même token" --> Trino
     Trino -. "vérifie à nouveau (JWKS)" .-> KC
     Trino -- "5. a-t-il le droit ? quelles lignes ? quel masque ?" --> OPA
     Trino --> PG
 ```
 
-- Le serveur MCP vérifie la signature du jeton, son émetteur (`http://localhost:8080/realms/sandbox`), son audience (`trino`) et son expiration, et refuse toute requête sans jeton.
-- Il envoie ce même jeton à Trino, en https uniquement, en vérifiant le certificat de Trino avec l'autorité du bac à sable.
-- Trino vérifie le jeton à son tour et exécute la requête au nom de son `preferred_username`.
+- Le serveur MCP vérifie la signature du token, son issuer (`http://localhost:8080/realms/sandbox`), son audience (`trino`) et son expiration, et refuse toute requête sans token.
+- Il envoie ce même token à Trino, en https uniquement, en vérifiant le certificat de Trino avec l'autorité du sandbox.
+- Trino vérifie le token à son tour et exécute la requête au nom de son `preferred_username`.
 - Trino interroge OPA avant chaque action. Toute la politique tient dans [un court fichier Rego](opa/policy.rego) : qui peut lire quoi, le masque des e-mails, le filtre de lignes.
 
 Pour changer ce que voit un utilisateur, modifiez `opa/policy.rego` puis lancez
@@ -106,15 +106,15 @@ Pour changer ce que voit un utilisateur, modifiez `opa/policy.rego` puis lancez
 
 ## Cliquer : l'Inspector MCP
 
-1. Lisez l'adresse et le jeton d'accès de l'Inspector : `docker compose logs inspector | grep MCP_INSPECTOR_API_TOKEN`.
-2. Ouvrez cette adresse. Choisissez le transport **Streamable HTTP** et l'URL `http://mcp:3000/mcp` (l'Inspector tourne dans le réseau du compose).
-3. Obtenez un jeton avec `./token.sh carol_analyst` et ajoutez l'en-tête `Authorization: Bearer <jeton>`.
-4. Connectez-vous, puis appelez `execute_query` avec `SELECT * FROM demo.crm.customers`. Recommencez avec le jeton d'alice.
+1. Ouvrez l'adresse affichée par l'Inspector : `docker compose logs inspector | grep MCP_INSPECTOR_API_TOKEN`.
+2. **Add Servers**, puis **+ Add manually**. Donnez un identifiant, choisissez le transport `streamable-http` et l'URL `http://mcp:3000/mcp` (l'Inspector tourne dans le réseau du compose). Cliquez sur **Add**.
+3. Récupérez un token avec `./token.sh carol_analyst`. Sur la carte du serveur, ouvrez **Settings**, puis **Custom Headers**, **+ Add Header** : `Authorization` et `Bearer <token>`. Fermez les réglages.
+4. Passez la carte en **Connected**, puis appelez `execute_query` avec `SELECT * FROM demo.crm.customers`. Recommencez avec le token d'alice.
 
-## Brancher votre propre hôte MCP
+## Brancher votre propre host MCP
 
 Claude Desktop, Cursor, VS Code et Claude Code peuvent utiliser le serveur du
-bac à sable, `http://localhost:3000/mcp`, avec le jeton d'un utilisateur. Voir
+sandbox, `http://localhost:3000/mcp`, avec le token d'un utilisateur. Voir
 [docs/connect-a-host.fr.md](docs/connect-a-host.fr.md).
 
 ## Tester
@@ -123,7 +123,7 @@ bac à sable, `http://localhost:3000/mcp`, avec le jeton d'un utilisateur. Voir
 tests/smoke.sh
 ```
 
-Le test démarre le bac à sable sous son propre nom de projet, joue la démo,
+Le test démarre le sandbox sous son propre nom de projet, joue la démo,
 vérifie les deux réponses différentes, `current_user`, chaque refus (à la porte
 du serveur et chez Trino), la ligne d'audit et l'Inspector, affiche le temps de
 démarrage et la mémoire, puis supprime tout. `KEEP=1` le laisse tourner.

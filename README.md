@@ -104,10 +104,10 @@ To change what a user sees, edit `opa/policy.rego` and run
 
 ## Click through it: the MCP Inspector
 
-1. Read the Inspector's address and access token: `docker compose logs inspector | grep MCP_INSPECTOR_API_TOKEN`.
-2. Open that address. Choose the transport **Streamable HTTP** and the URL `http://mcp:3000/mcp` (the Inspector runs in the compose network).
-3. Get a token with `./token.sh carol_analyst` and add the header `Authorization: Bearer <token>`.
-4. Connect, then call `execute_query` with `SELECT * FROM demo.crm.customers`. Do it again with alice's token.
+1. Open the address the Inspector prints: `docker compose logs inspector | grep MCP_INSPECTOR_API_TOKEN`.
+2. **Add Servers**, then **+ Add manually**. Give it an ID, choose the transport `streamable-http` and the URL `http://mcp:3000/mcp` (the Inspector runs in the compose network). Click **Add**.
+3. Get a token with `./token.sh carol_analyst`. On the new server card, open **Settings**, then **Custom Headers**, **+ Add Header**: `Authorization` and `Bearer <token>`. Close the settings.
+4. Switch the card to **Connected**, then call `execute_query` with `SELECT * FROM demo.crm.customers`. Do it again with alice's token.
 
 ## Connect your own MCP host
 
