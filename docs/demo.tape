@@ -12,17 +12,22 @@ Set Shell "bash"
 Set FontFamily "JetBrains Mono"
 Set FontSize 16
 Set Width 1280
-Set Height 860
+Set Height 820
 Set Padding 24
 Set Theme "Catppuccin Mocha"
 Set WindowBar Colorful
 Set Framerate 24
 Set TypingSpeed 75ms
 
-# Two and a half seconds between the steps of the demo, to read each one.
+# Off camera: a first run warms Trino up, so the recorded one answers at once.
+# Then two and a half seconds between the steps of the demo, to read each one.
 Hide
-Type "export DEMO_PACE=2.5 PS1='$ ' && clear"
+Type "export PS1='$ ' && ./demo.sh --check > /dev/null; echo warm''ed"
 Enter
+Wait+Screen@120s /warmed/
+Type "export DEMO_PACE=2.5 && clear"
+Enter
+Sleep 500ms
 Show
 
 Sleep 800ms

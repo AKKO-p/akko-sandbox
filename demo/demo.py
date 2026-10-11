@@ -104,14 +104,15 @@ def side_by_side(left: dict, right: dict) -> None:
     line(f"{len(rows_l)} rows, e-mails masked, Europe only", f"{len(rows_r)} rows, nothing hidden", "33", "32")
 
 
-def step(title: str, detail: str = "") -> None:
-    time.sleep(PACE)
+def step(title: str, detail: str = "", pause: bool = True) -> None:
+    if pause:
+        time.sleep(PACE)
     print(paint("1", title) + detail, flush=True)
 
 
 def show(r: dict) -> None:
     carol, alice, dave, gate = r["carol"], r["alice"], r["dave"], r["door"]
-    step("1. The same question, sent through MCP (tool execute_query) by each user")
+    step("1. The same question, sent through MCP (tool execute_query) by each user", pause=False)
     print(f"   {paint('36', QUESTION)}")
     print()
     step("2. Who does Trino see?", "  SELECT current_user")
