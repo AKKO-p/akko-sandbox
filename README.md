@@ -1,5 +1,7 @@
 # akko-sandbox
 
+[![smoke](https://github.com/AKKO-p/akko-sandbox/actions/workflows/smoke.yml/badge.svg)](https://github.com/AKKO-p/akko-sandbox/actions/workflows/smoke.yml)
+
 **Two accounts, one question, two answers.** A five minute sandbox for
 [akko-mcp-trino](https://github.com/AKKO-p/akko-mcp-trino), the open source MCP
 server that gives AI agents read-only access to Trino, each user with their own rights.

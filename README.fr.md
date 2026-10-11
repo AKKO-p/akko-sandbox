@@ -1,5 +1,7 @@
 # akko-sandbox
 
+[![smoke](https://github.com/AKKO-p/akko-sandbox/actions/workflows/smoke.yml/badge.svg)](https://github.com/AKKO-p/akko-sandbox/actions/workflows/smoke.yml)
+
 **Deux comptes, une question, deux réponses.** Un bac à sable de cinq minutes pour
 [akko-mcp-trino](https://github.com/AKKO-p/akko-mcp-trino), le serveur MCP open
 source qui donne aux agents d'IA un accès en lecture seule à Trino, chaque
