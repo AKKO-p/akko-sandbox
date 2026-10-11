@@ -10,4 +10,5 @@ First version: the open source core of akko-mcp-trino in five minutes.
 - `tests/smoke.sh`: the end-to-end test, with start time and memory.
 - CI: `tests/smoke.sh` on every push and pull request to `main`, on `ubuntu-latest`. The arm64 line (`ubuntu-24.04-arm`) is ready, commented out: GitHub's arm runners are free for public repositories only, so it is enabled when the repository goes public.
 - `docs/demo.tape` and a workflow started by hand that records the README animation with VHS. `DEMO_PACE` paces the demo's steps for a recording.
+- `docs/demo.gif`, the animation at the top of both READMEs.
 - Guide to connect Claude Code, Cursor, VS Code and Claude Desktop.
