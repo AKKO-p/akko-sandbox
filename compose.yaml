@@ -157,6 +157,7 @@ services:
     environment:
       KEYCLOAK_URL: http://keycloak:8080
       MCP_URL: http://mcp:3000/mcp
+      DEMO_PACE: ${DEMO_PACE:-0}   # seconds between steps, for a recording
     volumes:
       - ./demo:/demo:ro
     mem_limit: 128m

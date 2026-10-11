@@ -12,6 +12,7 @@ import json
 import os
 import re
 import sys
+import time
 
 import anyio
 import httpx
@@ -26,6 +27,7 @@ EUROPE = {"DE", "ES", "FR", "IT", "NL"}
 TOOLS = ["describe_table", "execute_query", "explain_query", "list_catalogs", "list_schemas", "list_tables"]
 
 COLOR = sys.stdout.isatty()
+PACE = float(os.environ.get("DEMO_PACE") or 0)  # seconds between steps, for a recording
 
 
 def paint(code: str, text: str) -> str:
@@ -102,25 +104,28 @@ def side_by_side(left: dict, right: dict) -> None:
     line(f"{len(rows_l)} rows, e-mails masked, Europe only", f"{len(rows_r)} rows, nothing hidden", "33", "32")
 
 
+def step(title: str, detail: str = "") -> None:
+    time.sleep(PACE)
+    print(paint("1", title) + detail, flush=True)
+
+
 def show(r: dict) -> None:
     carol, alice, dave, gate = r["carol"], r["alice"], r["dave"], r["door"]
-    print(paint("1", "akko-mcp-trino sandbox: two accounts, one question, two answers"))
-    print()
-    print(paint("1", "1. The same question, sent through MCP (tool execute_query) by each user"))
+    step("1. The same question, sent through MCP (tool execute_query) by each user")
     print(f"   {paint('36', QUESTION)}")
     print()
-    print(paint("1", "2. Who does Trino see?") + "  SELECT current_user")
+    step("2. Who does Trino see?", "  SELECT current_user")
     for x in (carol, alice):
         print(f"   token of {x['user']:<14} ->  Trino runs the query as {paint('1', x['current_user'])}")
     print()
-    print(paint("1", "3. Two answers, decided by the policy in Trino"))
+    step("3. Two answers, decided by the policy in Trino")
     side_by_side(carol, alice)
     print()
-    print(paint("1", "4. dave_viewer asks the same question"))
+    step("4. dave_viewer asks the same question")
     refusal = re.search(r'message="([^"]+)"', dave["error"])
     print(f"   {paint('31', refusal.group(1) if refusal else dave['error'] or 'answered (unexpected)')}")
     print()
-    print(paint("1", "5. At the door"))
+    step("5. At the door")
     print(f"   no token           ->  HTTP {paint('31', str(gate['no_token']))}")
     print(f"   forged signature   ->  HTTP {paint('31', str(gate['forged']))}")
 
@@ -151,10 +156,12 @@ def check(r: dict) -> int:
 
 
 def main() -> int:
-    r = collect()
     if "--check" in sys.argv[1:]:
-        return check(r)
-    show(r)
+        return check(collect())
+    print(paint("1", "akko-mcp-trino sandbox: two accounts, one question, two answers"))
+    print("Asking through MCP as carol_analyst, alice_admin and dave_viewer...")
+    print()
+    show(collect())
     return 0
 
 
