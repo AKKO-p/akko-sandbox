@@ -1,0 +1,165 @@
+# akko-sandbox: the open source core of akko-mcp-trino in five minutes.
+# Two accounts ask the same question through MCP and get two different answers,
+# because Trino runs each query as the user who asked, and a policy decides.
+#
+#   docker compose up -d --wait     then     ./demo.sh
+#
+# Everything here is for a laptop demo: a development Keycloak, a self-signed
+# certificate authority, obvious passwords. Nothing of it is meant for production.
+
+name: akko-sandbox
+
+x-defaults: &defaults
+  restart: "no"
+  security_opt: ["no-new-privileges:true"]
+
+services:
+  # One-shot: a small certificate authority and Trino's certificate, written to a
+  # volume. Runs as root only to give each file its owner, then exits.
+  certs:
+    <<: *defaults
+    image: alpine/openssl:3.5.9
+    entrypoint: ["/bin/sh", "/generate.sh"]
+    volumes:
+      - ./certs/generate.sh:/generate.sh:ro
+      - certs:/certs
+    mem_limit: 32m
+
+  # The fictional sample data: customers, accounts, transactions.
+  postgres:
+    <<: *defaults
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: sandbox
+      POSTGRES_USER: sandbox
+      POSTGRES_PASSWORD: sandbox   # demo only
+    volumes:
+      - ./postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sandbox -d sandbox"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    mem_limit: 128m
+
+  # The identity provider: one realm, three users, tokens with audience "trino".
+  keycloak:
+    <<: *defaults
+    image: quay.io/keycloak/keycloak:26.7.5
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin   # demo only
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin   # demo only
+      # Tokens always carry the issuer the browser sees, even when they are
+      # requested from inside the network; the JWKS is read at keycloak:8080.
+      KC_HOSTNAME: http://localhost:${KEYCLOAK_PORT:-8080}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+      JAVA_OPTS_KC_HEAP: "-Xms64m -Xmx448m"
+    volumes:
+      - ./keycloak/realm-sandbox.json:/opt/keycloak/data/import/realm-sandbox.json:ro
+    ports:
+      - "127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"
+    healthcheck:
+      # The image has no curl: ask the management port by hand.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    mem_limit: 768m
+
+  # The policy: who may read what, which column is masked, which rows are filtered.
+  opa:
+    <<: *defaults
+    image: openpolicyagent/opa:1.21.1-static
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=error", "/policy/policy.rego"]
+    volumes:
+      - ./opa/policy.rego:/policy/policy.rego:ro
+    user: "65532:65532"
+    mem_limit: 64m
+
+  # The engine: https only for users, every token verified, every action asked to OPA.
+  trino:
+    <<: *defaults
+    image: trinodb/trino:482
+    environment:
+      OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/sandbox
+    volumes:
+      - ./trino/etc:/etc/trino:ro
+      - certs:/certs:ro
+    depends_on:
+      certs: {condition: service_completed_successfully}
+      postgres: {condition: service_healthy}
+      keycloak: {condition: service_healthy}
+      opa: {condition: service_started}
+    healthcheck:
+      test: ["CMD", "/usr/lib/trino/bin/health-check"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    mem_limit: 1280m
+
+  # The open source core of akko-mcp-trino, in jwt mode: each caller's verified
+  # token goes to Trino, which verifies it again and runs the query as that user.
+  mcp:
+    <<: *defaults
+    image: akkoai/akko-mcp-trino:0.5.3
+    environment:
+      TRINO_HOST: trino
+      TRINO_PORT: "8443"
+      TRINO_HTTP_SCHEME: https
+      TRINO_VERIFY: /certs/ca.crt
+      TRINO_IDENTITY_MODE: jwt
+      TRINO_CATALOG: demo
+      TRINO_QUERY_TIMEOUT_SECONDS: "30"
+      MCP_AUTH_ENABLED: "true"
+      MCP_AUTH_REQUIRED: "true"
+      MCP_JWKS_URL: http://keycloak:8080/realms/sandbox/protocol/openid-connect/certs
+      MCP_OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/sandbox
+      MCP_OIDC_AUDIENCE: trino
+    volumes:
+      - certs:/certs:ro
+    ports:
+      - "127.0.0.1:${MCP_PORT:-3000}:3000"
+    depends_on:
+      trino: {condition: service_healthy}
+    healthcheck:
+      # /ready asks Trino's /v1/info over https, with the sandbox CA.
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:3001/ready')"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+    mem_limit: 256m
+
+  # The official MCP Inspector, to click through the tools without a model.
+  # Open http://localhost:6274 and read the access token with
+  #   docker compose logs inspector
+  inspector:
+    <<: *defaults
+    image: ghcr.io/modelcontextprotocol/inspector:2.9.0
+    environment:
+      CLIENT_PORT: ${INSPECTOR_PORT:-6274}
+      MCP_INSPECTOR_SECRET_STORE: memory   # nothing written to disk
+    ports:
+      - "127.0.0.1:${INSPECTOR_PORT:-6274}:${INSPECTOR_PORT:-6274}"
+    depends_on:
+      mcp: {condition: service_healthy}
+    mem_limit: 384m
+
+  # The demo client, started by ./demo.sh: the same image, the official MCP SDK.
+  client:
+    <<: *defaults
+    image: akkoai/akko-mcp-trino:0.5.3
+    profiles: ["tools"]
+    entrypoint: ["python", "/demo/demo.py"]
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      MCP_URL: http://mcp:3000/mcp
+    volumes:
+      - ./demo:/demo:ro
+    mem_limit: 128m
+
+volumes:
+  certs:
