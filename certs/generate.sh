@@ -1,10 +1,12 @@
 #!/bin/sh
-# Creates, on the first start, a small certificate authority and a certificate
-# for Trino, so that tokens only ever travel to Trino over https.
-# The CA's private key is deleted once Trino's certificate is signed.
+# Creates, on the first start, a small certificate authority and certificates
+# for Trino and Keycloak, so that tokens only ever travel over https between the
+# MCP server, Keycloak's token endpoint and Trino. Also draws the MCP server's
+# client secret at Keycloak, at random: none is written in the repository.
+# The CA's private key is deleted once the certificates are signed.
 set -eu
 cd /certs
-if [ -s trino.pem ] && [ -s ca.crt ]; then
+if [ -s trino.pem ] && [ -s keycloak.crt ] && [ -s mcp-client.secret ]; then
   echo "certificates already present"
   exit 0
 fi
@@ -14,26 +16,33 @@ openssl req -x509 -newkey rsa:2048 -nodes -days 825 -sha256 \
   -addext "basicConstraints=critical,CA:TRUE" \
   -addext "keyUsage=critical,keyCertSign,cRLSign"
 
-openssl req -newkey rsa:2048 -nodes -sha256 -subj "/CN=trino" \
-  -keyout trino.key -out trino.csr
-
-cat > trino.ext <<'EOF'
+sign() { # name, subjectAltName
+  openssl req -newkey rsa:2048 -nodes -sha256 -subj "/CN=$1" -keyout "$1.key" -out "$1.csr"
+  cat > "$1.ext" <<EOF
 basicConstraints=critical,CA:FALSE
 keyUsage=critical,digitalSignature,keyEncipherment
 extendedKeyUsage=serverAuth
-subjectAltName=DNS:trino,DNS:localhost,IP:127.0.0.1
+subjectAltName=$2
 subjectKeyIdentifier=hash
 authorityKeyIdentifier=keyid,issuer
 EOF
-openssl x509 -req -in trino.csr -CA ca.crt -CAkey ca.key -CAcreateserial \
-  -days 825 -sha256 -extfile trino.ext -out trino.crt
+  openssl x509 -req -in "$1.csr" -CA ca.crt -CAkey ca.key -CAcreateserial \
+    -days 825 -sha256 -extfile "$1.ext" -out "$1.crt"
+  rm -f "$1.csr" "$1.ext"
+}
+sign trino "DNS:trino,DNS:localhost,IP:127.0.0.1"
+sign keycloak "DNS:keycloak,DNS:localhost,IP:127.0.0.1"
+
+# The MCP server's client secret at Keycloak, read by both at start.
+openssl rand -hex 24 > mcp-client.secret
 
 # Trino reads its key and certificate from one PEM file.
 cat trino.key trino.crt > trino.pem
-rm -f ca.key ca.srl trino.key trino.csr trino.ext
+rm -f ca.key ca.srl trino.key
 
-# Trino runs as uid 1000; everyone else only needs the public CA.
-chown 1000:1000 trino.pem
-chmod 0400 trino.pem
-chmod 0444 ca.crt trino.crt
-echo "certificate authority and Trino certificate created"
+# Trino and Keycloak run as uid 1000, the MCP server as uid 10001: the secret is
+# readable by both, which a real deployment would keep in a secret store instead.
+chown 1000:1000 trino.pem keycloak.key keycloak.crt
+chmod 0400 trino.pem keycloak.key
+chmod 0444 ca.crt trino.crt keycloak.crt mcp-client.secret
+echo "certificate authority, Trino and Keycloak certificates, client secret created"

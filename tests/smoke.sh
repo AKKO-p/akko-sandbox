@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Smoke test of the sandbox, end to end, on a machine with Docker:
 # starts the compose project, plays the demo, checks the two different answers,
-# current_user, the refusals (401 at the door, 401 at Trino without a token),
-# the audit line, and measures start time and memory. Removes everything at the
+# current_user, the refusals (401 at the door, 401 at Trino without a token or
+# with a token issued for the MCP server), the token exchange, the audit line,
+# and measures start time and memory. Removes everything at the
 # end unless KEEP=1.
 #
 #   tests/smoke.sh
@@ -43,13 +44,37 @@ echo "  peak memory during the demo:"
 awk '{print $1, $2}' .smoke-stats | sort -k1,1 -k2,2h | awk '{peak[$1]=$2} END {for (c in peak) print "  " c, peak[c]}' | sort
 rm -f .smoke-stats
 
-echo "== 5. Trino verifies tokens itself, and the server logs no token"
-trino_no_token=$(docker compose exec -T mcp python -c "
-import httpx
-print(httpx.post('https://trino:8443/v1/statement', content='SELECT 1', verify='/certs/ca.crt').status_code)")
-check "Trino over https without a token: 401" "$trino_no_token" "401"
+echo "== 5. Trino verifies tokens itself, the server exchanges them, and logs none"
+trino_status() {
+  docker compose exec -T mcp python -c "
+import httpx, sys
+h = {'Authorization': 'Bearer ' + sys.argv[1]} if sys.argv[1] else {}
+print(httpx.post('https://trino:8443/v1/statement', content='SELECT 1', headers=h, verify='/certs/ca.crt').status_code)" "$1"
+}
+check "Trino over https without a token: 401" "$(trino_status '')" "401"
+check "Trino refuses a token issued for the MCP server: 401" "$(trino_status "$(./token.sh carol_analyst)")" "401"
+# Straight to Trino, with carol's own token for Trino: she may not act as alice.
+trino_as() { # token, X-Trino-User or empty: prints the row count, or the error
+  docker compose exec -T mcp python -c "
+import httpx, sys
+h = {'Authorization': 'Bearer ' + sys.argv[1]}
+if sys.argv[2]: h['X-Trino-User'] = sys.argv[2]
+kw = dict(headers=h, verify='/certs/ca.crt', timeout=30)
+r = httpx.post('https://trino:8443/v1/statement', content='SELECT count(*) FROM demo.crm.customers', **kw).json()
+rows = []
+while True:
+    if 'error' in r: print(r['error']['message']); break
+    rows += r.get('data', [])
+    if 'nextUri' not in r: print(rows[0][0] if rows else 'no rows'); break
+    r = httpx.get(r['nextUri'], **kw).json()" "$1" "$2"
+}
+carol_for_trino=$(./token.sh carol_analyst trino-cli)
+check "Trino, carol's own token, as carol: 5 customers" "$(trino_as "$carol_for_trino" '')" "5"
+check "Trino, carol's own token, as alice_admin: refused" "$(trino_as "$carol_for_trino" alice_admin)" "Access Denied: User carol_analyst cannot impersonate user alice_admin"
 logs=$(docker compose logs mcp)
 check "no token in the server log" "$(grep -c 'eyJ' <<<"$logs")" "0"
+check "no client secret in the server log" "$(grep -c "$(docker compose exec -T mcp cat /certs/mcp-client.secret)" <<<"$logs")" "0"
+check "the server exchanged tokens at Keycloak" "$(grep -q 'POST https://keycloak:8443/realms/sandbox/protocol/openid-connect/token "HTTP/1.1 200' <<<"$logs" && echo yes)" "yes"
 check "the audit line names carol_analyst" "$(grep -q 'carol_analyst' <<<"$logs" && echo yes)" "yes"
 
 echo "== 6. The MCP Inspector reaches the server with a bearer header"

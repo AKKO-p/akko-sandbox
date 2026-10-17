@@ -11,8 +11,9 @@ server that gives AI agents read-only access to Trino, each user with their own 
 [Français](README.fr.md)
 
 Two users ask the same question through MCP. akko-mcp-trino verifies each
-user's token and passes it to Trino. Trino verifies it again, runs the query as
-that user, and asks a policy what they may see. The analyst gets five European
+user's token, issued for the server, and exchanges it at Keycloak for a token
+issued for Trino: the user's own token never goes further. Trino verifies that
+token, runs the query as that user, and asks a policy what they may see. The analyst gets five European
 customers with masked e-mail addresses; the admin gets all ten, in clear. The
 server decides none of it.
 
@@ -38,7 +39,8 @@ ready in about a minute. Stop it and remove everything with
 2. `SELECT current_user`: Trino runs each query as the user whose token it received.
 3. The two answers side by side: masked e-mails and a row filter for the analyst, everything for the admin.
 4. A third user, `dave_viewer`, refused by the policy.
-5. A request without a token, and one with a forged signature: both refused with `401`.
+5. A write, refused by the server before it reaches Trino.
+6. A request without a token, one with a forged signature, and one with a valid token issued for Trino instead of the server: all three refused with `401`.
 
 `./demo.sh --check` plays the same steps as assertions.
 
@@ -58,16 +60,17 @@ The Keycloak console is at <http://localhost:8080> (`admin` / `admin`).
 
 | Service | Image | Role | Memory limit |
 |---|---|---|---|
-| `certs` | `alpine/openssl:3.5.9` | creates a demo certificate authority and Trino's certificate, then exits | 32 MB |
+| `certs` | `alpine/openssl:3.5.9` | creates a demo certificate authority, Trino's and Keycloak's certificates and the MCP server's client secret, then exits | 32 MB |
 | `postgres` | `postgres:17.11-alpine` | the fictional sample data: customers, accounts, transactions | 128 MB |
-| `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | the identity provider, realm `sandbox` | 768 MB |
+| `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | the identity provider, realm `sandbox`, with standard token exchange | 768 MB |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | the access policy, [`opa/policy.rego`](opa/policy.rego) | 64 MB |
 | `trino` | `trinodb/trino:482` | the engine, https, JWT authentication, OPA access control | 1280 MB |
-| `mcp` | `akkoai/akko-mcp-trino:0.5.3` | the MCP server, identity mode `jwt`, strict | 256 MB |
+| `mcp` | `akkoai/akko-mcp-trino:0.6.0` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 256 MB |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | the official MCP Inspector | 384 MB |
 
-Measured on a Linux host with `docker stats`: between 1.3 and 1.4 GB in use at rest,
-about 1.5 GB at the peak of the demo. Trino and Keycloak use most of it.
+Measured on a Linux host with `docker stats`: about 1.3 GB in use at rest, about
+1.5 GB at the peak of the demo. Trino and Keycloak use most of it; the MCP server
+about 70 MB.
 
 Only Keycloak (`8080`), the MCP server (`3000`) and the Inspector (`6274`) are
 published, on `127.0.0.1` only. Set `KEYCLOAK_PORT`, `MCP_PORT` or
@@ -85,19 +88,21 @@ flowchart LR
     PG[("PostgreSQL")]
 
     Client -- "1. user + password" --> KC
-    KC -- "2. access token" --> Client
+    KC -- "2. access token for the MCP server" --> Client
     Client -- "3. tool call + Bearer token" --> MCP
-    MCP -. "verify signature (JWKS)" .-> KC
-    MCP -- "4. read-only SQL + the same token" --> Trino
-    Trino -. "verify again (JWKS)" .-> KC
-    Trino -- "5. may this user? which rows? which mask?" --> OPA
+    MCP -. "verify signature, audience (JWKS)" .-> KC
+    MCP -. "4. exchange it for a token for Trino" .-> KC
+    MCP -- "5. read-only SQL + the token for Trino" --> Trino
+    Trino -. "verify it (JWKS)" .-> KC
+    Trino -- "6. may this user? which rows? which mask?" --> OPA
     Trino --> PG
 ```
 
-- The MCP server verifies the token's signature, issuer (`http://localhost:8080/realms/sandbox`), audience (`trino`) and expiry, and refuses a request without one.
-- It sends the same token to Trino over https only, checking Trino's certificate against the sandbox CA.
-- Trino verifies the token again and runs the query as its `preferred_username`.
-- Trino asks OPA before every action. The whole policy is [one short Rego file](opa/policy.rego): who may read what, the e-mail mask, the row filter.
+- The MCP server verifies the token's signature, issuer (`http://localhost:8080/realms/sandbox`), audience (`akko-mcp`, the server itself) and expiry, and refuses a request without a valid one. A token issued for Trino is refused too.
+- It exchanges the token at Keycloak, over https, for a token whose audience is `trino` (OAuth 2.0 Token Exchange, RFC 8693), with its own client `akko-mcp`. The user's token is never passed on.
+- It sends that token to Trino over https only, checking Trino's certificate against the sandbox CA.
+- Trino verifies the token and runs the query as its `preferred_username`.
+- Trino asks OPA before every action. The whole policy is [one short Rego file](opa/policy.rego): who may read what, the e-mail mask, the row filter, and nobody acting under another user's name.
 
 To change what a user sees, edit `opa/policy.rego` and run
 `docker compose restart opa`. The MCP server needs no change.
@@ -123,15 +128,17 @@ tests/smoke.sh
 
 It starts the sandbox under its own project name, plays the demo, checks the
 two different answers, `current_user`, every refusal (the server's door and
-Trino's own), the audit line and the Inspector, prints the start time and the
-memory, and removes everything. `KEEP=1` leaves it running.
+Trino's own), the token exchange, the audit line and the Inspector, prints the
+start time and the memory, and removes everything. `KEEP=1` leaves it running.
+`MCP_IMAGE` runs another build of the server, such as a release candidate.
 
 ## Not for production
 
 Everything here is chosen to start in one command on a laptop: a development
-Keycloak over http, a password grant, one password for every user, a self-signed
-certificate authority, a fixed Trino shared secret, a policy with three names in
-it. The akko-mcp-trino image and its configuration are the same as in
+Keycloak (http for the browser, https for the token exchange), a password grant,
+one password for every user, a self-signed certificate authority, a client
+secret kept in a shared volume, a fixed Trino shared secret, a policy with
+three names in it. The akko-mcp-trino image and its configuration are the same as in
 production; the rest is not.
 
 ## About AKKO

@@ -1,6 +1,8 @@
 # akko-sandbox: the open source core of akko-mcp-trino in five minutes.
 # Two accounts ask the same question through MCP and get two different answers,
 # because Trino runs each query as the user who asked, and a policy decides.
+# The MCP server never passes a user's token on: it exchanges it at Keycloak for
+# a token issued for Trino (OAuth 2.0 Token Exchange, RFC 8693).
 #
 #   docker compose up -d --wait     then     ./demo.sh
 #
@@ -14,8 +16,9 @@ x-defaults: &defaults
   security_opt: ["no-new-privileges:true"]
 
 services:
-  # One-shot: a small certificate authority and Trino's certificate, written to a
-  # volume. Runs as root only to give each file its owner, then exits.
+  # One-shot: a small certificate authority, Trino's and Keycloak's certificates,
+  # and the MCP server's client secret, drawn at random, written to a volume.
+  # Runs as root only to give each file its owner, then exits.
   certs:
     <<: *defaults
     image: alpine/openssl:3.5.9
@@ -42,11 +45,19 @@ services:
       retries: 30
     mem_limit: 128m
 
-  # The identity provider: one realm, three users, tokens with audience "trino".
+  # The identity provider: one realm, three users. Tokens for the MCP server
+  # (audience akko-mcp), exchanged by the server for tokens for Trino (audience
+  # trino) on https://keycloak:8443. The client secret is read from the volume.
   keycloak:
     <<: *defaults
     image: quay.io/keycloak/keycloak:26.7.5
-    command: ["start-dev", "--import-realm"]
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        MCP_CLIENT_SECRET=$$(cat /certs/mcp-client.secret)
+        exec /opt/keycloak/bin/kc.sh start-dev --import-realm
+        --https-certificate-file=/certs/keycloak.crt
+        --https-certificate-key-file=/certs/keycloak.key
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin   # demo only
       KC_BOOTSTRAP_ADMIN_PASSWORD: admin   # demo only
@@ -58,11 +69,15 @@ services:
       JAVA_OPTS_KC_HEAP: "-Xms64m -Xmx448m"
     volumes:
       - ./keycloak/realm-sandbox.json:/opt/keycloak/data/import/realm-sandbox.json:ro
+      - certs:/certs:ro
     ports:
       - "127.0.0.1:${KEYCLOAK_PORT:-8080}:8080"
+    depends_on:
+      certs: {condition: service_completed_successfully}
     healthcheck:
-      # The image has no curl: ask the management port by hand.
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"UP\"' <&3"]
+      # Healthy once the realm serves its signing keys, which Trino reads as it
+      # starts. The image has no curl: ask by hand.
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /realms/sandbox/protocol/openid-connect/certs HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"keys\"' <&3"]
       interval: 5s
       timeout: 5s
       retries: 60
@@ -101,24 +116,31 @@ services:
       start_period: 20s
     mem_limit: 1280m
 
-  # The open source core of akko-mcp-trino, in jwt mode: each caller's verified
-  # token goes to Trino, which verifies it again and runs the query as that user.
+  # The open source core of akko-mcp-trino, with its defaults: the jwt identity
+  # mode and a door that refuses any request without a valid token. It accepts
+  # only tokens issued for it (audience akko-mcp), exchanges each at Keycloak for a
+  # token issued for Trino, and Trino runs the query as that user.
+  # MCP_IMAGE runs another build of the server, such as a release candidate.
   mcp:
     <<: *defaults
-    image: akkoai/akko-mcp-trino:0.5.3
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.6.0}
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["TRINO_TOKEN_EXCHANGE_CLIENT_SECRET=$$(cat /certs/mcp-client.secret) exec akko-mcp-trino"]
     environment:
       TRINO_HOST: trino
       TRINO_PORT: "8443"
       TRINO_HTTP_SCHEME: https
       TRINO_VERIFY: /certs/ca.crt
-      TRINO_IDENTITY_MODE: jwt
       TRINO_CATALOG: demo
       TRINO_QUERY_TIMEOUT_SECONDS: "30"
-      MCP_AUTH_ENABLED: "true"
-      MCP_AUTH_REQUIRED: "true"
       MCP_JWKS_URL: http://keycloak:8080/realms/sandbox/protocol/openid-connect/certs
       MCP_OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/sandbox
-      MCP_OIDC_AUDIENCE: trino
+      MCP_OIDC_AUDIENCE: akko-mcp
+      MCP_RESOURCE_URL: http://localhost:${MCP_PORT:-3000}/mcp
+      TRINO_TOKEN_EXCHANGE_URL: https://keycloak:8443/realms/sandbox/protocol/openid-connect/token
+      TRINO_TOKEN_EXCHANGE_CLIENT_ID: akko-mcp
+      TRINO_TOKEN_EXCHANGE_AUDIENCE: trino
+      TRINO_TOKEN_EXCHANGE_VERIFY: /certs/ca.crt
     volumes:
       - certs:/certs:ro
     ports:
@@ -151,7 +173,7 @@ services:
   # The demo client, started by ./demo.sh: the same image, the official MCP SDK.
   client:
     <<: *defaults
-    image: akkoai/akko-mcp-trino:0.5.3
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.6.0}
     profiles: ["tools"]
     entrypoint: ["python", "/demo/demo.py"]
     environment:

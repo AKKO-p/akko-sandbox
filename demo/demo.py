@@ -1,8 +1,10 @@
 """The sandbox demo: one question through MCP, asked by two users, two answers.
 
-Each user gets a token from Keycloak, the official MCP client sends it to
-akko-mcp-trino, which verifies it and passes it to Trino. Trino verifies it
-again, runs the query as that user, and OPA decides what the user may see.
+Each user gets a token from Keycloak, issued for the MCP server, and the
+official MCP client sends it to akko-mcp-trino. The server verifies it and
+exchanges it at Keycloak for a token issued for Trino; the user's token never
+goes further. Trino verifies that token, runs the query as that user, and OPA
+decides what the user may see.
 
     python demo.py           show the demo
     python demo.py --check   the same, as assertions (exit 1 on any failure)
@@ -34,10 +36,11 @@ def paint(code: str, text: str) -> str:
     return f"\033[{code}m{text}\033[0m" if COLOR else text
 
 
-def token(user: str) -> str:
+def token(user: str, client: str = "sandbox-mcp") -> str:
+    """A user's access token: for the MCP server (sandbox-mcp), or for Trino (trino-cli)."""
     r = httpx.post(
         TOKEN_URL,
-        data={"grant_type": "password", "client_id": "sandbox-mcp", "username": user, "password": PASSWORD},
+        data={"grant_type": "password", "client_id": client, "username": user, "password": PASSWORD},
         timeout=20,
     )
     r.raise_for_status()
@@ -58,21 +61,28 @@ async def ask(user: str) -> dict:
 
             who = await run("SELECT current_user")
             answer = await run(QUESTION)
+            write = await run("DELETE FROM demo.crm.customers")
     return {
         "user": user,
         "tools": tools,
         "current_user": (who.get("rows") or [[who.get("error", "")]])[0][0],
         "rows": answer.get("rows", []),
         "error": answer.get("error", ""),
+        "write": write.get("error", ""),
     }
 
 
 def door() -> dict:
-    """The MCP endpoint without a token, and with a token whose signature is forged."""
+    """The MCP endpoint without a token, with a forged signature, and with a valid token
+    issued for Trino instead of the MCP server."""
     forged = token("carol_analyst").rsplit(".", 1)[0] + ".Zm9yZ2VkLXNpZ25hdHVyZQ"
+    for_trino = token("carol_analyst", client="trino-cli")
+    no_token = httpx.post(MCP_URL, json={}, timeout=10)
     return {
-        "no_token": httpx.post(MCP_URL, json={}, timeout=10).status_code,
+        "no_token": no_token.status_code,
+        "message": no_token.json().get("message", ""),
         "forged": httpx.post(MCP_URL, json={}, headers={"Authorization": f"Bearer {forged}"}, timeout=10).status_code,
+        "for_trino": httpx.post(MCP_URL, json={}, headers={"Authorization": f"Bearer {for_trino}"}, timeout=10).status_code,
     }
 
 
@@ -126,9 +136,13 @@ def show(r: dict) -> None:
     refusal = re.search(r'message="([^"]+)"', dave["error"])
     print(f"   {paint('31', refusal.group(1) if refusal else dave['error'] or 'answered (unexpected)')}")
     print()
-    step("5. At the door")
-    print(f"   no token           ->  HTTP {paint('31', str(gate['no_token']))}")
-    print(f"   forged signature   ->  HTTP {paint('31', str(gate['forged']))}")
+    step("5. carol asks the server to delete the customers")
+    print(f"   {paint('31', carol['write'] or 'answered (unexpected)')}")
+    print()
+    step("6. At the door")
+    print(f"   no token                    ->  HTTP {paint('31', str(gate['no_token']))}  {gate['message']}")
+    print(f"   forged signature            ->  HTTP {paint('31', str(gate['forged']))}")
+    print(f"   a valid token, for Trino    ->  HTTP {paint('31', str(gate['for_trino']))}  (the server accepts only tokens issued for it)")
 
 
 def check(r: dict) -> int:
@@ -145,8 +159,11 @@ def check(r: dict) -> int:
         ("alice: every customer, Europe and beyond", len(alice["rows"]) == 10 and not countries["alice"] <= EUROPE),
         ("two accounts, two different answers", carol["rows"] != alice["rows"]),
         ("dave: refused by the policy", not dave["rows"] and "Access Denied" in dave["error"]),
+        ("a write: refused by the server before Trino", "Read-only" in carol["write"]),
         ("no token: 401", gate["no_token"] == 401),
+        ("no token: the 401 says what to send", "requires a bearer token" in gate["message"]),
         ("forged token: 401", gate["forged"] == 401),
+        ("a token issued for Trino: 401 at the MCP server", gate["for_trino"] == 401),
     ]
     for name, ok in checks:
         print(f"  {'OK  ' if ok else 'FAIL'}  {name}")

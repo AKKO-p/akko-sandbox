@@ -32,6 +32,19 @@ forbidden if {
 	is_customers(input.action.resource.table)
 }
 
+# 2b. Nobody may act under another name. Trino asks ImpersonateUser when a client
+#     names a user (X-Trino-User) other than the one its token proves: refused,
+#     except for the accounts listed here, such as akko-mcp-trino's own account in
+#     its impersonation mode (list it, and give it a role above). The sandbox runs
+#     the jwt mode, where no one impersonates, so the list is empty.
+impersonators := set()
+
+forbidden if {
+	input.action.operation == "ImpersonateUser"
+	input.action.resource.user.user != user
+	not user in impersonators
+}
+
 # 3. Everyone but an admin sees e-mail addresses masked: ***@example.com
 columnMask := {"expression": "'***' || substr(email, strpos(email, '@'))"} if {
 	role != "admin"
