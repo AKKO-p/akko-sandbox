@@ -53,6 +53,24 @@ print(httpx.post('https://trino:8443/v1/statement', content='SELECT 1', headers=
 }
 check "Trino over https without a token: 401" "$(trino_status '')" "401"
 check "Trino refuses a token issued for the MCP server: 401" "$(trino_status "$(./token.sh carol_analyst)")" "401"
+# Straight to Trino, with carol's own token for Trino: she may not act as alice.
+trino_as() { # token, X-Trino-User or empty: prints the row count, or the error
+  docker compose exec -T mcp python -c "
+import httpx, sys
+h = {'Authorization': 'Bearer ' + sys.argv[1]}
+if sys.argv[2]: h['X-Trino-User'] = sys.argv[2]
+kw = dict(headers=h, verify='/certs/ca.crt', timeout=30)
+r = httpx.post('https://trino:8443/v1/statement', content='SELECT count(*) FROM demo.crm.customers', **kw).json()
+rows = []
+while True:
+    if 'error' in r: print(r['error']['message']); break
+    rows += r.get('data', [])
+    if 'nextUri' not in r: print(rows[0][0] if rows else 'no rows'); break
+    r = httpx.get(r['nextUri'], **kw).json()" "$1" "$2"
+}
+carol_for_trino=$(./token.sh carol_analyst trino-cli)
+check "Trino, carol's own token, as carol: 5 customers" "$(trino_as "$carol_for_trino" '')" "5"
+check "Trino, carol's own token, as alice_admin: refused" "$(trino_as "$carol_for_trino" alice_admin)" "Access Denied: User carol_analyst cannot impersonate user alice_admin"
 logs=$(docker compose logs mcp)
 check "no token in the server log" "$(grep -c 'eyJ' <<<"$logs")" "0"
 check "no client secret in the server log" "$(grep -c "$(docker compose exec -T mcp cat /certs/mcp-client.secret)" <<<"$logs")" "0"

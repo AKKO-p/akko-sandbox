@@ -102,7 +102,7 @@ flowchart LR
 - It exchanges the token at Keycloak, over https, for a token whose audience is `trino` (OAuth 2.0 Token Exchange, RFC 8693), with its own client `akko-mcp`. The user's token is never passed on.
 - It sends that token to Trino over https only, checking Trino's certificate against the sandbox CA.
 - Trino verifies the token and runs the query as its `preferred_username`.
-- Trino asks OPA before every action. The whole policy is [one short Rego file](opa/policy.rego): who may read what, the e-mail mask, the row filter.
+- Trino asks OPA before every action. The whole policy is [one short Rego file](opa/policy.rego): who may read what, the e-mail mask, the row filter, and nobody acting under another user's name.
 
 To change what a user sees, edit `opa/policy.rego` and run
 `docker compose restart opa`. The MCP server needs no change.
