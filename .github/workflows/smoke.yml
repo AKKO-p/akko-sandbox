@@ -23,10 +23,6 @@ jobs:
     timeout-minutes: 20
     env:
       COMPOSE_PROJECT_NAME: akko-sandbox-ci
-      # Until akko-mcp-trino 0.6.0 is published, the server is built from the
-      # branch that prepares it, as a release candidate. Remove both lines then.
-      MCP_CORE_REF: fix/secure-defaults-token-exchange
-      MCP_IMAGE: akko-mcp-trino:0.6.0rc1
     steps:
       - uses: actions/checkout@v7
 

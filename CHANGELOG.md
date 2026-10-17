@@ -9,7 +9,7 @@
 - `tests/smoke.sh` checks that Trino refuses a token issued for the MCP server, that the server exchanged tokens at Keycloak, and that its log holds no client secret.
 - The policy refuses `ImpersonateUser` towards any name but the one the token proves, except for the accounts listed in `impersonators` (empty here; akko-mcp-trino's own account in its `impersonation` mode). Before, a user calling Trino directly with their own token could act as another user (found on 2026-10-17). `tests/smoke.sh` proves carol cannot act as alice_admin.
 - `./token.sh <user> trino-cli` prints a token for Trino itself.
-- `MCP_IMAGE` runs another build of the server. Until 0.6.0 is published, CI builds it from the branch that prepares it.
+- `MCP_IMAGE` runs another build of the server.
 
 ## 0.1.0 (unreleased)
 
