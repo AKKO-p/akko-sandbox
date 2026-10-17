@@ -23,11 +23,24 @@ jobs:
     timeout-minutes: 20
     env:
       COMPOSE_PROJECT_NAME: akko-sandbox-ci
+      # Until akko-mcp-trino 0.6.0 is published, the server is built from the
+      # branch that prepares it, as a release candidate. Remove both lines then.
+      MCP_CORE_REF: fix/secure-defaults-token-exchange
+      MCP_IMAGE: akko-mcp-trino:0.6.0rc1
     steps:
       - uses: actions/checkout@v7
 
+      - name: Build akko-mcp-trino from source, until 0.6.0 is published
+        if: env.MCP_CORE_REF != ''
+        run: |
+          git clone --quiet --depth 1 --branch "$MCP_CORE_REF" https://github.com/AKKO-p/akko-mcp-trino.git core
+          sed -i 's/^version = "0.6.0"/version = "0.6.0rc1"/' core/pyproject.toml
+          sed -i 's/__version__ = "0.6.0"/__version__ = "0.6.0rc1"/' core/akko_mcp_trino/__init__.py
+          docker build --quiet --tag "$MCP_IMAGE" core
+          docker run --rm "$MCP_IMAGE" akko-mcp-trino --version
+
       - name: Pull the images
-        run: docker compose --profile tools pull --quiet
+        run: docker compose --profile tools pull --quiet --ignore-pull-failures
 
       - name: Start, play the demo, check everything
         run: KEEP=1 tests/smoke.sh

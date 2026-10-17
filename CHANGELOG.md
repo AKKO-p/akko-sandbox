@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- akko-mcp-trino 0.6.0, with its safe defaults: the server accepts only tokens issued for it (audience `akko-mcp`) and exchanges each at Keycloak for a token issued for Trino (OAuth 2.0 Token Exchange, RFC 8693); the user's token is never passed on.
+- Keycloak: a confidential client `akko-mcp` with standard token exchange, a target client `trino`, and a public client `trino-cli` whose tokens are issued for Trino. Keycloak serves https too, with its own certificate from the sandbox CA, for the token endpoint. Keycloak is healthy once the realm serves its keys.
+- The MCP server's client secret is drawn at random on the first start (`certs`), never written in the repository.
+- `demo.sh` shows and checks a write refused before Trino, the message of the `401`, and a valid token issued for Trino refused by the server.
+- `tests/smoke.sh` checks that Trino refuses a token issued for the MCP server, that the server exchanged tokens at Keycloak, and that its log holds no client secret.
+- `MCP_IMAGE` runs another build of the server. Until 0.6.0 is published, CI builds it from the branch that prepares it.
+
 ## 0.1.0 (unreleased)
 
 First version: the open source core of akko-mcp-trino in five minutes.

@@ -12,8 +12,10 @@ utilisateur avec ses propres droits.
 [English](README.md)
 
 Deux utilisateurs posent la même question par MCP. akko-mcp-trino vérifie le
-token de chacun et le transmet à Trino. Trino le vérifie à son tour, exécute la
-requête au nom de cet utilisateur et demande à une politique ce qu'il peut voir.
+token de chacun, émis pour le serveur, et l'échange auprès de Keycloak contre un
+token émis pour Trino : le token de l'utilisateur ne va jamais plus loin. Trino
+vérifie ce token, exécute la requête au nom de cet utilisateur et demande à une
+politique ce qu'il peut voir.
 L'analyste obtient cinq clients européens aux adresses e-mail masquées ;
 l'administratrice obtient les dix, en clair. Le serveur ne décide rien de tout cela.
 
@@ -39,7 +41,8 @@ supprimer : `docker compose down -v`.
 2. `SELECT current_user` : Trino exécute chaque requête au nom de l'utilisateur dont il a reçu le token.
 3. Les deux réponses côte à côte : e-mails masqués et filtre de lignes pour l'analyste, tout pour l'administratrice.
 4. Un troisième utilisateur, `dave_viewer`, refusé par la politique.
-5. Une requête sans token, puis une autre avec une signature falsifiée : les deux refusées par un `401`.
+5. Une écriture, refusée par le serveur avant d'atteindre Trino.
+6. Une requête sans token, une autre avec une signature falsifiée, et une troisième avec un token valide mais émis pour Trino au lieu du serveur : les trois refusées par un `401`.
 
 `./demo.sh --check` joue les mêmes étapes sous forme d'assertions.
 
@@ -60,16 +63,17 @@ La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 
 | Service | Image | Rôle | Limite mémoire |
 |---|---|---|---|
-| `certs` | `alpine/openssl:3.5.9` | crée une autorité de certification de démonstration et le certificat de Trino, puis s'arrête | 32 Mo |
+| `certs` | `alpine/openssl:3.5.9` | crée une autorité de certification de démonstration, les certificats de Trino et de Keycloak et le secret client du serveur MCP, puis s'arrête | 32 Mo |
 | `postgres` | `postgres:17.11-alpine` | les données fictives : clients, comptes, transactions | 128 Mo |
-| `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | le fournisseur d'identité, realm `sandbox` | 768 Mo |
+| `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | le fournisseur d'identité, realm `sandbox`, avec le token exchange standard | 768 Mo |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | la politique d'accès, [`opa/policy.rego`](opa/policy.rego) | 64 Mo |
 | `trino` | `trinodb/trino:482` | le moteur, en https, authentification JWT, contrôle d'accès OPA | 1280 Mo |
-| `mcp` | `akkoai/akko-mcp-trino:0.5.3` | le serveur MCP, mode d'identité `jwt`, strict | 256 Mo |
+| `mcp` | `akkoai/akko-mcp-trino:0.6.0` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 256 Mo |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | l'Inspector MCP officiel | 384 Mo |
 
-Mesuré sur une machine Linux avec `docker stats` : entre 1,3 et 1,4 Go utilisés au
-repos, environ 1,5 Go au plus fort de la démo. Trino et Keycloak en prennent l'essentiel.
+Mesuré sur une machine Linux avec `docker stats` : environ 1,3 Go utilisés au repos,
+environ 1,5 Go au plus fort de la démo. Trino et Keycloak en prennent l'essentiel ;
+le serveur MCP, environ 70 Mo.
 
 Seuls Keycloak (`8080`), le serveur MCP (`3000`) et l'Inspector (`6274`) sont
 publiés, et sur `127.0.0.1` seulement. `KEYCLOAK_PORT`, `MCP_PORT` et
@@ -87,18 +91,20 @@ flowchart LR
     PG[("PostgreSQL")]
 
     Client -- "1. utilisateur + mot de passe" --> KC
-    KC -- "2. token d'accès" --> Client
+    KC -- "2. token d'accès pour le serveur MCP" --> Client
     Client -- "3. tool call + bearer token" --> MCP
-    MCP -. "vérifie la signature (JWKS)" .-> KC
-    MCP -- "4. SQL read-only + le même token" --> Trino
-    Trino -. "vérifie à nouveau (JWKS)" .-> KC
-    Trino -- "5. a-t-il le droit ? quelles lignes ? quel masque ?" --> OPA
+    MCP -. "vérifie la signature, l'audience (JWKS)" .-> KC
+    MCP -. "4. l'échange contre un token pour Trino" .-> KC
+    MCP -- "5. SQL read-only + le token pour Trino" --> Trino
+    Trino -. "le vérifie (JWKS)" .-> KC
+    Trino -- "6. a-t-il le droit ? quelles lignes ? quel masque ?" --> OPA
     Trino --> PG
 ```
 
-- Le serveur MCP vérifie la signature du token, son issuer (`http://localhost:8080/realms/sandbox`), son audience (`trino`) et son expiration, et refuse toute requête sans token.
-- Il envoie ce même token à Trino, en https uniquement, en vérifiant le certificat de Trino avec l'autorité du sandbox.
-- Trino vérifie le token à son tour et exécute la requête au nom de son `preferred_username`.
+- Le serveur MCP vérifie la signature du token, son issuer (`http://localhost:8080/realms/sandbox`), son audience (`akko-mcp`, le serveur lui-même) et son expiration, et refuse toute requête sans token valide. Un token émis pour Trino est refusé aussi.
+- Il échange le token auprès de Keycloak, en https, contre un token dont l'audience est `trino` (OAuth 2.0 Token Exchange, RFC 8693), avec son propre client `akko-mcp`. Le token de l'utilisateur n'est jamais transmis.
+- Il envoie ce token à Trino, en https uniquement, en vérifiant le certificat de Trino avec l'autorité du sandbox.
+- Trino vérifie le token et exécute la requête au nom de son `preferred_username`.
 - Trino interroge OPA avant chaque action. Toute la politique tient dans [un court fichier Rego](opa/policy.rego) : qui peut lire quoi, le masque des e-mails, le filtre de lignes.
 
 Pour changer ce que voit un utilisateur, modifiez `opa/policy.rego` puis lancez
@@ -125,15 +131,18 @@ tests/smoke.sh
 
 Le test démarre le sandbox sous son propre nom de projet, joue la démo,
 vérifie les deux réponses différentes, `current_user`, chaque refus (à la porte
-du serveur et chez Trino), la ligne d'audit et l'Inspector, affiche le temps de
-démarrage et la mémoire, puis supprime tout. `KEEP=1` le laisse tourner.
+du serveur et chez Trino), le token exchange, la ligne d'audit et l'Inspector,
+affiche le temps de démarrage et la mémoire, puis supprime tout. `KEEP=1` le
+laisse tourner. `MCP_IMAGE` lance une autre version du serveur, par exemple une
+release candidate.
 
 ## Pas pour la production
 
 Tout ici est choisi pour démarrer en une commande sur un portable : un Keycloak
-de développement en http, une connexion par mot de passe, un seul mot de passe
-pour tous, une autorité de certification auto-signée, un secret partagé de
-Trino fixe, une politique qui contient trois noms. L'image d'akko-mcp-trino et
+de développement (http pour le navigateur, https pour le token exchange), une
+connexion par mot de passe, un seul mot de passe pour tous, une autorité de
+certification auto-signée, un secret client rangé dans un volume partagé, un
+secret partagé de Trino fixe, une politique qui contient trois noms. L'image d'akko-mcp-trino et
 sa configuration sont celles de la production ; le reste ne l'est pas.
 
 ## À propos d'AKKO
