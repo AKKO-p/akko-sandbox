@@ -1,0 +1,26 @@
+# Trino Gateway in front of two Trino clusters. Clients reach it over https
+# only (8443); plain http (8080) stays on the back network for its health check
+# and the registration of the backends.
+serverConfig:
+  node.environment: sandbox
+  http-server.http.port: 8080
+  http-server.https.enabled: true
+  http-server.https.port: 8443
+  http-server.https.keystore.path: /certs/gateway.pem
+
+routingRules:
+  rulesEngineEnabled: false
+
+routing:
+  # Pins Trino's OAuth2 browser login to the coordinator that started it.
+  oauth2RoutingEnabled: true
+
+dataStore:
+  jdbcUrl: jdbc:postgresql://gateway-db:5432/gateway
+  user: gateway
+  password: gateway   # demo only
+  driver: org.postgresql.Driver
+  queryHistoryHoursRetention: 24
+
+clusterStatsConfiguration:
+  monitorType: INFO_API

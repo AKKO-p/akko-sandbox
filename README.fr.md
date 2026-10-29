@@ -136,6 +136,26 @@ affiche le temps de démarrage et la mémoire, puis supprime tout. `KEEP=1` le
 laisse tourner. `MCP_IMAGE` lance une autre version du serveur, par exemple une
 release candidate.
 
+## Derrière Trino Gateway
+
+Le même bac à sable peut tourner avec [Trino Gateway](https://trinodb.github.io/trino-gateway/)
+devant deux clusters Trino. Le serveur MCP ne joint alors que le gateway : il
+n'est pas sur le réseau des clusters, donc chaque requête, chaque page suivante
+et chaque annulation passent par le gateway. Le gateway termine le TLS, et
+chaque cluster lit le protocole transmis (`http-server.process-forwarded=true`).
+
+```bash
+COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose up -d --wait
+COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml ./demo.sh --check
+tests/gateway.sh   # les contrôles, de bout en bout
+```
+
+`tests/gateway.sh` vérifie les deux réponses différentes à travers le gateway,
+que le serveur ne peut pas joindre un cluster directement, que les requêtes se
+répartissent sur les deux clusters au nom de chaque utilisateur, qu'un long
+résultat et une annulation passent par le gateway, et que les refus restent les
+mêmes.
+
 ## Pas pour la production
 
 Tout ici est choisi pour démarrer en une commande sur un portable : un Keycloak

@@ -132,6 +132,25 @@ Trino's own), the token exchange, the audit line and the Inspector, prints the
 start time and the memory, and removes everything. `KEEP=1` leaves it running.
 `MCP_IMAGE` runs another build of the server, such as a release candidate.
 
+## Behind Trino Gateway
+
+The same sandbox can run with [Trino Gateway](https://trinodb.github.io/trino-gateway/)
+in front of two Trino clusters. The MCP server then reaches the gateway only:
+it is not on the clusters' network, so every request, every next page and every
+cancel goes through the gateway. The gateway terminates TLS, and each cluster
+reads the forwarded protocol (`http-server.process-forwarded=true`).
+
+```bash
+COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose up -d --wait
+COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml ./demo.sh --check
+tests/gateway.sh   # the checks, end to end
+```
+
+`tests/gateway.sh` checks the two different answers through the gateway, that
+the server cannot reach a cluster directly, that queries spread over both
+clusters under each user's own name, that a long result and a cancel go through
+the gateway, and that the refusals stay the same.
+
 ## Not for production
 
 Everything here is chosen to start in one command on a laptop: a development

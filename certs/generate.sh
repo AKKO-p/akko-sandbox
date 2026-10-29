@@ -32,17 +32,20 @@ EOF
 }
 sign trino "DNS:trino,DNS:localhost,IP:127.0.0.1"
 sign keycloak "DNS:keycloak,DNS:localhost,IP:127.0.0.1"
+# Used only by the Trino Gateway variant (gateway/compose.gateway.yaml).
+sign gateway "DNS:gateway,DNS:localhost,IP:127.0.0.1"
 
 # The MCP server's client secret at Keycloak, read by both at start.
 openssl rand -hex 24 > mcp-client.secret
 
 # Trino reads its key and certificate from one PEM file.
 cat trino.key trino.crt > trino.pem
-rm -f ca.key ca.srl trino.key
+cat gateway.key gateway.crt > gateway.pem
+rm -f ca.key ca.srl trino.key gateway.key gateway.crt
 
 # Trino and Keycloak run as uid 1000, the MCP server as uid 10001: the secret is
 # readable by both, which a real deployment would keep in a secret store instead.
-chown 1000:1000 trino.pem keycloak.key keycloak.crt
-chmod 0400 trino.pem keycloak.key
+chown 1000:1000 trino.pem gateway.pem keycloak.key keycloak.crt
+chmod 0400 trino.pem gateway.pem keycloak.key
 chmod 0444 ca.crt trino.crt keycloak.crt mcp-client.secret
 echo "certificate authority, Trino and Keycloak certificates, client secret created"
