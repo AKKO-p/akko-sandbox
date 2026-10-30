@@ -199,9 +199,10 @@ image is still 0.6.0, on which these checks fail: the CI runs the script once
 
 The policy hides the `balance` column from viewers with two operations of
 Trino's OPA plugin: `FilterColumns` leaves it out of every listing, and
-`SelectFromColumns` refuses a query that names it. The sandbox sets no
-`opa.policy.batched-uri`, so Trino asks `FilterColumns` at `allow`, one column
-at a time. Trino runs with `hide-inaccessible-columns=true`, which we advise
+`SelectFromColumns` refuses a query that names it. The sandbox sets
+`opa.policy.batched-uri`, so Trino asks `FilterColumns` once per listing, at the
+policy's `batch` rule, which applies `allow` to each column; without it Trino
+asks OPA one column at a time, and a table of 200 columns saturates OPA's queue. Trino runs with `hide-inaccessible-columns=true`, which we advise
 administrators to set too: `SELECT *` then answers without the hidden column.
 Without it, `SELECT *` is refused, and in Trino 482 that refusal lists every
 column of the table, the hidden one included: Trino's message, which the server

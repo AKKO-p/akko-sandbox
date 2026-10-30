@@ -200,6 +200,24 @@ check "dave, an unknown column of accounts: kind column" "$(d execute_query 'sql
 check "dave, describe_schema of a schema that does not exist: kind schema" "$(d describe_schema catalog=demo schema=nosuch | field 'd["kind"]')" "schema"
 check "dave, describe_schema of tpcds, which he names: kind permission" "$(call dave_viewer describe_schema catalog=tpcds schema=tiny | field 'd["kind"]')" "permission"
 check "carol, describe_schema of tpcds.tiny: its tables" "$(call carol_analyst describe_schema catalog=tpcds schema=tiny | field 'len(d["tables"]) > 0')" "True"
+
+# I1: search_columns with a named schema checks that the caller sees it. A schema
+# that does not exist and one the policy hides answer the same kind schema, never
+# an empty search said to be complete; a catalog he may not use keeps Trino's error.
+check "dave, search_columns demo.crm_missing: kind schema, not found or not visible" "$(call dave_viewer search_columns text=amount catalog=demo schema=crm_missing | field '(d["kind"], d["error"], "complete" in d)')" "('schema', 'Schema demo.crm_missing not found or not visible', False)"
+check "the variant that hides crm_archive from viewers is loaded" "$(opa PUT v07-hide-archive -H 'Content-Type: text/plain' --data-binary 'package trino
+
+forbidden if {
+	role == "viewer"
+	input.action.resource[_].catalogName == "demo"
+	input.action.resource[_].schemaName == "crm_archive"
+}')" "200"
+check "dave, search_columns demo.crm_archive, hidden: the same answer as a missing schema" "$(call dave_viewer search_columns text=amount catalog=demo schema=crm_archive | field '(d["kind"], d["error"], "complete" in d)')" "('schema', 'Schema demo.crm_archive not found or not visible', False)"
+check "carol, search_columns demo.crm_archive, visible to her: matches, searched" "$(call carol_analyst search_columns text=amount catalog=demo schema=crm_archive | field '(len(d["matches"]) > 0, d["schemas_searched"] + len(d["not_searched"]) >= 1, "kind" in d)')" "(True, True, False)"
+check "the variant is removed" "$(opa DELETE v07-hide-archive)" "200"
+check "dave, search_columns demo.crm_archive again: matches" "$(call dave_viewer search_columns text=amount catalog=demo schema=crm_archive | field 'len(d["matches"]) > 0')" "True"
+check "carol, search_columns demo.crm, visible: complete, transactions.amount" "$(call carol_analyst search_columns text=revenue catalog=demo schema=crm | field '([(m["table"], m["column"]) for m in d["matches"]], d["schemas_searched"], d["complete"])')" "([('transactions', 'amount')], 1, True)"
+check "dave, search_columns tpcds.tiny, a catalog he may not use: Trino's kind permission" "$(call dave_viewer search_columns text=amount catalog=tpcds schema=tiny | field 'd["kind"]')" "permission"
 # segment as a name of its own: tpch's mktsegment, which dave may see, holds it.
 for word in customers full_name '"segment"' email 'People and companies' 'Retail or business' balance 'Current balance' tpcds; do
   check "nothing dave got names '$word'" "$(grep -ci -- "$word" "$scratch/dave")" "0"

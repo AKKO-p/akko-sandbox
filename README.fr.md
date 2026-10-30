@@ -204,9 +204,11 @@ la CI lancera le script une fois la 0.7 publiée.
 
 La politique cache la colonne `balance` aux viewers par deux opérations du
 plugin OPA de Trino : `FilterColumns` la retire de chaque listing, et
-`SelectFromColumns` refuse une requête qui la nomme. Le bac à sable ne fixe pas
-`opa.policy.batched-uri` : Trino pose donc `FilterColumns` à `allow`, une colonne
-à la fois. Trino tourne avec `hide-inaccessible-columns=true`, que nous
+`SelectFromColumns` refuse une requête qui la nomme. Le bac à sable fixe
+`opa.policy.batched-uri` : Trino pose `FilterColumns` une fois par listing, à la
+règle `batch` de la politique, qui applique `allow` à chaque colonne ; sans ce
+réglage, Trino interroge OPA une colonne à la fois, et une table de 200 colonnes
+sature sa file. Trino tourne avec `hide-inaccessible-columns=true`, que nous
 conseillons aussi aux administrateurs : `SELECT *` répond alors sans la colonne
 cachée. Sans ce réglage, `SELECT *` est refusé, et en Trino 482 ce refus liste
 toutes les colonnes de la table, la colonne cachée comprise : c'est le message de
