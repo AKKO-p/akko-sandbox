@@ -1,0 +1,32 @@
+# The checks of akko-mcp-trino 0.7 (tests/v07.sh): small pages, so that the
+# sandbox's schemas come in several, and a call budget the script can shorten,
+# to see search_columns stop in time and resume. Added to COMPOSE_FILE by the
+# script, after gateway/compose.gateway.yaml when GATEWAY=1.
+#
+#   MCP_IMAGE=<0.7 image> tests/v07.sh
+#   GATEWAY=1 MCP_IMAGE=<0.7 image> tests/v07.sh
+
+services:
+  mcp:
+    environment:
+      # Pages of five names; describe_table still shows every column of the
+      # crm tables, five at most.
+      TRINO_MAX_ROWS: "5"
+      # describe_schema: four tables a page, and ten columns at most, so a page
+      # of crm_archive (three columns a table) holds three whole tables.
+      MCP_DESCRIBE_SCHEMA_TABLES: "4"
+      MCP_DESCRIBE_SCHEMA_COLUMNS: "10"
+      # The script starts the server again with a short budget for one check.
+      MCP_CALL_TIMEOUT_SECONDS: ${V07_CALL_TIMEOUT_SECONDS:-120}
+      MCP_SEARCH_RESERVE_SECONDS: ${V07_SEARCH_RESERVE_SECONDS:-2}
+
+  # The checks' own client of OPA's API, on the network OPA is on: it loads a
+  # variant of the policy for one check, then removes it. Started by the script.
+  opa-admin:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    image: curlimages/curl:8.23.0
+    profiles: ["tools"]
+    entrypoint: ["sleep", "infinity"]
+    networks: [default]
+    mem_limit: 32m

@@ -55,7 +55,7 @@ réutilisez jamais ailleurs.
 |---|---|---|
 | `alice_admin` | `demo` | toutes les lignes, toutes les colonnes en clair |
 | `carol_analyst` | `demo` | les clients européens seulement, adresses e-mail masquées |
-| `dave_viewer` | `demo` | tout sauf la table des clients |
+| `dave_viewer` | `demo` | tout sauf la table des clients, la colonne `balance` des comptes et le catalogue `tpcds` |
 
 La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 
@@ -64,10 +64,10 @@ La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 | Service | Image | Rôle | Limite mémoire |
 |---|---|---|---|
 | `certs` | `alpine/openssl:3.5.9` | crée une autorité de certification de démonstration, les certificats de Trino et de Keycloak et le secret client du serveur MCP, puis s'arrête | 32 Mo |
-| `postgres` | `postgres:17.11-alpine` | les données fictives : clients, comptes, transactions | 128 Mo |
+| `postgres` | `postgres:17.11-alpine` | les données fictives : clients, comptes, transactions, avec des commentaires sur les tables et les colonnes, et douze tables d'archive vides (`crm_archive`) | 128 Mo |
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | le fournisseur d'identité, realm `sandbox`, avec le token exchange standard | 768 Mo |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | la politique d'accès, [`opa/policy.rego`](opa/policy.rego) | 64 Mo |
-| `trino` | `trinodb/trino:482` | le moteur, en https, authentification JWT, contrôle d'accès OPA | 1280 Mo |
+| `trino` | `trinodb/trino:482` | le moteur, en https, authentification JWT, contrôle d'accès OPA ; catalogues `demo` (PostgreSQL), `tpch` et `tpcds` (données générées par Trino, rien de stocké) | 1280 Mo |
 | `mcp` | `akkoai/akko-mcp-trino:0.6.0` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 256 Mo |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | l'Inspector MCP officiel | 384 Mo |
 
@@ -105,7 +105,7 @@ flowchart LR
 - Il échange le token auprès de Keycloak, en https, contre un token dont l'audience est `trino` (OAuth 2.0 Token Exchange, RFC 8693), avec son propre client `akko-mcp`. Le token de l'utilisateur n'est jamais transmis.
 - Il envoie ce token à Trino, en https uniquement, en vérifiant le certificat de Trino avec l'autorité du sandbox.
 - Trino vérifie le token et exécute la requête au nom de son `preferred_username`.
-- Trino interroge OPA avant chaque action. Toute la politique tient dans [un court fichier Rego](opa/policy.rego) : qui peut lire quoi, le masque des e-mails, le filtre de lignes, et personne n'agit sous le nom d'un autre utilisateur.
+- Trino interroge OPA avant chaque action. Toute la politique tient dans [un court fichier Rego](opa/policy.rego) : qui peut lire quoi, une colonne cachée, un catalogue caché, le masque des e-mails, le filtre de lignes, et personne n'agit sous le nom d'un autre utilisateur.
 
 Pour changer ce que voit un utilisateur, modifiez `opa/policy.rego` puis lancez
 `docker compose restart opa`. Le serveur MCP ne change pas.
@@ -168,6 +168,44 @@ dépasse son délai est annulée dans Trino à travers le gateway, et que les re
 restent les mêmes. Il utilise les ports hôtes du bac à sable (8080, 3000, 6274) ;
 pour le lancer à côté d'un bac à sable démarré, fixez les ports comme dans
 l'en-tête du script. La CI le lance après `tests/smoke.sh`.
+
+## Les outils d'akko-mcp-trino 0.7
+
+```bash
+MCP_IMAGE=<image 0.7> tests/v07.sh
+GATEWAY=1 MCP_IMAGE=<image 0.7> tests/v07.sh   # les mêmes contrôles derrière Trino Gateway
+```
+
+`tests/v07.sh` vérifie les outils qu'akko-mcp-trino 0.7 ajoute ou change, sur le
+bac à sable complété par [`tests/compose.v07.yaml`](tests/compose.v07.yaml) (des
+pages de cinq noms, des pages de `describe_schema` de quatre tables et dix
+colonnes au plus) : `search_columns` trouve `transactions.amount` par le mot
+`revenue` de son commentaire ; `dave_viewer` n'obtient rien de `crm.customers`,
+de la colonne `balance` des comptes ni du catalogue `tpcds`, par aucun outil,
+messages d'erreur compris, tant qu'il ne les demande pas par leur nom (voir
+plus bas), et Trino lui-même retire la colonne de
+`information_schema.columns`, de `system.jdbc.columns`, de `SHOW COLUMNS` et de
+`DESCRIBE` pour lui ; `list_tables` et `describe_schema` parcourent `crm_archive`
+page par page, chaque table une fois et entière ; une recherche avec un budget
+d'appel court dit ce qu'elle n'a pas fouillé, et son curseur la reprend jusqu'au
+bout ; les erreurs portent leur `kind`, Trino arrêté compris ; une politique qui
+refuse `system.jdbc` reçoit une erreur qui dit quoi autoriser ; le SQL de l'agent
+sur `system` reste refusé ; le serveur ne journalise aucun token. Le script
+affiche aussi les plans des requêtes de métadonnées de `describe_schema`.
+`V07_SHORT_BUDGET` et `V07_SHORT_RESERVE` (3 et 2 secondes) fixent le budget
+court. L'image par défaut reste la 0.6.0, sur laquelle ces contrôles échouent :
+la CI lancera le script une fois la 0.7 publiée.
+
+La politique cache la colonne `balance` aux viewers par deux opérations du
+plugin OPA de Trino : `FilterColumns` la retire de chaque listing, et
+`SelectFromColumns` refuse une requête qui la lit. Le bac à sable ne fixe pas
+`opa.policy.batched-uri` : Trino pose donc `FilterColumns` à `allow`, une colonne
+à la fois. En Trino 482, le refus d'un `SELECT *` liste toutes les colonnes de
+la table, la colonne cachée comprise, et la nomme donc à qui l'a demandée : c'est
+le message de Trino, que le serveur transmet entier. Le contrôle lit le code
+d'erreur, pas le texte. De même, un catalogue qu'il nomme reçoit le refus de
+Trino (`Cannot access catalog tpcds`, kind `permission`) là où un catalogue
+absent reçoit `not found` (kind `catalog`) : Trino distingue les deux.
 
 ## Pas pour la production
 
