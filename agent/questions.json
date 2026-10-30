@@ -1,27 +1,74 @@
 [
   {
     "question": "What is the revenue per customer?",
-    "expected": ["demo.crm.transactions.amount", "demo.crm.transactions.account_id", "demo.crm.accounts.customer_id"],
-    "why": "The revenue is the booked amount (its comment says so); a transaction reaches its customer through its account."
+    "expected": [
+      "demo.crm.transactions.amount",
+      "demo.crm.transactions.account_id",
+      "demo.crm.accounts.customer_id"
+    ],
+    "forbidden": [
+      "demo.crm.accounts.balance"
+    ],
+    "why": "The revenue is the booked amount (its comment says so); a transaction reaches its customer through its account.",
+    "why_forbidden": "A balance is what an account holds, not what was sold."
   },
   {
     "question": "Which customer segment holds the largest total account balance?",
-    "expected": ["demo.crm.customers.segment", "demo.crm.accounts.balance", "demo.crm.accounts.customer_id"],
-    "why": "The segment is a customer's, the balance an account's; the account names its customer."
+    "expected": [
+      "demo.crm.customers.segment",
+      "demo.crm.accounts.balance",
+      "demo.crm.accounts.customer_id"
+    ],
+    "forbidden": [
+      "demo.crm.transactions.amount"
+    ],
+    "why": "The segment is a customer's, the balance an account's; the account names its customer.",
+    "why_forbidden": "The sum of the movements is not the balance the accounts hold."
   },
   {
     "question": "How much was spent in each spending category in March 2026?",
-    "expected": ["demo.crm.transactions.category", "demo.crm.transactions.amount", "demo.crm.transactions.booked_at"],
-    "why": "One table: the category, the amount, and the booking date for the month."
+    "expected": [
+      "demo.crm.transactions.category",
+      "demo.crm.transactions.amount",
+      "demo.crm.transactions.booked_at"
+    ],
+    "forbidden": [
+      "demo.crm.accounts.opened_on"
+    ],
+    "why": "One table: the category, the amount, and the booking date for the month.",
+    "why_forbidden": "The only other date of demo.crm: when an account was opened, not when money was spent. demo.crm.transactions has no second date column (id, account_id, booked_at, amount, category)."
   },
   {
     "question": "How many accounts are held in each currency?",
-    "expected": ["demo.crm.accounts.currency"],
-    "why": "One column of one table, found by its name."
+    "expected": [
+      "demo.crm.accounts.currency"
+    ],
+    "forbidden": [
+      "demo.crm.customers.country"
+    ],
+    "why": "One column of one table, found by its name.",
+    "why_forbidden": "A customer's country is not an account's currency."
   },
   {
     "question": "What was the total amount of the archived transactions booked in 2019?",
-    "expected": ["demo.crm_archive.transactions_2019.amount"],
-    "why": "The archive holds one table per year among twelve; the 2019 table's amount, not the current transactions'."
+    "expected": [
+      "demo.crm_archive.transactions_2019.amount"
+    ],
+    "forbidden": [
+      "demo.crm.transactions.amount",
+      "demo.crm_archive.transactions_2014.amount",
+      "demo.crm_archive.transactions_2015.amount",
+      "demo.crm_archive.transactions_2016.amount",
+      "demo.crm_archive.transactions_2017.amount",
+      "demo.crm_archive.transactions_2018.amount",
+      "demo.crm_archive.transactions_2020.amount",
+      "demo.crm_archive.transactions_2021.amount",
+      "demo.crm_archive.transactions_2022.amount",
+      "demo.crm_archive.transactions_2023.amount",
+      "demo.crm_archive.transactions_2024.amount",
+      "demo.crm_archive.transactions_2025.amount"
+    ],
+    "why": "The archive holds one table per year among twelve; the 2019 table's amount, not the current transactions'.",
+    "why_forbidden": "The current transactions are all booked in 2026, and each other archive year is another table: summing any of them gives a wrong total."
   }
 ]
