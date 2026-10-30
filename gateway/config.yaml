@@ -10,6 +10,9 @@ serverConfig:
   http-server.https.port: 8443
   http-server.https.keystore.path: /certs/gateway.pem
 
+# On each admin call with Basic credentials, the gateway first looks for a login
+# session token and logs ERROR "The token is null" before it accepts the Basic
+# credentials: harmless, the call succeeds.
 authentication:
   defaultType: ["form"]
   form:

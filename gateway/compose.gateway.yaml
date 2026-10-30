@@ -65,10 +65,14 @@ services:
     security_opt: ["no-new-privileges:true"]
     image: trinodb/trino-gateway:22
     # The admin password is read from the volume, then substituted in the config.
+    # Without it, missing or empty, the gateway refuses to start. The jar's path
+    # is the one inside the image: check it when the image is bumped.
     entrypoint: ["/bin/sh", "-c"]
     command:
       - >-
-        GATEWAY_ADMIN_PASSWORD=$$(cat /certs/gateway-admin.secret)
+        GATEWAY_ADMIN_PASSWORD=$$(cat /certs/gateway-admin.secret) && [ -n "$$GATEWAY_ADMIN_PASSWORD" ]
+        || { echo "no admin password in /certs/gateway-admin.secret: not starting" >&2; exit 1; };
+        export GATEWAY_ADMIN_PASSWORD;
         exec java -jar /usr/lib/trino-gateway/gateway-ha-jar-with-dependencies.jar
         /etc/trino-gateway/config.yaml
     volumes:

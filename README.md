@@ -172,7 +172,10 @@ one password for every user, a self-signed certificate authority, a client
 secret kept in a shared volume, a fixed Trino shared secret, a policy with
 three names in it. Behind the gateway, each cluster trusts `X-Forwarded-Proto`
 from any peer on its network: in production, nothing but the gateway should
-reach a cluster. The akko-mcp-trino image and its configuration are the same as in
+reach a cluster. The gateway is started with `java -jar` and the jar's path
+inside its image, which an image bump may move. Its admin password and session
+key are readable by every service that runs as uid 1000 (Keycloak, Trino, the
+gateway), only not by the MCP server. The akko-mcp-trino image and its configuration are the same as in
 production; the rest is not.
 
 ## About AKKO

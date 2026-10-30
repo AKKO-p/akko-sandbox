@@ -4,10 +4,10 @@
 # two clusters. Checks that a second start is healthy, the two different
 # answers, that the server cannot reach a backend directly nor use the
 # gateway's admin API, that queries spread over both clusters under the user's
-# own name, that a capped result and a cancel both go through the gateway, and
-# that the gateway changes nothing to the refusals. Removes
-# everything at the end unless KEEP=1. Uses the sandbox's host ports (8080,
-# 3000, 6274) unless told otherwise, as below.
+# own name, that a capped result and a cancel both go through the gateway, that
+# the gateway changes nothing to the refusals, and that it does not start
+# without its admin password. Removes everything at the end unless KEEP=1.
+# Uses the sandbox's host ports (8080, 3000, 6274) unless told otherwise, as below.
 #
 #   tests/gateway.sh
 #   COMPOSE_PROJECT_NAME=akko-gw KEYCLOAK_PORT=18480 MCP_PORT=13000 INSPECTOR_PORT=16274 tests/gateway.sh
@@ -165,5 +165,15 @@ logs=$(docker compose logs mcp gateway trino trino-2)
 check "no token in the server, gateway and Trino logs" "$(grep -c 'eyJ' <<<"$logs")" "0"
 check "no client secret in those logs" "$(grep -c "$(docker compose exec -T mcp cat /certs/mcp-client.secret)" <<<"$logs")" "0"
 check "no gateway admin password in those logs" "$(grep -c "$(docker compose exec -T gateway cat /certs/gateway-admin.secret)" <<<"$logs")" "0"
+
+echo "== 8. The gateway refuses to start without its admin password"
+# The gateway's own command, with the password file empty, then with no file.
+mkdir -p .gw-nopass/certs && : > .gw-nopass/admin.secret && chmod 0755 .gw-nopass/certs && chmod 0644 .gw-nopass/admin.secret
+gw_alone() { # docker run volume options: prints the exit code and the last line
+  local out; out=$(timeout 60 docker compose run --rm --no-deps -T "$@" gateway 2>&1); echo "$? ${out##*$'\n'}"
+}
+check "empty password: the gateway does not start" "$(gw_alone -v "$PWD/.gw-nopass/admin.secret:/certs/gateway-admin.secret:ro")" "1 no admin password in /certs/gateway-admin.secret: not starting"
+check "no password file: the gateway does not start" "$(gw_alone -v "$PWD/.gw-nopass/certs:/certs:ro")" "1 no admin password in /certs/gateway-admin.secret: not starting"
+rm -rf .gw-nopass
 
 [ $failed -eq 0 ] && echo "== GATEWAY OK ==" || { echo "== GATEWAY FAILED =="; exit 1; }
