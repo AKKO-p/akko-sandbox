@@ -3,6 +3,7 @@
 #   batch       which of these resources may this user see? (the filter operations)
 #   rowFilters  which rows of this table may this user see?
 #   columnMask  how is this column shown to this user?
+#   batchColumnMasks  the same, for all the columns of a table at once
 # akko-mcp-trino decides none of it: it only sends the query as the user.
 package trino
 
@@ -98,8 +99,13 @@ rowFilters contains {"expression": "country IN ('DE', 'ES', 'FR', 'IT', 'NL')"} 
 #    Each index is kept when `allow` accepts the same action on that one resource,
 #    so the two paths, one question per resource or one for all, cannot disagree:
 #    the rules above are written once, over input.action.resource.
+#    Only the operations named here are answered; any other asks nothing and is
+#    granted nothing, since the shape of its resource may be one `forbidden` does
+#    not read.
+batch_operations := {"FilterCatalogs", "FilterSchemas", "FilterTables", "FilterViewQueryOwnedBy"}
+
 batch contains i if {
-	input.action.operation != "FilterColumns"
+	input.action.operation in batch_operations
 	some i, resource in input.action.filterResources
 	allow with input.action.resource as resource
 }
@@ -113,6 +119,14 @@ batch contains i if {
 	table := input.action.filterResources[0].table
 	some i, column in table.columns
 	allow with input.action.resource as {"table": object.union(table, {"columns": [column]})}
+}
+
+# 6. Batch column masks, the batched form of rule 3: one request carries every
+#    column of the table, and the answer is the masks to apply, by index. Each
+#    column is asked of `columnMask`, as in the single-resource path.
+batchColumnMasks contains {"index": i, "viewExpression": mask} if {
+	some i, resource in input.action.filterResources
+	mask := columnMask with input.action.resource as resource
 }
 
 is_customers(t) if {

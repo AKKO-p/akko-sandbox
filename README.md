@@ -202,8 +202,10 @@ Trino's OPA plugin: `FilterColumns` leaves it out of every listing, and
 `SelectFromColumns` refuses a query that names it. The sandbox sets
 `opa.policy.batched-uri`, so Trino asks `FilterColumns` once per listing, at the
 policy's `batch` rule, which applies `allow` to each column; without it Trino
-asks OPA one column at a time, and a table of 200 columns saturates OPA's queue. Trino runs with `hide-inaccessible-columns=true`, which we advise
-administrators to set too: `SELECT *` then answers without the hidden column.
+asks OPA one column at a time, and a table of 200 columns saturates OPA's
+queue. The masks are batched the same way (`opa.policy.batch-column-masking-uri`
+and the `batchColumnMasks` rule). Trino runs with `hide-inaccessible-columns=true`,
+which we advise administrators to set too: `SELECT *` then answers without the hidden column.
 Without it, `SELECT *` is refused, and in Trino 482 that refusal lists every
 column of the table, the hidden one included: Trino's message, which the server
 passes on whole. A query that names the column is still refused; the checks
