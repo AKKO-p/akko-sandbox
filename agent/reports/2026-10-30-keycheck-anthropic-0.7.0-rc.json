@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "date": "2026-10-30 17:52 UTC",
+    "provider": "anthropic",
+    "model_requested": "claude-sonnet-5-5",
+    "model_returned": "",
+    "server": "trino-mcp 0.7.0, 8 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, search_columns",
+    "server_image": "akko-mcp-trino:0.7.0-rc",
+    "mcp_url": "http://mcp:3000/mcp",
+    "persona": "carol_analyst",
+    "questions": "reports/keycheck-questions.json",
+    "repeat": 1,
+    "max_steps": 12,
+    "max_tokens": 16000,
+    "sampling": "API defaults (the Messages API takes no temperature); output tokens include thinking, so tokens compare server against server for one model, never across providers"
+  },
+  "trials": [
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 1,
+      "tools": [],
+      "first_seen": {},
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "answer": "",
+      "last_text": "",
+      "named": {},
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 0.8777825848665088,
+      "stop": "error: BadRequestError 400",
+      "calls": 0,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    }
+  ]
+}

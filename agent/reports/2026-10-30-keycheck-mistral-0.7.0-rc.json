@@ -1,0 +1,64 @@
+{
+  "meta": {
+    "date": "2026-10-30 17:52 UTC",
+    "provider": "mistral",
+    "model_requested": "codestral-latest",
+    "model_returned": "codestral-latest",
+    "server": "trino-mcp 0.7.0, 8 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, search_columns",
+    "server_image": "akko-mcp-trino:0.7.0-rc",
+    "mcp_url": "http://mcp:3000/mcp",
+    "persona": "carol_analyst",
+    "questions": "reports/keycheck-questions.json",
+    "repeat": 1,
+    "max_steps": 12,
+    "max_tokens": 16000,
+    "sampling": "temperature 0, random_seed 0; tokens compare server against server for one model"
+  },
+  "trials": [
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "explain_query",
+        "search_columns",
+        "explain_query",
+        "search_columns",
+        "explain_query",
+        "execute_query"
+      ],
+      "first_seen": {
+        "demo.crm.transactions.amount": 1,
+        "demo.crm.accounts.customer_id": 2,
+        "demo.crm.transactions.account_id": 4
+      },
+      "input_tokens": 29227,
+      "output_tokens": 348,
+      "answer": "I'm sorry, but I couldn't find the necessary columns to calculate the revenue per customer. It seems there might be an issue with the column names or the data structure. Could you please provide more details or check the column names?",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": false,
+        "demo.crm.transactions.account_id": false,
+        "demo.crm.accounts.customer_id": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 16.340512034948915,
+      "stop": "answered",
+      "calls": 8,
+      "first_hit": 1,
+      "all_hit": 4,
+      "right": false,
+      "never_shown": []
+    }
+  ]
+}
