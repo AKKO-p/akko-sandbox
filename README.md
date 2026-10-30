@@ -210,6 +210,15 @@ read the error code, not the text. In the same way, a catalog he names gets
 Trino's refusal (`Cannot access catalog tpcds`, kind `permission`) where a
 missing one gets `not found` (kind `catalog`): Trino tells the two apart.
 
+## A real agent: how many calls to the right column
+
+[`agent/`](agent/README.md) asks a real model (Mistral or Anthropic, by their
+APIs) five questions about the sample data, through MCP, as `carol_analyst`, and
+counts the tool calls until the final answer, the call at which an expected
+column first shows, the tokens, and whether the answer names the right columns.
+Run against two server images with the same model and settings, the reports
+compare line by line. `--dry-run` lists the tools without any model or key.
+
 ## Not for production
 
 Everything here is chosen to start in one command on a laptop: a development

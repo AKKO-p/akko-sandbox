@@ -1,0 +1,27 @@
+[
+  {
+    "question": "What is the revenue per customer?",
+    "expected": ["demo.crm.transactions.amount", "demo.crm.transactions.account_id", "demo.crm.accounts.customer_id"],
+    "why": "The revenue is the booked amount (its comment says so); a transaction reaches its customer through its account."
+  },
+  {
+    "question": "Which customer segment holds the largest total account balance?",
+    "expected": ["demo.crm.customers.segment", "demo.crm.accounts.balance", "demo.crm.accounts.customer_id"],
+    "why": "The segment is a customer's, the balance an account's; the account names its customer."
+  },
+  {
+    "question": "How much was spent in each spending category in March 2026?",
+    "expected": ["demo.crm.transactions.category", "demo.crm.transactions.amount", "demo.crm.transactions.booked_at"],
+    "why": "One table: the category, the amount, and the booking date for the month."
+  },
+  {
+    "question": "How many accounts are held in each currency?",
+    "expected": ["demo.crm.accounts.currency"],
+    "why": "One column of one table, found by its name."
+  },
+  {
+    "question": "What was the total amount of the archived transactions booked in 2019?",
+    "expected": ["demo.crm_archive.transactions_2019.amount"],
+    "why": "The archive holds one table per year among twelve; the 2019 table's amount, not the current transactions'."
+  }
+]

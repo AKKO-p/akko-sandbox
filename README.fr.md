@@ -216,6 +216,16 @@ catalogue qu'il nomme reçoit le refus de Trino (`Cannot access catalog tpcds`,
 kind `permission`) là où un catalogue absent reçoit `not found` (kind
 `catalog`) : Trino distingue les deux.
 
+## Un agent réel : combien d'appels jusqu'à la bonne colonne
+
+[`agent/`](agent/README.md) pose à un vrai modèle (Mistral ou Anthropic, par leurs
+API) cinq questions sur les données d'exemple, par MCP, en tant que
+`carol_analyst`, et compte les appels d'outils jusqu'à la réponse finale, l'appel
+où une colonne attendue apparaît pour la première fois, les jetons, et si la
+réponse nomme les bonnes colonnes. Lancés contre deux images du serveur avec le
+même modèle et les mêmes réglages, les rapports se comparent ligne à ligne.
+`--dry-run` liste les outils sans modèle ni clé.
+
 ## Pas pour la production
 
 Tout ici est choisi pour démarrer en une commande sur un portable : un Keycloak

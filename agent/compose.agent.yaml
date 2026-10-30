@@ -1,0 +1,35 @@
+# The real-agent harness (agent/README.md), on the sandbox's network. Added to
+# COMPOSE_FILE after compose.yaml; started on demand, never by `up`.
+#
+#   export COMPOSE_FILE=compose.yaml:agent/compose.agent.yaml
+#   docker compose up -d --wait
+#   docker compose run --rm agent --provider mistral --dry-run
+#   AGENT_ENV_FILE=/root/secrets/agent.env docker compose run --rm agent \
+#     --provider mistral --out reports/<date>-mistral-<server>.md
+#
+# The keys come from AGENT_ENV_FILE (MISTRAL_API_KEY, ANTHROPIC_API_KEY), passed
+# to the container's environment only: never in the image, never in a report.
+
+services:
+  agent:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    build: ./agent
+    image: akko-sandbox-agent:local
+    profiles: ["tools"]
+    env_file:
+      - path: ${AGENT_ENV_FILE:-/dev/null}
+        required: false
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      MCP_URL: http://mcp:3000/mcp
+      # The image the mcp service runs, with compose.yaml's default: written in
+      # the report, since the server announces no version of its own.
+      MCP_IMAGE: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.6.0}
+    working_dir: /agent
+    volumes:
+      # The reports, written by the container's user.
+      - ./agent/reports:/agent/reports
+    depends_on:
+      mcp: {condition: service_healthy}
+    mem_limit: 256m
