@@ -1,19 +1,39 @@
-# Trino Gateway in front of two Trino clusters. Clients reach it over https
-# only (8443); plain http (8080) stays on the back network for its health check
-# and the registration of the backends.
+# Trino Gateway in front of two Trino clusters. It listens on https only (8443):
+# no plain http port, so neither a token nor the admin password ever crosses the
+# network in clear. Queries go through to the clusters, where Trino verifies
+# each token itself; the gateway's own API (backends, query history) asks for
+# its admin account, whose password is drawn at random in the certs volume.
 serverConfig:
   node.environment: sandbox
-  http-server.http.port: 8080
+  http-server.http.enabled: false
   http-server.https.enabled: true
   http-server.https.port: 8443
   http-server.https.keystore.path: /certs/gateway.pem
+
+authentication:
+  defaultType: ["form"]
+  form:
+    selfSignKeyPair:
+      privateKey: /certs/gateway-session.key
+      publicKey: /certs/gateway-session.pub
+
+presetUsers:
+  admin:
+    password: ${ENV:GATEWAY_ADMIN_PASSWORD}
+    privileges: ADMIN_API
+
+authorization:
+  admin: (.*)ADMIN(.*)
+  user: (.*)USER(.*)
+  api: (.*)API(.*)
 
 routingRules:
   rulesEngineEnabled: false
 
 routing:
-  # Pins Trino's OAuth2 browser login to the coordinator that started it.
-  oauth2RoutingEnabled: true
+  # The gateway adds X-Forwarded-Proto: https and X-Forwarded-Host: gateway, so
+  # each cluster accepts the token and writes the gateway's address in nextUri.
+  forwardedHeadersEnabled: true
 
 dataStore:
   jdbcUrl: jdbc:postgresql://gateway-db:5432/gateway
@@ -24,3 +44,8 @@ dataStore:
 
 clusterStatsConfiguration:
   monitorType: INFO_API
+
+# A cluster added or updated is routed to once the monitor has seen it healthy:
+# every 5 s instead of every minute.
+monitor:
+  taskDelay: 5s

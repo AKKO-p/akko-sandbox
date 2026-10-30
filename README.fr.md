@@ -141,20 +141,33 @@ release candidate.
 Le même bac à sable peut tourner avec [Trino Gateway](https://trinodb.github.io/trino-gateway/)
 devant deux clusters Trino. Le serveur MCP ne joint alors que le gateway : il
 n'est pas sur le réseau des clusters, donc chaque requête, chaque page suivante
-et chaque annulation passent par le gateway. Le gateway termine le TLS, et
-chaque cluster lit le protocole transmis (`http-server.process-forwarded=true`).
+et chaque annulation passent par le gateway. Le gateway n'écoute qu'en https et
+termine le TLS, et chaque cluster lit le protocole transmis
+(`http-server.process-forwarded=true`). Sa propre API (backends, historique des
+requêtes) demande son compte d'administration, dont le mot de passe est tiré au
+hasard dans le volume `certs` et n'est pas lisible par le serveur MCP.
 
 ```bash
 COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose up -d --wait
 COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml ./demo.sh --check
+COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose --profile tools down -v
 tests/gateway.sh   # les contrôles, de bout en bout
 ```
 
-`tests/gateway.sh` vérifie les deux réponses différentes à travers le gateway,
-que le serveur ne peut pas joindre un cluster directement, que les requêtes se
-répartissent sur les deux clusters au nom de chaque utilisateur, qu'un long
-résultat et une annulation passent par le gateway, et que les refus restent les
-mêmes.
+Démarrez la variante avec le même `COMPOSE_FILE` à chaque fois, et arrêtez-la
+avec lui aussi : un `docker compose down` sans lui laisse derrière lui le second
+cluster et le gateway.
+
+`tests/gateway.sh` vérifie qu'un second démarrage est sain, les deux réponses
+différentes à travers le gateway, que le serveur ne peut ni joindre un cluster
+directement ni utiliser l'API d'administration du gateway, que le gateway refuse
+les en-têtes de transfert envoyés par un client, que les requêtes se répartissent
+sur les deux clusters et que chaque cluster les exécute au nom de l'utilisateur
+qui a demandé, qu'un résultat plafonné passe par le gateway, qu'une requête qui
+dépasse son délai est annulée dans Trino à travers le gateway, et que les refus
+restent les mêmes. Il utilise les ports hôtes du bac à sable (8080, 3000, 6274) ;
+pour le lancer à côté d'un bac à sable démarré, fixez les ports comme dans
+l'en-tête du script. La CI le lance après `tests/smoke.sh`.
 
 ## Pas pour la production
 
@@ -162,7 +175,9 @@ Tout ici est choisi pour démarrer en une commande sur un portable : un Keycloak
 de développement (http pour le navigateur, https pour le token exchange), une
 connexion par mot de passe, un seul mot de passe pour tous, une autorité de
 certification auto-signée, un secret client rangé dans un volume partagé, un
-secret partagé de Trino fixe, une politique qui contient trois noms. L'image d'akko-mcp-trino et
+secret partagé de Trino fixe, une politique qui contient trois noms. Derrière le
+gateway, chaque cluster fait confiance à `X-Forwarded-Proto` venant de n'importe
+quel pair de son réseau : en production, seul le gateway doit joindre un cluster. L'image d'akko-mcp-trino et
 sa configuration sont celles de la production ; le reste ne l'est pas.
 
 ## À propos d'AKKO

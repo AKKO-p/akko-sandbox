@@ -137,19 +137,32 @@ start time and the memory, and removes everything. `KEEP=1` leaves it running.
 The same sandbox can run with [Trino Gateway](https://trinodb.github.io/trino-gateway/)
 in front of two Trino clusters. The MCP server then reaches the gateway only:
 it is not on the clusters' network, so every request, every next page and every
-cancel goes through the gateway. The gateway terminates TLS, and each cluster
-reads the forwarded protocol (`http-server.process-forwarded=true`).
+cancel goes through the gateway. The gateway listens on https only and
+terminates TLS, and each cluster reads the forwarded protocol
+(`http-server.process-forwarded=true`). Its own API (backends, query history)
+asks for its admin account, whose password is drawn at random in the `certs`
+volume and is not readable by the MCP server.
 
 ```bash
 COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose up -d --wait
 COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml ./demo.sh --check
+COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose --profile tools down -v
 tests/gateway.sh   # the checks, end to end
 ```
 
-`tests/gateway.sh` checks the two different answers through the gateway, that
-the server cannot reach a cluster directly, that queries spread over both
-clusters under each user's own name, that a long result and a cancel go through
-the gateway, and that the refusals stay the same.
+Start the variant with the same `COMPOSE_FILE` every time, and stop it with it
+too: a `docker compose down` without it leaves the second cluster and the
+gateway behind.
+
+`tests/gateway.sh` checks that a second start is healthy, the two different
+answers through the gateway, that the server can neither reach a cluster
+directly nor use the gateway's admin API, that the gateway refuses forwarded
+headers sent by a client, that queries spread over both clusters and that each
+cluster runs them as the user who asked, that a capped result goes through the
+gateway, that a query past its time budget is cancelled in Trino through the
+gateway, and that the refusals stay the same. It uses the sandbox's host ports
+(8080, 3000, 6274); to run it next to a running sandbox, set the ports as in the
+script's header. The CI runs it after `tests/smoke.sh`.
 
 ## Not for production
 
@@ -157,7 +170,9 @@ Everything here is chosen to start in one command on a laptop: a development
 Keycloak (http for the browser, https for the token exchange), a password grant,
 one password for every user, a self-signed certificate authority, a client
 secret kept in a shared volume, a fixed Trino shared secret, a policy with
-three names in it. The akko-mcp-trino image and its configuration are the same as in
+three names in it. Behind the gateway, each cluster trusts `X-Forwarded-Proto`
+from any peer on its network: in production, nothing but the gateway should
+reach a cluster. The akko-mcp-trino image and its configuration are the same as in
 production; the rest is not.
 
 ## About AKKO
