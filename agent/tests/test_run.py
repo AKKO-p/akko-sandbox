@@ -386,6 +386,33 @@ def test_both_clients_build_as_the_harness_builds_them():
     for name in ("model", "max_tokens", "system", "tools", "messages"):
         assert name in params
     assert "temperature" not in params
+    assert "anthropic-workspace-id" not in claude.client.default_headers
+
+
+def test_the_workspace_id_is_sent_as_a_header_only_when_set():
+    scoped = run.AnthropicChat("not-a-key", "claude-sonnet-5-5", 16000, {"ANTHROPIC_WORKSPACE_ID": "wrkspc_1"})
+    assert scoped.client.default_headers["anthropic-workspace-id"] == "wrkspc_1"
+    for env in ({}, {"ANTHROPIC_WORKSPACE_ID": ""}):
+        assert "anthropic-workspace-id" not in run.AnthropicChat("k", "m", 1, env).client.default_headers
+
+
+def test_the_workspace_id_comes_from_the_process_environment(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_WORKSPACE_ID", "wrkspc_2")
+    assert run.AnthropicChat("k", "m", 1).client.default_headers["anthropic-workspace-id"] == "wrkspc_2"
+    monkeypatch.delenv("ANTHROPIC_WORKSPACE_ID")
+    assert "anthropic-workspace-id" not in run.AnthropicChat("k", "m", 1).client.default_headers
+
+
+def test_the_report_records_each_call_arguments():
+    r = run.Record(question="Q", expected=[AMOUNT], stop="answered")
+    r.tools = ["search_columns", "describe_table", "search_tables"]
+    r.arguments = [{"query": "x" * 300, "limit": 5}, {"table": "demo.crm.transactions"}, None]
+    data = json.loads(run.report_json(META, [r]))
+    assert data["trials"][0]["arguments"] == r.arguments
+    text = run.render_report(META, [r])
+    assert "| 1 | `search_columns` | " + "x" * 200 + " |" in text and "x" * 201 not in text
+    assert "| 2 | `describe_table` |  |" in text  # not a search: no text
+    assert "| 3 | `search_tables` |  |" in text
 
 
 def test_an_error_is_recorded_by_kind_and_status_only():
