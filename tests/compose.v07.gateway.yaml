@@ -1,0 +1,7 @@
+# The checks of akko-mcp-trino 0.7 behind Trino Gateway (GATEWAY=1 tests/v07.sh):
+# the second cluster gets the same catalogs as the first (tests/compose.v07.yaml).
+
+services:
+  trino-2:
+    volumes:
+      - ./tests/v07/catalog:/etc/trino/catalog:ro

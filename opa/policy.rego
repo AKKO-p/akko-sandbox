@@ -48,7 +48,8 @@ forbidden if {
 	"balance" in t.columns
 }
 
-# 2b. Viewers may not use the tpcds catalog: Trino does not even list it to them.
+# 2b. Viewers may not use the tpcds catalog, which tests/v07.sh adds: Trino does
+#     not even list it to them.
 #     The catalog's own operations (AccessCatalog, FilterCatalogs, ShowSchemas,
 #     CreateSchema) name it as resource.catalog.name; the operations on one of
 #     its schemas or tables name it as resource.schema.catalogName or

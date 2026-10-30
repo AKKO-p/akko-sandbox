@@ -18,7 +18,7 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 if [ "${GATEWAY:-0}" = "1" ]; then
   export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-akko-sandbox-v07-gateway}"
-  export COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml:tests/compose.v07.yaml
+  export COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml:tests/compose.v07.yaml:tests/compose.v07.gateway.yaml
   clusters="trino trino-2"
 else
   export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-akko-sandbox-v07}"
@@ -117,6 +117,10 @@ opa() { # method, policy id, then curl options: OPA's policy API
 }
 
 echo "== 1. Start (project $COMPOSE_PROJECT_NAME, clusters: $clusters)"
+# The checks' catalog folder holds the sandbox's demo catalog as it is.
+if ! diff <(grep -v '^#' trino/etc/catalog/demo.properties) <(grep -v '^#' tests/v07/catalog/demo.properties) >/dev/null; then
+  echo "  tests/v07/catalog/demo.properties differs from trino/etc/catalog/demo.properties"; exit 1
+fi
 start=$(date +%s)
 if ! docker compose up -d --wait --wait-timeout 480; then
   docker compose ps -a; docker compose logs --tail 40; exit 1

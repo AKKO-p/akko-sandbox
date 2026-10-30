@@ -55,7 +55,7 @@ réutilisez jamais ailleurs.
 |---|---|---|
 | `alice_admin` | `demo` | toutes les lignes, toutes les colonnes en clair |
 | `carol_analyst` | `demo` | les clients européens seulement, adresses e-mail masquées |
-| `dave_viewer` | `demo` | tout sauf la table des clients, la colonne `balance` des comptes et le catalogue `tpcds` |
+| `dave_viewer` | `demo` | tout sauf la table des clients et la colonne `balance` des comptes |
 
 La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 
@@ -67,7 +67,7 @@ La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 | `postgres` | `postgres:17.11-alpine` | les données fictives : clients, comptes, transactions, avec des commentaires sur les tables et les colonnes, et douze tables d'archive vides (`crm_archive`) | 128 Mo |
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | le fournisseur d'identité, realm `sandbox`, avec le token exchange standard | 768 Mo |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | la politique d'accès, [`opa/policy.rego`](opa/policy.rego) | 64 Mo |
-| `trino` | `trinodb/trino:482` | le moteur, en https, authentification JWT, contrôle d'accès OPA ; catalogues `demo` (PostgreSQL), `tpch` et `tpcds` (données générées par Trino, rien de stocké) | 1280 Mo |
+| `trino` | `trinodb/trino:482` | le moteur, en https, authentification JWT, contrôle d'accès OPA | 1280 Mo |
 | `mcp` | `akkoai/akko-mcp-trino:0.6.0` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 256 Mo |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | l'Inspector MCP officiel | 384 Mo |
 
@@ -179,7 +179,11 @@ GATEWAY=1 MCP_IMAGE=<image 0.7> tests/v07.sh   # les mêmes contrôles derrière
 `tests/v07.sh` vérifie les outils qu'akko-mcp-trino 0.7 ajoute ou change, sur le
 bac à sable complété par [`tests/compose.v07.yaml`](tests/compose.v07.yaml) (des
 pages de cinq noms, des pages de `describe_schema` de quatre tables et dix
-colonnes au plus) : `search_columns` trouve `transactions.amount` par le mot
+colonnes au plus, et deux catalogues de plus pris dans
+[`tests/v07/catalog`](tests/v07/catalog), `tpch` et `tpcds`, générés par Trino,
+le second caché aux viewers par la politique ; avec `GATEWAY=1`,
+[`tests/compose.v07.gateway.yaml`](tests/compose.v07.gateway.yaml) les donne
+aussi au second cluster) : `search_columns` trouve `transactions.amount` par le mot
 `revenue` de son commentaire ; `dave_viewer` n'obtient rien de `crm.customers`,
 de la colonne `balance` des comptes ni du catalogue `tpcds`, par aucun outil,
 messages d'erreur compris, tant qu'il ne les nomme pas lui-même (voir plus bas),
