@@ -34,6 +34,7 @@ from typing import Any
 
 DEFAULT_MODELS = {"mistral": "codestral-latest", "anthropic": "claude-sonnet-5-5"}
 KEY_VARIABLES = {"mistral": "MISTRAL_API_KEY", "anthropic": "ANTHROPIC_API_KEY"}
+WORKSPACE_VARIABLE = "ANTHROPIC_WORKSPACE_ID"
 PASSWORD = "demo"  # the sandbox's demo password, the same for every user
 
 SYSTEM_PROMPT = (
@@ -224,6 +225,7 @@ class Record:
     forbidden: list[str] = field(default_factory=list)
     trial: int = 1
     tools: list[str] = field(default_factory=list)
+    arguments: list[dict | None] = field(default_factory=list)  # each call's arguments, same order as tools
     first_seen: dict[str, int] = field(default_factory=dict)  # expected column -> 1-based call index
     input_tokens: int = 0
     output_tokens: int = 0
@@ -334,6 +336,16 @@ SETTINGS = (
 )
 
 
+SEARCH_TEXT_LENGTH = 200
+
+
+def search_text(name: str, arguments: dict | None) -> str:
+    """The text a search call looked for: its string arguments, cut to a fixed length."""
+    if not name.startswith("search") or not isinstance(arguments, dict):
+        return ""
+    return " ".join(v for v in arguments.values() if isinstance(v, str))[:SEARCH_TEXT_LENGTH]
+
+
 def render_report(meta: dict, records: list[Record]) -> str:
     """The report: the run's settings, one line per question over its trials (median and
     range), the totals, then each trial's tool calls and final answer in full. Same layout
@@ -374,6 +386,14 @@ def render_report(meta: dict, records: list[Record]) -> str:
                 f"### Trial {r.trial}: {r.calls} tool calls, {_cell(r.stop)}, {'right' if r.right else 'not right'}",
                 "",
                 f"Tools called: {collapse(r.tools)}",
+                "",
+                "| Call | Tool | Search text (first 200 characters) |",
+                "|---|---|---|",
+            ]
+            for n, name in enumerate(r.tools, 1):
+                given = r.arguments[n - 1] if n <= len(r.arguments) else None
+                lines.append(f"| {n} | `{name}` | {_cell(search_text(name, given))} |")
+            lines += [
                 "",
                 "| Column | Kind | First shown at call | Named in the answer |",
                 "|---|---|---|---|",
@@ -523,10 +543,13 @@ class AnthropicChat:
     """Anthropic's Messages API. Its current API version accepts no sampling parameter,
     so the model's default sampling applies; thinking and effort stay at their defaults."""
 
-    def __init__(self, key: str, model: str, max_tokens: int) -> None:
+    def __init__(self, key: str, model: str, max_tokens: int, environ: dict | None = None) -> None:
         import anthropic
 
-        self.client = anthropic.AsyncAnthropic(api_key=key)
+        # A key scoped to a workspace needs its id on every request; none is sent when unset.
+        workspace = (os.environ if environ is None else environ).get(WORKSPACE_VARIABLE)
+        headers = {"anthropic-workspace-id": workspace} if workspace else None
+        self.client = anthropic.AsyncAnthropic(api_key=key, default_headers=headers)
         self.model, self.max_tokens = model, max_tokens
         self.sampling = (
             "API defaults (the Messages API takes no temperature); output tokens include thinking, "
@@ -667,6 +690,7 @@ async def ask(args: argparse.Namespace, chat: Any, item: dict, trial: int = 1) -
                 results = []
                 for call_id, name, arguments in turn.calls:
                     record.tools.append(name)
+                    record.arguments.append(arguments)
                     if arguments is None:
                         text, is_error = json.dumps({"error": "the arguments are not a JSON object"}), True
                     else:
