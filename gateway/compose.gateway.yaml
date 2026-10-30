@@ -1,0 +1,150 @@
+# The sandbox behind Trino Gateway: the MCP server talks to the gateway only,
+# and the gateway routes each query to one of two Trino clusters. The MCP server
+# is not on the back network, so every request, nextUri and cancel included,
+# can only go through the gateway.
+#
+#   COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose up -d --wait
+#   COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml ./demo.sh --check
+#   COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose --profile tools down -v
+#   tests/gateway.sh          the checks, end to end
+
+networks:
+  front: {}
+
+# The second cluster is the first one again; on the first, only what changes
+# is set, since the sandbox's compose.yaml already defines the rest. The image
+# is the one of compose.yaml: bump both together.
+x-trino: &trino
+  image: trinodb/trino:482
+  environment:
+    OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/sandbox
+  volumes:
+    - ./trino/etc:/etc/trino:ro
+    - ./gateway/trino-config.properties:/etc/trino/config.properties:ro
+    - certs:/certs:ro
+  depends_on:
+    certs: {condition: service_completed_successfully}
+    postgres: {condition: service_healthy}
+    keycloak: {condition: service_healthy}
+    opa: {condition: service_started}
+  healthcheck:
+    test: ["CMD", "/usr/lib/trino/bin/health-check"]
+    interval: 5s
+    timeout: 5s
+    retries: 60
+    start_period: 20s
+  mem_limit: 1280m
+
+services:
+  trino: *trino
+  trino-2:
+    <<: *trino
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+
+  keycloak:
+    networks: [default, front]
+
+  gateway-db:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    image: postgres:17.11-alpine
+    environment:
+      POSTGRES_DB: gateway
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway   # demo only
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    mem_limit: 128m
+
+  gateway:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    image: trinodb/trino-gateway:22
+    # The admin password is read from the volume, then substituted in the config.
+    # Without it, missing or empty, the gateway refuses to start. The jar's path
+    # is the one inside the image: check it when the image is bumped.
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        GATEWAY_ADMIN_PASSWORD=$$(cat /certs/gateway-admin.secret) && [ -n "$$GATEWAY_ADMIN_PASSWORD" ]
+        || { echo "no admin password in /certs/gateway-admin.secret: not starting" >&2; exit 1; };
+        export GATEWAY_ADMIN_PASSWORD;
+        exec java -jar /usr/lib/trino-gateway/gateway-ha-jar-with-dependencies.jar
+        /etc/trino-gateway/config.yaml
+    volumes:
+      - ./gateway/config.yaml:/etc/trino-gateway/config.yaml:ro
+      - certs:/certs:ro
+    networks: [default, front]
+    depends_on:
+      certs: {condition: service_completed_successfully}
+      gateway-db: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD-SHELL", "/usr/lib/trino-gateway/bin/health-check || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    mem_limit: 768m
+
+  # One-shot: registers both clusters at the gateway, as its admin, then waits
+  # until the gateway has seen both healthy, so that it routes queries by the
+  # time the MCP server starts. update adds a backend, or updates it when the
+  # gateway already knows it, so a second start registers them again without
+  # error. Runs as the uid that owns the admin password.
+  gateway-backends:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    image: curlimages/curl:8.23.0
+    user: "1000:1000"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        for b in trino trino-2; do
+        curl -fsS --cacert /certs/ca.crt -u "admin:$$(cat /certs/gateway-admin.secret)"
+        -X POST https://gateway:8443/gateway/backend/modify/update
+        -H 'Content-Type: application/json'
+        -d "{\"name\":\"$$b\",\"proxyTo\":\"http://$$b:8080\",\"active\":true,\"routingGroup\":\"adhoc\"}" || exit 1;
+        done; echo;
+        for b in trino trino-2; do
+        n=0; until curl -fsS --cacert /certs/ca.crt https://gateway:8443/api/public/backends/$$b/state
+        | grep -q '"trinoStatus":"HEALTHY"'; do
+        n=$$((n + 1)); [ $$n -lt 60 ] || { echo "$$b is not healthy at the gateway"; exit 1; }; sleep 1;
+        done; done; echo backends registered
+    volumes:
+      - certs:/certs:ro
+    depends_on:
+      gateway: {condition: service_healthy}
+      trino: {condition: service_healthy}
+      trino-2: {condition: service_healthy}
+    mem_limit: 32m
+
+  mcp:
+    environment:
+      TRINO_HOST: gateway
+      TRINO_PORT: "8443"
+    networks: [front]
+    depends_on:
+      gateway-backends: {condition: service_completed_successfully}
+
+  inspector:
+    networks: [front]
+
+  client:
+    networks: [front]
+
+  # The checks' own client: curl on both networks, to read the gateway's public
+  # list of backends and ask a backend directly. Started by tests/gateway.sh only.
+  probe:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    image: curlimages/curl:8.23.0
+    profiles: ["tools"]
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - certs:/certs:ro
+    networks: [default, front]
+    mem_limit: 32m
