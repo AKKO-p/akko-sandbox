@@ -6,7 +6,8 @@
 # a search with a short budget says what it did not search and resumes to the
 # end, errors say their kind, a policy that refuses system.jdbc gets an error
 # that says what to allow, the agent's SQL never reads system, and the server
-# logs no token. Records the plans of describe_schema's metadata statements.
+# logs no token. Checks that describe_schema's metadata statements read only
+# the page's tables.
 # Removes everything at the end unless KEEP=1. GATEWAY=1 runs the same checks
 # behind Trino Gateway. Uses the sandbox's host ports unless told otherwise.
 #
@@ -25,10 +26,13 @@ else
   clusters="trino"
 fi
 failed=0
+# Scratch files: dave's answers, the calls made, the server's logs. Removed at the end.
+scratch=$(mktemp -d)
 check() { if [ "$2" = "$3" ]; then printf '  OK    %s\n' "$1"; else printf '  FAIL  %s (got %s, expected %s)\n' "$1" "$2" "$3"; failed=1; fi; }
 cleanup() {
+  rm -rf "$scratch"
   if [ "${KEEP:-0}" = "1" ]; then echo "KEEP=1: project $COMPOSE_PROJECT_NAME left running"; return; fi
-  docker compose --profile tools down -v --remove-orphans >/dev/null 2>&1; rm -f .v07-dave
+  docker compose --profile tools down -v --remove-orphans >/dev/null 2>&1
   echo "== project $COMPOSE_PROJECT_NAME removed: $(docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | wc -l) containers, $(docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | wc -l) volumes left"
 }
 trap cleanup EXIT
@@ -37,6 +41,7 @@ trap cleanup EXIT
 call() { # user, tool, then name=value arguments
   local user=$1 tool=$2; shift 2
   local args=(); for a in "$@"; do args+=(--tool-arg "$a"); done
+  echo "$user $tool" >> "$scratch/calls"
   docker compose exec -T inspector mcp-inspector --cli http://mcp:3000/mcp \
     --header "Authorization: Bearer $(./token.sh "$user")" --method tools/call \
     --tool-name "$tool" "${args[@]}" 2>/dev/null \
@@ -94,6 +99,18 @@ for line in sys.stdin:
 try: print(eval(sys.argv[1], {}, {'pages': pages}))
 except Exception as e: print('error:', type(e).__name__)" "$1"; }
 names() { field 'sorted({m["table"] for m in d["matches"]})'; }
+# The server's log so far, kept before its container is created again.
+keep_logs() { docker compose logs --no-color mcp >> "$scratch/mcp.log" 2>&1; }
+# How many queries the engine received whose text holds $1: the gateway's
+# history behind the gateway, Trino's own list of queries otherwise.
+received() {
+  local q="'"; set -- "${1//$q/$q$q}"   # a literal in the statement below
+  if [ "${GATEWAY:-0}" = "1" ]; then
+    docker compose exec -T gateway-db psql -U gateway -d gateway -tAc "SELECT count(*) FROM query_history WHERE query_text LIKE '%$1%'"
+  else
+    trino alice_admin "SELECT count(*) FROM system.runtime.queries WHERE user <> 'alice_admin' AND query LIKE '%$1%'" | field 'd["rows"][0][0]'
+  fi
+}
 opa() { # method, policy id, then curl options: OPA's policy API
   local method=$1 id=$2; shift 2
   docker compose exec -T opa-admin curl -fsS -o /dev/null -w '%{http_code}' -X "$method" "http://opa:8181/v1/policies/$id" "$@"
@@ -108,6 +125,13 @@ echo "  all services healthy in $(( $(date +%s) - start )) s"
 docker compose --profile tools up -d opa-admin >/dev/null 2>&1 || { echo "  opa-admin did not start"; exit 1; }
 echo "  server: $(docker compose exec -T mcp akko-mcp-trino --version 2>&1 | tail -1)"
 archive=$(python3 -c "print([f'transactions_{y}' for y in range(2014, 2026)])")
+# How many schemas each catalog holds, from Trino itself, as alice: what a
+# search of every catalog must have searched.
+declare -A schemas
+for c in demo tpch tpcds; do
+  schemas[$c]=$(trino alice_admin "SELECT count(*) FROM $c.information_schema.schemata WHERE schema_name <> 'information_schema'" | field 'd["rows"][0][0]')
+done
+echo "  schemas: demo ${schemas[demo]}, tpch ${schemas[tpch]}, tpcds ${schemas[tpcds]}"
 
 echo "== 2. A column found by a word of its comment"
 out=$(call carol_analyst search_columns text=revenue catalog=demo)
@@ -116,8 +140,8 @@ check "carol: the match carries its comment" "$(field 'd["matches"][0]["comment"
 check "carol: the search of demo is complete" "$(field '(d["complete"], d["not_searched"], d["next_cursor"])' <<<"$out")" "(True, [], None)"
 everywhere=$(call carol_analyst search_columns text=revenue)
 check "carol, 'revenue' in every catalog: the same match, complete" "$(field '([(m["catalog"], m["table"], m["column"]) for m in d["matches"]], d["complete"])' <<<"$everywhere")" "([('demo', 'transactions', 'amount')], True)"
-schemas_all=$(field 'd["schemas_searched"]' <<<"$everywhere")
-echo "  schemas searched in every catalog: $schemas_all"
+schemas_all=$(( schemas[demo] + schemas[tpch] + schemas[tpcds] ))
+check "  every schema of demo, tpch and tpcds searched" "$(field 'd["schemas_searched"]' <<<"$everywhere")" "$schemas_all"
 amount=$(search_all carol_analyst text=amount catalog=demo)
 check "carol, 'amount' in demo: 13 columns, over the row cap, resumed to the end" "$(pages '(len({(m["schema"], m["table"], m["column"]) for p in pages for m in p["matches"]}), sum(len(p["matches"]) for p in pages), pages[-1]["complete"])' <<<"$amount")" "(13, 13, True)"
 check "  the first answer stopped at the row cap" "$(pages '[g["reason"] for g in pages[0]["not_searched"]][:1]' <<<"$amount")" "['row_cap']"
@@ -125,41 +149,58 @@ check "  the first answer stopped at the row cap" "$(pages '[g["reason"] for g i
 echo "== 3. dave_viewer sees nothing of crm.customers, nor of accounts.balance"
 # What dave gets, kept for the checks at the end of this section; never what he
 # asks by name himself (a refused SELECT balance, the tpcds catalog), which Trino
-# may repeat in its error.
-: > .v07-dave
-d() { call dave_viewer "$@" | tee -a .v07-dave; }
-out=$(d search_columns text=full_name catalog=demo)
-check "dave, 'full_name': no match, complete" "$(field '(d["matches"], d["complete"])' <<<"$out")" "([], True)"
+# repeats in its error. Each of his answers has its twin for carol or alice.
+d() { call dave_viewer "$@" | tee -a "$scratch/dave"; }
+match() { field '[(m["table"], m["column"]) for m in d["matches"]]'; }
+for word in full_name email segment; do
+  check "dave, '$word' in demo: no match, complete" "$(d search_columns text=$word catalog=demo | field '(d["matches"], d["complete"])')" "([], True)"
+  check "carol, '$word' in demo: customers.$word" "$(call carol_analyst search_columns text=$word catalog=demo | match)" "[('customers', '$word')]"
+done
+check "carol: segment comes with its comment" "$(call carol_analyst search_columns text=segment catalog=demo | field 'd["matches"][0]["comment"]')" "Retail or business customer"
 check "dave, 'customer' in demo: accounts only" "$(d search_columns text=customer catalog=demo | names)" "['accounts']"
 check "carol, 'customer' in demo: accounts and customers" "$(call carol_analyst search_columns text=customer catalog=demo | names)" "['accounts', 'customers']"
+# A catalog he may not see and one he may, in the same search: the one he may
+# is searched, every schema of it; the other appears nowhere.
 out=$(d search_columns text=email)
 check "dave, 'email' in every catalog: no match, complete, nothing left" "$(field '(d["matches"], d["complete"], d["not_searched"])' <<<"$out")" "([], True, [])"
+check "  every schema of demo and tpch searched" "$(field 'd["schemas_searched"]' <<<"$out")" "$(( schemas[demo] + schemas[tpch] ))"
+out=$(search_all dave_viewer text=mktsegment | tee -a "$scratch/dave")
+check "dave, 'mktsegment' in every catalog: tpch.customer in each tpch schema" "$(pages '(sorted({(m["catalog"], m["table"], m["column"]) for p in pages for m in p["matches"]}), sum(len(p["matches"]) for p in pages), pages[-1]["complete"])' <<<"$out")" "([('tpch', 'customer', 'mktsegment')], ${schemas[tpch]}, True)"
+check "  every schema of demo and tpch searched once" "$(pages 'sum(p["schemas_searched"] for p in pages)' <<<"$out")" "$(( schemas[demo] + schemas[tpch] ))"
 check "dave's catalogs: tpcds is not one" "$(d list_catalogs | field 'd["catalogs"]')" "['demo', 'tpch']"
 check "carol's catalogs: tpcds too" "$(call carol_analyst list_catalogs | field 'd["catalogs"]')" "['demo', 'tpcds', 'tpch']"
-check "carol, 'email' in every catalog: tpcds searched" "$(call carol_analyst search_columns text=email | field '"tpcds" in {m["catalog"] for m in d["matches"]}')" "True"
-out=$(d describe_schema catalog=demo schema=crm)
-check "dave, describe_schema crm: accounts and transactions" "$(field '[t["table"] for t in d["tables"]]' <<<"$out")" "['accounts', 'transactions']"
-check "dave, describe_schema crm: accounts without balance" "$(field '[c["column"] for t in d["tables"] if t["table"] == "accounts" for c in t["columns"]]' <<<"$out")" "['id', 'customer_id', 'opened_on', 'currency']"
+check "carol, 'email' in every catalog: demo and tpcds" "$(call carol_analyst search_columns text=email | field 'sorted({m["catalog"] for m in d["matches"]})')" "['demo', 'tpcds']"
+out=$(walk dave_viewer describe_schema catalog=demo schema=crm | tee -a "$scratch/dave")
+check "dave, describe_schema crm by pages: one page, accounts and transactions" "$(pages '[([t["table"] for t in p["tables"]], p["shortened"], p["next_offset"]) for p in pages]' <<<"$out")" "[(['accounts', 'transactions'], False, None)]"
+check "dave, describe_schema crm: accounts without balance" "$(pages '[c["column"] for p in pages for t in p["tables"] if t["table"] == "accounts" for c in t["columns"]]' <<<"$out")" "['id', 'customer_id', 'opened_on', 'currency']"
 out=$(walk carol_analyst describe_schema catalog=demo schema=crm)
-check "carol, describe_schema crm by pages: three tables, balance with its comment" "$(pages '([t["table"] for p in pages for t in p["tables"]], [c["comment"] for p in pages for t in p["tables"] for c in t["columns"] if c["column"] == "balance"])' <<<"$out")" "(['accounts', 'customers', 'transactions'], ['Current balance in the account currency'])"
-out=$(walk dave_viewer list_tables catalog=demo schema=crm | tee -a .v07-dave)
-check "dave, list_tables crm by pages: accounts and transactions" "$(pages '[t for p in pages for t in p["tables"]]' <<<"$out")" "['accounts', 'transactions']"
+check "carol, describe_schema crm by pages: two pages, three tables" "$(pages '[([t["table"] for t in p["tables"]], p["shortened"], p["next_offset"]) for p in pages]' <<<"$out")" "[(['accounts', 'customers'], True, 2), (['transactions'], False, None)]"
+check "carol: balance with its comment" "$(pages '[c["comment"] for p in pages for t in p["tables"] for c in t["columns"] if c["column"] == "balance"]' <<<"$out")" "['Current balance in the account currency']"
+check "carol: customers with its comment and its columns" "$(pages '[(t["comment"], [c["column"] for c in t["columns"]]) for p in pages for t in p["tables"] if t["table"] == "customers"]' <<<"$out")" "[('People and companies who hold an account', ['id', 'full_name', 'email', 'country', 'segment'])]"
+out=$(walk dave_viewer list_tables catalog=demo schema=crm | tee -a "$scratch/dave")
+check "dave, list_tables crm by pages: accounts and transactions" "$(pages '[(p["tables"], p["next_offset"]) for p in pages]' <<<"$out")" "[(['accounts', 'transactions'], None)]"
+check "carol, list_tables crm: customers too" "$(call carol_analyst list_tables catalog=demo schema=crm | field 'd["tables"]')" "['accounts', 'customers', 'transactions']"
 check "dave, 'balance' in demo: no match" "$(d search_columns text=balance catalog=demo | field 'd["matches"]')" "[]"
-check "carol, 'balance' in demo: accounts.balance" "$(call carol_analyst search_columns text=balance catalog=demo | field '[(m["table"], m["column"]) for m in d["matches"]]')" "[('accounts', 'balance')]"
+check "carol, 'balance' in demo: accounts.balance" "$(call carol_analyst search_columns text=balance catalog=demo | match)" "[('accounts', 'balance')]"
 out=$(d describe_table catalog=demo schema=crm table=accounts)
 check "dave, describe_table accounts: four columns, none cut" "$(field '([r[0] for r in d["rows"]], d["truncated"])' <<<"$out")" "(['id', 'customer_id', 'opened_on', 'currency'], False)"
 check "alice, describe_table accounts: five, balance too" "$(call alice_admin describe_table catalog=demo schema=crm table=accounts | field '[r[0] for r in d["rows"]]')" "['id', 'customer_id', 'opened_on', 'currency', 'balance']"
+# hide-inaccessible-columns: SELECT * leaves the hidden column out, and names it nowhere.
+out=$(d execute_query 'sql=SELECT * FROM demo.crm.accounts ORDER BY id')
+check "dave, SELECT * of accounts: an answer without balance" "$(field '(d["columns"], d["row_count"])' <<<"$out")" "(['id', 'customer_id', 'opened_on', 'currency'], 5)"
+check "alice, SELECT * of accounts: balance too" "$(call alice_admin execute_query 'sql=SELECT * FROM demo.crm.accounts ORDER BY id' | field 'd["columns"]')" "['id', 'customer_id', 'opened_on', 'currency', 'balance']"
 check "dave, SELECT balance: refused by the policy" "$(call dave_viewer execute_query 'sql=SELECT balance FROM demo.crm.accounts' | field 'd["kind"]')" "permission"
+check "alice, SELECT balance: an answer" "$(call alice_admin execute_query 'sql=SELECT sum(balance) > 0 FROM demo.crm.accounts' | field 'd["rows"]')" "[[True]]"
 check "dave, SELECT count(*) of accounts: 12" "$(d execute_query 'sql=SELECT count(*) FROM demo.crm.accounts' | field 'd["rows"]')" "[[12]]"
 check "dave, an unknown column of accounts: kind column" "$(d execute_query 'sql=SELECT nope FROM demo.crm.accounts' | field 'd["kind"]')" "column"
 check "dave, describe_schema of a schema that does not exist: kind schema" "$(d describe_schema catalog=demo schema=nosuch | field 'd["kind"]')" "schema"
 check "dave, describe_schema of tpcds, which he names: kind permission" "$(call dave_viewer describe_schema catalog=tpcds schema=tiny | field 'd["kind"]')" "permission"
-for word in customers full_name segment email 'People and companies' balance 'Current balance' tpcds; do
-  check "nothing dave got names '$word'" "$(grep -ci -- "$word" .v07-dave)" "0"
+check "carol, describe_schema of tpcds.tiny: its tables" "$(call carol_analyst describe_schema catalog=tpcds schema=tiny | field 'len(d["tables"]) > 0')" "True"
+# segment as a name of its own: tpch's mktsegment, which dave may see, holds it.
+for word in customers full_name '"segment"' email 'People and companies' 'Retail or business' balance 'Current balance' tpcds; do
+  check "nothing dave got names '$word'" "$(grep -ci -- "$word" "$scratch/dave")" "0"
 done
-check "every answer dave got is JSON ($(grep -c . .v07-dave) answers)" "$(grep -c . .v07-dave)" "$(grep -c '^{' .v07-dave)"
-rm -f .v07-dave
-echo "  dave, SELECT * of accounts, Trino's message: $(call dave_viewer execute_query 'sql=SELECT * FROM demo.crm.accounts' | field 'd["error"]')"
+check "dave got his 16 answers, all JSON" "$(grep -c '^{' "$scratch/dave") $(grep -c . "$scratch/dave")" "16 16"
 # The same column, straight in Trino, with dave's own token: the policy filters
 # every listing and refuses the read; alice sees it everywhere.
 for who in dave_viewer alice_admin; do
@@ -170,7 +211,7 @@ for who in dave_viewer alice_admin; do
   check "$who in Trino, DESCRIBE" "$(trino $who "DESCRIBE demo.crm.accounts" | field '[r[0] for r in d["rows"]]')" "$want"
 done
 check "dave in Trino, SELECT balance: PERMISSION_DENIED" "$(trino dave_viewer "SELECT balance FROM demo.crm.accounts" | field 'd["error"]')" "PERMISSION_DENIED"
-check "dave in Trino, SELECT *: PERMISSION_DENIED" "$(trino dave_viewer "SELECT * FROM demo.crm.accounts" | field 'd["error"]')" "PERMISSION_DENIED"
+check "dave in Trino, SELECT *: every column but balance" "$(trino dave_viewer "SELECT * FROM demo.crm.accounts" | field 'd["columns"]')" "['id', 'customer_id', 'opened_on', 'currency']"
 
 echo "== 4. list_tables on crm_archive, page by page"
 out=$(walk carol_analyst list_tables catalog=demo schema=crm_archive)
@@ -188,6 +229,7 @@ check "a page of an offset past the end: empty, the last" "$(call carol_analyst 
 
 echo "== 6. A search within a short budget says what it left, and resumes to the end"
 budget="${V07_SHORT_BUDGET:-3}" reserve="${V07_SHORT_RESERVE:-2}"
+keep_logs
 if ! V07_CALL_TIMEOUT_SECONDS=$budget V07_SEARCH_RESERVE_SECONDS=$reserve docker compose up -d --no-deps --wait --wait-timeout 120 mcp >/dev/null 2>&1; then
   echo "  the server did not start with a $budget s budget"; failed=1
 fi
@@ -201,6 +243,7 @@ check "  and it gives a cursor" "$(pages 'pages[0]["next_cursor"] is not None' <
 check "resumed by its cursor, the search ends complete" "$(pages '(len(pages) > 1, pages[-1]["complete"], pages[-1]["next_cursor"])' <<<"$out")" "(True, True, None)"
 check "  every schema searched once over the calls" "$(pages 'sum(p["schemas_searched"] for p in pages)' <<<"$out")" "$schemas_all"
 check "  the same match as with the whole budget" "$(pages '[(m["catalog"], m["table"], m["column"]) for p in pages for m in p["matches"]]' <<<"$out")" "[('demo', 'transactions', 'amount')]"
+keep_logs
 docker compose up -d --no-deps --wait --wait-timeout 120 mcp >/dev/null 2>&1 || { echo "  the server did not start again"; failed=1; }
 
 echo "== 7. Errors say their kind"
@@ -227,26 +270,37 @@ for args in "describe_schema catalog=demo schema=crm" "search_columns text=reven
 done
 check "the variant is removed" "$(opa DELETE v07-no-jdbc)" "200"
 check "describe_schema answers again" "$(call carol_analyst describe_schema catalog=demo schema=crm | field '[t["table"] for t in d["tables"]]')" "['accounts', 'customers']"
+check "search_columns answers again" "$(call carol_analyst search_columns text=revenue catalog=demo | match)" "[('transactions', 'amount')]"
 
 echo "== 9. The agent's SQL never reads system"
-for sql in "SELECT * FROM system.runtime.queries" "SELECT * FROM system.jdbc.columns" "SHOW TABLES FROM system.jdbc"; do
+# Each statement carries a marker, so the engine's own record shows whether it
+# came; one allowed statement with the marker comes, and only that one.
+for sql in "SELECT * FROM system.runtime.queries WHERE query_id = 'v07-guard'" "SELECT * FROM system.jdbc.columns WHERE table_name = 'v07-guard'" "SHOW TABLES FROM system.jdbc LIKE 'v07-guard'"; do
   out=$(call dave_viewer execute_query "sql=$sql")
-  check "refused before Trino: $sql" "$(field '("rows" in d, d.get("kind"))' <<<"$out")" "(False, 'read_only')"
+  check "refused by the server: $sql" "$(field '("rows" in d, d.get("kind"))' <<<"$out")" "(False, 'read_only')"
 done
+check "an allowed statement with the marker: an answer" "$(call dave_viewer execute_query "sql=SELECT 'v07-guard' AS marker" | field 'd["rows"]')" "[['v07-guard']]"
+check "the engine received that one only" "$(received v07-guard)" "1"
 
-echo "== 10. The plans of describe_schema's metadata statements on crm_archive"
-# The filter of a page's statements, as the server builds it (table_name IN (...)), and
-# the same with one table (table_name = ...), run as alice straight in Trino:
-# the plan, then how many rows the scan reads, crm_archive holding 12 tables of
-# 3 columns. Recorded, not checked.
-in_list=$(python3 -c "print(', '.join(\"'transactions_%d'\" % y for y in range(2014, 2018)))")
+echo "== 10. describe_schema's metadata statements on crm_archive read the page only"
+# crm_archive holds 12 tables of 3 columns. For a page of 4 tables, the server
+# reads each table by its own equality, in one UNION ALL (Trino pushes an
+# equality on table_name into its metadata views, never a list). Run as alice
+# straight in Trino: the rows the scans read, with the server's form, then with
+# table_name IN (...) for reference, which reads the whole schema.
+page=(transactions_2014 transactions_2015 transactions_2016 transactions_2017)
+check "the server sent that form in section 5" "$( [ "$(received "table_name = 'transactions_2014' UNION ALL")" -gt 0 ] 2>/dev/null && echo yes)" "yes"
+scanned() { # sql: prints the rows read by every scan of its plan, summed
+  trino alice_admin "EXPLAIN ANALYZE $1" | field 'd["rows"][0][0]' \
+    | python3 -c "import re, sys; print(sum(int(n) for n in re.findall(r'Input: ([0-9]+) rows? \\([^)]*\\), Filtered', sys.stdin.read())))"
+}
 for view in "jdbc.columns WHERE table_cat = 'demo' AND table_schem" "metadata.table_comments WHERE catalog_name = 'demo' AND schema_name"; do
-  for tables in "IN ($in_list)" "= 'transactions_2014'"; do
-    sql="SELECT * FROM system.$view = 'crm_archive' AND table_name $tables"
-    echo "  $sql"
-    trino alice_admin "EXPLAIN $sql" | field 'd["rows"][0][0]' | grep -E 'ScanFilter|TableScan' | sed 's/^ */    plan: /'
-    trino alice_admin "EXPLAIN ANALYZE $sql" | field 'd["rows"][0][0]' | grep -E '^ +Input: .*Filtered' | sed 's/^ */    scan: /'
-  done
+  select="SELECT * FROM system.$view = 'crm_archive'"
+  union="SELECT * FROM ($(for t in "${page[@]}"; do printf '%s' "${sep:-}$select AND table_name = '$t'"; sep=" UNION ALL "; done)) ORDER BY table_name"; unset sep
+  in_list="$select AND table_name IN ($(printf "'%s', " "${page[@]}" | sed 's/, $//'))"
+  [ "${view%%.*}" = jdbc ] && want=12 || want=4
+  check "system.${view%% *}, the server's form: $want rows read" "$(scanned "$union")" "$want"
+  echo "  for reference, table_name IN (...): $(scanned "$in_list") rows read"
 done
 
 echo "== 11. Trino stopped: kind unavailable"
@@ -256,8 +310,13 @@ check "execute_query: kind unavailable" "$(call carol_analyst execute_query 'sql
 check "describe_schema: kind unavailable" "$(call carol_analyst describe_schema catalog=demo schema=crm | field 'd["kind"]')" "unavailable"
 
 echo "== 12. No token in the logs"
-logs=$(docker compose logs mcp)
-check "no token in the server log" "$(grep -c 'eyJ' <<<"$logs")" "0"
-check "no client secret in the server log" "$(grep -c "$(docker compose exec -T mcp cat /certs/mcp-client.secret)" <<<"$logs")" "0"
+# Every server container of the run: the two before a new start in section 6,
+# and this one. Each tool call leaves one audit line: the log holds them all.
+keep_logs
+calls=$(grep -c . "$scratch/calls")
+check "the server's log holds an audit line for each of the $calls tool calls" "$(grep -c '"tool":"' "$scratch/mcp.log")" "$calls"
+check "  dave's and carol's among them" "$(grep -c '"subject":"dave_viewer"' "$scratch/mcp.log" | grep -qv '^0$' && grep -c '"subject":"carol_analyst"' "$scratch/mcp.log" | grep -qv '^0$' && echo yes)" "yes"
+check "no token in the server log" "$(grep -c 'eyJ' "$scratch/mcp.log")" "0"
+check "no client secret in the server log" "$(grep -c "$(docker compose exec -T mcp cat /certs/mcp-client.secret)" "$scratch/mcp.log")" "0"
 
 [ $failed -eq 0 ] && echo "== V07 OK ==" || { echo "== V07 FAILED =="; exit 1; }

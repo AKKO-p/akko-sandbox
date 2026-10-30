@@ -182,15 +182,17 @@ pages de cinq noms, des pages de `describe_schema` de quatre tables et dix
 colonnes au plus) : `search_columns` trouve `transactions.amount` par le mot
 `revenue` de son commentaire ; `dave_viewer` n'obtient rien de `crm.customers`,
 de la colonne `balance` des comptes ni du catalogue `tpcds`, par aucun outil,
-messages d'erreur compris, tant qu'il ne les demande pas par leur nom (voir
-plus bas), et Trino lui-même retire la colonne de
-`information_schema.columns`, de `system.jdbc.columns`, de `SHOW COLUMNS` et de
-`DESCRIBE` pour lui ; `list_tables` et `describe_schema` parcourent `crm_archive`
-page par page, chaque table une fois et entière ; une recherche avec un budget
-d'appel court dit ce qu'elle n'a pas fouillé, et son curseur la reprend jusqu'au
-bout ; les erreurs portent leur `kind`, Trino arrêté compris ; une politique qui
+messages d'erreur compris, tant qu'il ne les nomme pas lui-même (voir plus bas),
+alors que carol ou alice obtiennent chacun d'eux ; sa recherche dans tous les
+catalogues fouille chaque schéma de `demo` et de `tpch` ; Trino lui-même retire
+la colonne de `information_schema.columns`, de `system.jdbc.columns`, de
+`SHOW COLUMNS`, de `DESCRIBE` et de `SELECT *` pour lui ; `list_tables` et
+`describe_schema` parcourent `crm_archive` page par page, chaque table une fois
+et entière ; une recherche avec un budget d'appel court dit ce qu'elle n'a pas
+fouillé, et son curseur la reprend jusqu'au bout ; les erreurs portent leur `kind`, Trino arrêté compris ; une politique qui
 refuse `system.jdbc` reçoit une erreur qui dit quoi autoriser ; le SQL de l'agent
-sur `system` reste refusé ; le serveur ne journalise aucun token. Le script
+sur `system` reste refusé et n'atteint jamais le moteur ; le journal du serveur
+contient une ligne d'audit pour chaque appel et aucun token. Le script
 affiche aussi les plans des requêtes de métadonnées de `describe_schema`.
 `V07_SHORT_BUDGET` et `V07_SHORT_RESERVE` (3 et 2 secondes) fixent le budget
 court. L'image par défaut reste la 0.6.0, sur laquelle ces contrôles échouent :
@@ -198,14 +200,17 @@ la CI lancera le script une fois la 0.7 publiée.
 
 La politique cache la colonne `balance` aux viewers par deux opérations du
 plugin OPA de Trino : `FilterColumns` la retire de chaque listing, et
-`SelectFromColumns` refuse une requête qui la lit. Le bac à sable ne fixe pas
+`SelectFromColumns` refuse une requête qui la nomme. Le bac à sable ne fixe pas
 `opa.policy.batched-uri` : Trino pose donc `FilterColumns` à `allow`, une colonne
-à la fois. En Trino 482, le refus d'un `SELECT *` liste toutes les colonnes de
-la table, la colonne cachée comprise, et la nomme donc à qui l'a demandée : c'est
-le message de Trino, que le serveur transmet entier. Le contrôle lit le code
-d'erreur, pas le texte. De même, un catalogue qu'il nomme reçoit le refus de
-Trino (`Cannot access catalog tpcds`, kind `permission`) là où un catalogue
-absent reçoit `not found` (kind `catalog`) : Trino distingue les deux.
+à la fois. Trino tourne avec `hide-inaccessible-columns=true`, que nous
+conseillons aussi aux administrateurs : `SELECT *` répond alors sans la colonne
+cachée. Sans ce réglage, `SELECT *` est refusé, et en Trino 482 ce refus liste
+toutes les colonnes de la table, la colonne cachée comprise : c'est le message de
+Trino, que le serveur transmet entier. Une requête qui nomme la colonne reste
+refusée ; les contrôles lisent le code d'erreur, pas le texte. De même, un
+catalogue qu'il nomme reçoit le refus de Trino (`Cannot access catalog tpcds`,
+kind `permission`) là où un catalogue absent reçoit `not found` (kind
+`catalog`) : Trino distingue les deux.
 
 ## Pas pour la production
 

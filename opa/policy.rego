@@ -49,6 +49,10 @@ forbidden if {
 }
 
 # 2b. Viewers may not use the tpcds catalog: Trino does not even list it to them.
+#     The catalog's own operations (AccessCatalog, FilterCatalogs, ShowSchemas,
+#     CreateSchema) name it as resource.catalog.name; the operations on one of
+#     its schemas or tables name it as resource.schema.catalogName or
+#     resource.table.catalogName, which the second rule reads.
 forbidden if {
 	role == "viewer"
 	input.action.resource.catalog.name == "tpcds"

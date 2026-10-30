@@ -26,7 +26,9 @@ MCP_URL = os.environ["MCP_URL"]
 PASSWORD = "demo"  # the sandbox's demo password, the same for every user
 QUESTION = "SELECT full_name, email, country FROM demo.crm.customers ORDER BY id"
 EUROPE = {"DE", "ES", "FR", "IT", "NL"}
-# The core's tools: six up to akko-mcp-trino 0.6, eight from 0.7 on.
+# The core's tools: six up to akko-mcp-trino 0.6, eight from 0.7 on. The list of
+# 0.6 is accepted only while the sandbox's default image is 0.6: drop it with the
+# move to 0.7, so that a 0.7 image without its two new tools fails here too.
 TOOLS = ["describe_table", "execute_query", "explain_query", "list_catalogs", "list_schemas", "list_tables"]
 TOOLS_07 = sorted(TOOLS + ["describe_schema", "search_columns"])
 

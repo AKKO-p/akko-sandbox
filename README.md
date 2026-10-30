@@ -177,13 +177,17 @@ five names, `describe_schema` pages of four tables and ten columns at most):
 `search_columns` finds `transactions.amount` by the word `revenue` of its
 comment; `dave_viewer` gets nothing of `crm.customers`, of the accounts'
 `balance` column or of the `tpcds` catalog, from any tool, error messages
-included, as long as he does not ask for them by name (see below), and Trino itself leaves the column out of `information_schema.columns`,
-`system.jdbc.columns`, `SHOW COLUMNS` and `DESCRIBE` for him; `list_tables` and
+included, as long as he does not name them himself (see below), while carol or
+alice get each of them; his search of every catalog searches every schema of
+`demo` and `tpch`; Trino itself leaves the column out of
+`information_schema.columns`, `system.jdbc.columns`, `SHOW COLUMNS`, `DESCRIBE`
+and `SELECT *` for him; `list_tables` and
 `describe_schema` walk `crm_archive` page by page, every table once and whole; a
 search with a short call budget says what it did not search, and its cursor
 resumes it to the end; errors carry their `kind`, Trino stopped included; a
 policy that refuses `system.jdbc` gets an error that says what to allow; the
-agent's own SQL on `system` stays refused; the server logs no token. It also
+agent's own SQL on `system` stays refused and never reaches the engine; the
+server's log holds an audit line for every call and no token. It also
 prints the plans of `describe_schema`'s metadata statements. `V07_SHORT_BUDGET`
 and `V07_SHORT_RESERVE` (3 and 2 seconds) set the short budget. The default
 image is still 0.6.0, on which these checks fail: the CI runs the script once
@@ -191,14 +195,16 @@ image is still 0.6.0, on which these checks fail: the CI runs the script once
 
 The policy hides the `balance` column from viewers with two operations of
 Trino's OPA plugin: `FilterColumns` leaves it out of every listing, and
-`SelectFromColumns` refuses a query that reads it. The sandbox sets no
+`SelectFromColumns` refuses a query that names it. The sandbox sets no
 `opa.policy.batched-uri`, so Trino asks `FilterColumns` at `allow`, one column
-at a time. In Trino 482 the refusal of `SELECT *` lists every column of the
-table, the hidden one included, so it names the column to whoever asked: that is
-Trino's message, which the server passes on whole. The check reads the error
-code, not the text. In the same way, a catalog he names gets Trino's refusal
-(`Cannot access catalog tpcds`, kind `permission`) where a missing one gets
-`not found` (kind `catalog`): Trino tells the two apart.
+at a time. Trino runs with `hide-inaccessible-columns=true`, which we advise
+administrators to set too: `SELECT *` then answers without the hidden column.
+Without it, `SELECT *` is refused, and in Trino 482 that refusal lists every
+column of the table, the hidden one included: Trino's message, which the server
+passes on whole. A query that names the column is still refused; the checks
+read the error code, not the text. In the same way, a catalog he names gets
+Trino's refusal (`Cannot access catalog tpcds`, kind `permission`) where a
+missing one gets `not found` (kind `catalog`): Trino tells the two apart.
 
 ## Not for production
 
