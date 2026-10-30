@@ -60,3 +60,27 @@ SELECT n,
        round((((n * 37) % 400) - 150 + (n % 7) * 0.25)::numeric, 2),
        (ARRAY['groceries', 'travel', 'salary', 'rent', 'utilities', 'restaurants'])[1 + n % 6]
 FROM generate_series(1, 120) AS n;
+
+-- Comments: what a table or a column means, which Trino shows to whoever sees
+-- the table, and which an agent can search (search_columns).
+COMMENT ON TABLE crm.customers IS 'People and companies who hold an account';
+COMMENT ON COLUMN crm.customers.segment IS 'Retail or business customer';
+COMMENT ON TABLE crm.accounts IS 'Bank accounts, one currency each, each held by one customer';
+COMMENT ON COLUMN crm.accounts.balance IS 'Current balance in the account currency';
+COMMENT ON TABLE crm.transactions IS 'Movements booked on the accounts';
+COMMENT ON COLUMN crm.transactions.amount IS 'Booked amount in the account currency: the revenue of a sale';
+COMMENT ON COLUMN crm.transactions.category IS 'Spending or income category';
+
+-- Archived transactions, one table per year: enough tables for a listing to
+-- come in several pages. Empty: only their names and columns matter.
+CREATE SCHEMA crm_archive;
+
+DO $$
+BEGIN
+    FOR y IN 2014..2025 LOOP
+        EXECUTE format('CREATE TABLE crm_archive.transactions_%s ('
+                       'id integer PRIMARY KEY, booked_at date NOT NULL, amount numeric(12,2) NOT NULL)', y);
+        EXECUTE format('COMMENT ON TABLE crm_archive.transactions_%s IS %L',
+                       y, 'Transactions booked in ' || y || ', archived');
+    END LOOP;
+END $$;

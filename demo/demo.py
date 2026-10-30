@@ -26,7 +26,11 @@ MCP_URL = os.environ["MCP_URL"]
 PASSWORD = "demo"  # the sandbox's demo password, the same for every user
 QUESTION = "SELECT full_name, email, country FROM demo.crm.customers ORDER BY id"
 EUROPE = {"DE", "ES", "FR", "IT", "NL"}
+# The core's tools: six up to akko-mcp-trino 0.6, eight from 0.7 on. The list of
+# 0.6 is accepted only while the sandbox's default image is 0.6: drop it with the
+# move to 0.7, so that a 0.7 image without its two new tools fails here too.
 TOOLS = ["describe_table", "execute_query", "explain_query", "list_catalogs", "list_schemas", "list_tables"]
+TOOLS_07 = sorted(TOOLS + ["describe_schema", "search_columns"])
 
 COLOR = sys.stdout.isatty()
 PACE = float(os.environ.get("DEMO_PACE") or 0)  # seconds between steps, for a recording
@@ -150,7 +154,7 @@ def check(r: dict) -> int:
     emails = {k: [row[1] for row in r[k]["rows"]] for k in ("carol", "alice")}
     countries = {k: {row[2] for row in r[k]["rows"]} for k in ("carol", "alice")}
     checks = [
-        ("six tools, no more", carol["tools"] == TOOLS and alice["tools"] == TOOLS),
+        ("the core's tools, no more", carol["tools"] == alice["tools"] and carol["tools"] in (TOOLS, TOOLS_07)),
         ("carol: Trino's current_user is carol_analyst", carol["current_user"] == "carol_analyst"),
         ("alice: Trino's current_user is alice_admin", alice["current_user"] == "alice_admin"),
         ("carol: an answer, every e-mail masked", bool(emails["carol"]) and all(e.startswith("***@") for e in emails["carol"])),

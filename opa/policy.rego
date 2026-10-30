@@ -32,7 +32,39 @@ forbidden if {
 	is_customers(input.action.resource.table)
 }
 
-# 2b. Nobody may act under another name. Trino asks ImpersonateUser when a client
+# 2a. Viewers may not see account balances: the column is left out of every
+#     listing (FilterColumns: information_schema, system.jdbc, SHOW COLUMNS,
+#     DESCRIBE) and refused in a query (SelectFromColumns). Trino asks
+#     FilterColumns here, at allow, one column at a time, since this sandbox sets
+#     no opa.policy.batched-uri. Reading information_schema and system.jdbc
+#     stays allowed: Trino filters them with this same rule.
+forbidden if {
+	role == "viewer"
+	input.action.operation in {"FilterColumns", "SelectFromColumns"}
+	t := input.action.resource.table
+	t.catalogName == "demo"
+	t.schemaName == "crm"
+	t.tableName == "accounts"
+	"balance" in t.columns
+}
+
+# 2b. Viewers may not use the tpcds catalog, which tests/v07.sh adds: Trino does
+#     not even list it to them.
+#     The catalog's own operations (AccessCatalog, FilterCatalogs, ShowSchemas,
+#     CreateSchema) name it as resource.catalog.name; the operations on one of
+#     its schemas or tables name it as resource.schema.catalogName or
+#     resource.table.catalogName, which the second rule reads.
+forbidden if {
+	role == "viewer"
+	input.action.resource.catalog.name == "tpcds"
+}
+
+forbidden if {
+	role == "viewer"
+	input.action.resource[_].catalogName == "tpcds"
+}
+
+# 2c. Nobody may act under another name. Trino asks ImpersonateUser when a client
 #     names a user (X-Trino-User) other than the one its token proves: refused,
 #     except for the accounts listed here, such as akko-mcp-trino's own account in
 #     its impersonation mode (list it, and give it a role above). The sandbox runs
