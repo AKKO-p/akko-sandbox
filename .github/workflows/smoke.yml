@@ -10,6 +10,25 @@ permissions:
   contents: read
 
 jobs:
+  # The real-agent harness's unit tests: no model, no server, no key.
+  agent:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: agent
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Unit tests
+        run: |
+          pip install --quiet -r requirements.txt
+          python -m pytest -q -p no:cacheprovider tests
+
   smoke:
     strategy:
       fail-fast: false

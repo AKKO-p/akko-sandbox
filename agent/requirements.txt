@@ -1,0 +1,7 @@
+# The harness's own dependencies, exact versions. The MCP client is the official SDK,
+# the same release as akko-mcp-trino's image.
+mcp==2.2.0
+mistralai==3.6.0
+anthropic==2.3.0
+anyio==4.15.1
+pytest==9.2.0
