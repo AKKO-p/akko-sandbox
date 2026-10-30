@@ -16,6 +16,10 @@ services:
     volumes:
       - ./tests/v07/catalog:/etc/trino/catalog:ro
 
+  # OPA's decisions go to its log, for the check that Trino asks the batch rule.
+  opa:
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=error", "--set=decision_logs.console=true", "/policy/policy.rego"]
+
   mcp:
     environment:
       # Pages of five names; describe_table still shows every column of the

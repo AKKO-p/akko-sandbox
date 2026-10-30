@@ -200,6 +200,28 @@ check "dave, an unknown column of accounts: kind column" "$(d execute_query 'sql
 check "dave, describe_schema of a schema that does not exist: kind schema" "$(d describe_schema catalog=demo schema=nosuch | field 'd["kind"]')" "schema"
 check "dave, describe_schema of tpcds, which he names: kind permission" "$(call dave_viewer describe_schema catalog=tpcds schema=tiny | field 'd["kind"]')" "permission"
 check "carol, describe_schema of tpcds.tiny: its tables" "$(call carol_analyst describe_schema catalog=tpcds schema=tiny | field 'len(d["tables"]) > 0')" "True"
+
+# I1: search_columns with a named schema checks that the caller sees it. A schema
+# that does not exist and one the policy hides answer the same kind schema, never
+# an empty search said to be complete; a catalog he may not use keeps Trino's error.
+check "dave, search_columns demo.crm_missing: kind schema, not found or not visible" "$(call dave_viewer search_columns text=amount catalog=demo schema=crm_missing | field '(d["kind"], d["error"], "complete" in d)')" "('schema', 'Schema demo.crm_missing not found or not visible', False)"
+check "the variant that hides crm_archive from viewers is loaded" "$(opa PUT v07-hide-archive -H 'Content-Type: text/plain' --data-binary 'package trino
+
+forbidden if {
+	role == "viewer"
+	input.action.resource[_].catalogName == "demo"
+	input.action.resource[_].schemaName == "crm_archive"
+}')" "200"
+check "dave, search_columns demo.crm_archive, hidden: the same answer as a missing schema" "$(call dave_viewer search_columns text=amount catalog=demo schema=crm_archive | field '(d["kind"], d["error"], "complete" in d)')" "('schema', 'Schema demo.crm_archive not found or not visible', False)"
+check "carol, search_columns demo.crm_archive, visible to her: first page, the five oldest archive tables" "$(call carol_analyst search_columns text=amount catalog=demo schema=crm_archive | field '(sorted((m["table"], m["column"]) for m in d["matches"]), d["complete"], "kind" in d)')" "([('transactions_2014', 'amount'), ('transactions_2015', 'amount'), ('transactions_2016', 'amount'), ('transactions_2017', 'amount'), ('transactions_2018', 'amount')], False, False)"
+check "the variant is removed" "$(opa DELETE v07-hide-archive)" "200"
+check "dave, search_columns demo.crm_archive again: the same first page" "$(call dave_viewer search_columns text=amount catalog=demo schema=crm_archive | field '(sorted((m["table"], m["column"]) for m in d["matches"]), d["complete"], "kind" in d)')" "([('transactions_2014', 'amount'), ('transactions_2015', 'amount'), ('transactions_2016', 'amount'), ('transactions_2017', 'amount'), ('transactions_2018', 'amount')], False, False)"
+check "carol, search_columns demo.crm, visible: complete, transactions.amount" "$(call carol_analyst search_columns text=revenue catalog=demo schema=crm | field '([(m["table"], m["column"]) for m in d["matches"]], (d["schemas_searched"], d["complete"]) == (1, True))')" "([('transactions', 'amount')], True)"
+check "dave, search_columns tpcds.tiny, a catalog he may not use: Trino's kind permission" "$(call dave_viewer search_columns text=amount catalog=tpcds schema=tiny | field 'd["kind"]')" "permission"
+check "carol, search_columns tpcds.tiny, which she may use: matches, complete" "$(call carol_analyst search_columns text=amount catalog=tpcds schema=tiny | field '(len(d["matches"]) > 0, d["schemas_searched"], d["complete"], "kind" in d)')" "(True, 1, True, False)"
+# Trino asks OPA through the batch rule, not one question per column: the decision
+# log of OPA holds batch decisions, for the operations the rule names only.
+check "OPA's log: Trino asked trino/batch" "$(docker compose logs opa 2>/dev/null | grep -c '"path":"trino/batch"' | awk '{print ($1 > 0)}')" "1"
 # segment as a name of its own: tpch's mktsegment, which dave may see, holds it.
 for word in customers full_name '"segment"' email 'People and companies' 'Retail or business' balance 'Current balance' tpcds; do
   check "nothing dave got names '$word'" "$(grep -ci -- "$word" "$scratch/dave")" "0"
@@ -306,6 +328,12 @@ for view in "jdbc.columns WHERE table_cat = 'demo' AND table_schem" "metadata.ta
   check "system.${view%% *}, the server's form: $want rows read" "$(scanned "$union")" "$want"
   echo "  for reference, table_name IN (...): $(scanned "$in_list") rows read"
 done
+
+echo "== 10b. OPA's batch rule: only the operations it names"
+# Behind the gateway Trino sends no FilterViewQueryOwnedBy, so the check is on what lies outside the list.
+check "OPA's log: every batch operation is one the rule names" "$(docker compose logs opa 2>/dev/null | grep '"path":"trino/batch"' | grep -o '"operation":"[A-Za-z]*"' | sort -u | grep -Ev '"(FilterCatalogs|FilterSchemas|FilterTables|FilterColumns|FilterViewQueryOwnedBy)"' | wc -l)" "0"
+check "OPA's log: the batch rule saw FilterCatalogs, FilterSchemas, FilterTables and FilterColumns" "$(docker compose logs opa 2>/dev/null | grep '"path":"trino/batch"' | grep -o '"operation":"[A-Za-z]*"' | sort -u | grep -Ec '"(FilterCatalogs|FilterSchemas|FilterTables|FilterColumns)"')" "4"
+check "OPA's log: no FilterColumns asked one column at a time at allow" "$(docker compose logs opa 2>/dev/null | grep '"path":"trino/allow"' | grep -c '"operation":"FilterColumns"')" "0"
 
 echo "== 11. Trino stopped: kind unavailable"
 # shellcheck disable=SC2086

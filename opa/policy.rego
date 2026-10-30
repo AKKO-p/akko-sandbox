@@ -1,7 +1,9 @@
 # The sandbox access policy. Trino asks it three questions:
 #   allow       may this user do this action?
+#   batch       which of these resources may this user see? (the filter operations)
 #   rowFilters  which rows of this table may this user see?
 #   columnMask  how is this column shown to this user?
+#   batchColumnMasks  the same, for all the columns of a table at once
 # akko-mcp-trino decides none of it: it only sends the query as the user.
 package trino
 
@@ -35,9 +37,9 @@ forbidden if {
 # 2a. Viewers may not see account balances: the column is left out of every
 #     listing (FilterColumns: information_schema, system.jdbc, SHOW COLUMNS,
 #     DESCRIBE) and refused in a query (SelectFromColumns). Trino asks
-#     FilterColumns here, at allow, one column at a time, since this sandbox sets
-#     no opa.policy.batched-uri. Reading information_schema and system.jdbc
-#     stays allowed: Trino filters them with this same rule.
+#     FilterColumns through batch (rule 5), which applies this same rule to each
+#     column. Reading information_schema and system.jdbc stays allowed: Trino
+#     filters them with this same rule.
 forbidden if {
 	role == "viewer"
 	input.action.operation in {"FilterColumns", "SelectFromColumns"}
@@ -87,6 +89,44 @@ columnMask := {"expression": "'***' || substr(email, strpos(email, '@'))"} if {
 rowFilters contains {"expression": "country IN ('DE', 'ES', 'FR', 'IT', 'NL')"} if {
 	role == "analyst"
 	is_customers(input.action.resource.table)
+}
+
+# 5. Batch. Trino filters a listing (catalogs, schemas, tables, columns) with
+#    opa.policy.batched-uri: one request carries every resource of the listing in
+#    input.action.filterResources, and the answer is the indexes of those the user
+#    may see. Without it Trino asks `allow` once per resource, which saturates
+#    OPA's request queue on a table of a few hundred columns.
+#    Each index is kept when `allow` accepts the same action on that one resource,
+#    so the two paths, one question per resource or one for all, cannot disagree:
+#    the rules above are written once, over input.action.resource.
+#    Only the operations named here are answered; any other asks nothing and is
+#    granted nothing, since the shape of its resource may be one `forbidden` does
+#    not read.
+batch_operations := {"FilterCatalogs", "FilterSchemas", "FilterTables", "FilterViewQueryOwnedBy"}
+
+batch contains i if {
+	input.action.operation in batch_operations
+	some i, resource in input.action.filterResources
+	allow with input.action.resource as resource
+}
+
+# FilterColumns is the one exception in shape: a single resource, the table, whose
+# `columns` lists the columns to filter, and the indexes are those of the columns.
+# Each column is asked as a table of that one column, as `allow` is asked.
+batch contains i if {
+	input.action.operation == "FilterColumns"
+	count(input.action.filterResources) == 1
+	table := input.action.filterResources[0].table
+	some i, column in table.columns
+	allow with input.action.resource as {"table": object.union(table, {"columns": [column]})}
+}
+
+# 6. Batch column masks, the batched form of rule 3: one request carries every
+#    column of the table, and the answer is the masks to apply, by index. Each
+#    column is asked of `columnMask`, as in the single-resource path.
+batchColumnMasks contains {"index": i, "viewExpression": mask} if {
+	some i, resource in input.action.filterResources
+	mask := columnMask with input.action.resource as resource
 }
 
 is_customers(t) if {
