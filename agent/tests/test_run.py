@@ -651,3 +651,61 @@ def test_ask_records_an_error_by_its_kind_only(monkeypatch):
 def test_a_server_without_a_version_says_so():
     init = SimpleNamespace(server_info=SimpleNamespace(name="trino-mcp", version=""))
     assert run.server_name(init, TOOLS) == "trino-mcp (no version announced), 2 tools: list_catalogs, search_columns"
+
+
+# Fix round 2: fairness of the sighting rule and of the recorded names.
+
+
+@pytest.mark.parametrize("table", ["crm.transactions", "demo.crm.transactions", '"demo"."crm"."transactions"'])
+def test_a_qualified_table_argument_names_the_table(table):
+    result = json.dumps({"columns": ["Column", "Type"], "rows": [["amount", "decimal(12,2)"]]})
+    assert run.result_shows({"catalog": "demo", "table": table}, result, AMOUNT)
+
+
+@pytest.mark.parametrize(
+    "arguments",
+    [
+        {"table": "crm_archive.transactions"},
+        {"table": "demo.crm_archive.transactions"},
+        {"table": "crm.transactions_2019"},
+        {"schema": "crm_archive", "table": "crm.transactions"},
+    ],
+)
+def test_a_qualified_table_argument_for_another_table(arguments):
+    result = json.dumps({"columns": ["Column", "Type"], "rows": [["amount", "decimal(12,2)"]]})
+    assert not run.result_shows(arguments, result, AMOUNT)
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        {"error": "Column 'demo.crm.transactions.amount' cannot be resolved", "kind": "column"},
+        {"error": "line 1:8: Column 'amount' cannot be resolved", "kind": "column", "columns": ["amount"]},
+    ],
+)
+def test_an_error_result_shows_nothing_even_unflagged(result):
+    sql = {"sql": "SELECT amount FROM demo.crm.transactions"}
+    assert not run.result_shows(sql, json.dumps(result), AMOUNT)
+
+
+def test_nested_objects_inherit_their_parent_schema():
+    archive = json.dumps(
+        {
+            "catalog": "demo",
+            "schema": "crm_archive",
+            "tables": [{"table": "accounts", "columns": [{"column": "balance"}]}],
+        }
+    )
+    assert not run.result_shows({"catalog": "demo", "schema": "crm_archive"}, archive, "demo.crm.accounts.balance")
+    current = archive.replace("crm_archive", "crm")
+    assert run.result_shows({"catalog": "demo", "schema": "crm"}, current, "demo.crm.accounts.balance")
+
+
+def test_other_names_leave_out_forbidden_columns_and_tables():
+    r = trial(stop="answered", forbidden=["demo.crm.accounts.balance"])
+    r.score(
+        "SUM(demo.crm.transactions.amount) by demo.crm.accounts.customer_id, joining demo.crm.customers "
+        "and crm.customers.full_name; not demo.crm.accounts.balance"
+    )
+    assert r.forbidden_named == ["demo.crm.accounts.balance"]
+    assert r.other_named == ["crm.customers.full_name"]

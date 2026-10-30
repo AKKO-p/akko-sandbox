@@ -120,38 +120,45 @@ def answer_names(answer: str, expected: str) -> bool:
     return qualified(expected).search(plain(answer)) is not None
 
 
-def other_names(answer: str, expected: list[str]) -> list[str]:
-    """The dotted names of three or four parts the answer gives that are neither an expected
-    column nor one of their tables or schemas: recorded, so that a reader sees a shotgun
-    answer; only the question's forbidden columns change the verdict."""
-    known = set()
-    for c in expected:
+def other_names(answer: str, expected: list[str], forbidden: Iterable[str] = ()) -> list[str]:
+    """The other columns the answer names: dotted names of four parts, and of three parts
+    that do not start with an expected column's catalog (catalog.schema.table is a table),
+    that are neither an expected nor a forbidden column, nor one of the expected columns'
+    tables or schemas. Recorded, so that a reader sees a shotgun answer; only the
+    question's forbidden columns change the verdict."""
+    known: set[str] = set()
+    catalogs = set()
+    for c in [*expected, *forbidden]:
         parts = split_column(c)
+        catalogs.add(parts[0])
         known |= {".".join(parts[i:]) for i in range(3)} | {".".join(parts[i:3]) for i in range(2)}
     found = []
     for name in DOTTED.findall(plain(answer)):
-        if name.count(".") >= 2 and name not in known and name not in found:
+        dots = name.count(".")
+        table = dots == 2 and name.split(".")[0] in catalogs
+        if dots >= 2 and not table and name not in known and name not in found:
             found.append(name)
     return found
 
 
-def _holds_column(value: Any, table: str, schema: str, column: str, in_table: bool) -> bool:
+def _holds_column(value: Any, table: str, schema: str, column: str, in_table: bool, here: str) -> bool:
     """Whether a JSON value holds the column's name inside something that names its table:
-    an object whose "table" is the table (and whose "schema", if any, is its schema), an
-    array (a row) that holds the table's name, or the whole result when the call's
-    arguments name the table."""
+    an object whose "table" is the table and whose schema, its own or the nearest enclosing
+    object's ("here"), is its schema; an array (a row) that holds the table's name; or the
+    whole result when the call's arguments name the table."""
     if isinstance(value, str):
         return in_table and value.lower() == column
     if isinstance(value, dict):
+        here = str(value.get("schema", here)).lower()
         # An object that says its table speaks for itself: a search match in another table
         # never inherits the call's arguments.
         named = in_table
         if "table" in value:
-            named = str(value["table"]).lower() == table and str(value.get("schema", schema)).lower() == schema
-        return any(_holds_column(v, table, schema, column, named) for v in value.values())
+            named = str(value["table"]).lower() == table and here == schema
+        return any(_holds_column(v, table, schema, column, named, here) for v in value.values())
     if isinstance(value, list):
         named = in_table or any(isinstance(v, str) and v.lower() == table for v in value)
-        return any(_holds_column(v, table, schema, column, named) for v in value)
+        return any(_holds_column(v, table, schema, column, named, here) for v in value)
     return False
 
 
@@ -168,13 +175,23 @@ def _strings(value: Any) -> Iterable[str]:
 
 def arguments_name_table(arguments: dict, expected: str) -> bool:
     """Whether a call's arguments name the column's table: as structured arguments (a
-    "table", with its "schema" when given), or in a text such as the SQL of a query, as
-    catalog.schema.table, schema.table or table."""
+    "table", bare or written catalog.schema.table or schema.table, with its "schema" when
+    given), or in a text such as the SQL of a query, in the same forms."""
     _, schema, table, _ = split_column(expected)
-    if "table" in arguments:
-        return str(arguments["table"]).lower() == table and str(arguments.get("schema", schema)).lower() == schema
     pattern = table_named(expected)
+    if "table" in arguments:
+        # A bare name with its schema argument, or a name the model wrote qualified.
+        given = plain(str(arguments["table"]))
+        if str(arguments.get("schema", schema)).lower() != schema:
+            return False
+        return given == table or pattern.fullmatch(given) is not None
     return any(pattern.search(plain(s)) for s in _strings(arguments))
+
+
+def is_error_result(value: Any) -> bool:
+    """Whether a tool result is the server's error, {"error": ...}, whether or not the MCP
+    result was flagged as an error: an error shows no column, whatever it quotes."""
+    return isinstance(value, dict) and "error" in value
 
 
 def result_shows(arguments: dict, result: str, expected: str) -> bool:
@@ -186,9 +203,11 @@ def result_shows(arguments: dict, result: str, expected: str) -> bool:
         value = json.loads(result)
     except ValueError:
         value = result
+    if is_error_result(value):
+        return False
     if any(qualified(expected).search(plain(s)) for s in _strings(value)):
         return True
-    return _holds_column(value, table, schema, column, arguments_name_table(arguments, expected))
+    return _holds_column(value, table, schema, column, arguments_name_table(arguments, expected), schema)
 
 
 # ---------------------------------------------------------------------------
@@ -254,7 +273,7 @@ class Record:
         self.answer = text
         self.named = {c: answer_names(text, c) for c in self.expected}
         self.forbidden_named = [c for c in self.forbidden if answer_names(text, c)]
-        self.other_named = other_names(text, self.expected)
+        self.other_named = other_names(text, self.expected, self.forbidden)
 
 
 def collapse(tools: list[str]) -> str:

@@ -135,10 +135,12 @@ such as the current transactions' `amount` for the archived year: naming it at
 all makes the answer wrong, even beside the right one. The system prompt asks the
 model to name every column it relies on, and no other.
 
-The report also lists every other column the answer names (`other`), dotted
-names of three or four parts that are neither an expected column nor one of
-their tables or schemas. They do not change the verdict: they show a reader an
-answer that names more than it needs.
+The report also lists every other column the answer names (`other`): dotted
+names of four parts, and of three parts that do not start with a catalog of the
+question's columns (`demo.crm.customers` is a table, `crm.customers.full_name` a
+column), that are neither an expected nor a forbidden column, nor one of the
+expected columns' tables or schemas. They do not change the verdict: they show a
+reader an answer that names more than it needs.
 
 ### Matching a column in the final answer
 
@@ -153,19 +155,22 @@ columns.
 ### When a column shows in a tool result
 
 The rule reads the JSON the server returns, whatever its keys, the same for
-every server version. A result that is an error shows nothing. Otherwise a
-result shows a column when:
+every server version. A result that is an error shows nothing, whether the MCP
+result is flagged as an error or only carries the server's `{"error": ...}`, and
+whatever the error quotes. Otherwise a result shows a column when:
 
 - it holds the column's qualified name anywhere (`crm.transactions.amount`, as
   in a query plan);
-- an object in it says its table (and its schema, when it says one) and holds the
-  column's name: a `search_columns` match, a `describe_schema` table. Such an
-  object speaks for itself: a match in another table never counts, whatever the
-  call's arguments say;
+- an object in it says its table and holds the column's name, and its schema, its
+  own or the nearest enclosing object's, is the column's: a `search_columns`
+  match, a `describe_schema` table under the answer's `schema`. Such an object
+  speaks for itself: a match in another table never counts, whatever the call's
+  arguments say;
 - an array in it holds the table's name and the column's: a row of a query on
   `information_schema`;
 - the call's arguments name the table and the result holds the column's name:
-  `describe_table` with `table` (and `schema`, when given), or a query whose SQL
+  `describe_table` with `table`, bare or written `schema.table` or
+  `catalog.schema.table` (and `schema`, when given, the column's), or a query whose SQL
   names the table as `catalog.schema.table`, `schema.table` or `table`
   (`SELECT * FROM demo.crm.transactions` shows `amount` in its `columns`), with
   quotes ignored. `demo.crm_archive.transactions_2019` and
@@ -179,7 +184,9 @@ A listing of tables shows no column.
 `carol_analyst`, who sees every table of `demo.crm` and `demo.crm_archive`. Each
 entry gives the question, the columns that answer it, the wrong but plausible
 columns that make an answer wrong, and why. The questions are fixed before any
-run and are not changed to get a result.
+run and are not changed to get a result. The archive tables are empty, so the
+right number for the archived year is 0 or NULL: only the columns the answer
+names are scored, and a model may say the table is empty.
 
 ## Tests
 
