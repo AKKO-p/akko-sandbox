@@ -4,10 +4,16 @@ The second measurement, after the search change (akko-mcp-trino `main` f55ef00: 
 by words across columns and tables, table-only hits in `tables`, a `hint` on a complete empty
 search). The first measurement (2026-10-30) stays in this folder as history.
 
-**Headline (Mistral `codestral-latest`, 3 trials per question): 0.7.0 cuts the tool calls from
-6.8 to 2.6 per trial, and the right answers drop from 9/15 to 6/15.** On Q1 and Q3, every 0.7.0
-trial made a single search, got an empty answer with its `hint`, and stopped. **Claude did not
-run**: every trial ended in `AuthenticationError` 401 before any model call, on both servers.
+**Headline, 3 trials per question:**
+
+- **Claude `claude-sonnet-5-5`: 0.7.0 cuts the tool calls from 8.5 to 4.5 per trial and gets
+  every answer right (15/15 against 12/15).** Claude searches one or two words at a time.
+- **Mistral `codestral-latest`: 0.7.0 cuts the tool calls from 6.8 to 2.6 per trial, but the right
+  answers drop from 9/15 to 6/15.** On Q1 and Q3, every 0.7.0 trial made a single search with
+  the whole question, got an empty answer with its `hint`, and stopped.
+
+The Claude passes first failed with `AuthenticationError` 401 on every trial. They were run again
+the same day with a new key; the 401 reports are in this branch's history (commit 5a31eac).
 
 ## Setup
 
@@ -18,7 +24,7 @@ run**: every trial ended in `AuthenticationError` 401 before any model call, on 
 | After | `akko-mcp-trino:0.7.0-f55ef00`, built from akko-mcp-trino `main` f55ef00: 8 tools, announces `trino-mcp 0.7.0` |
 | Questions, rules, prompt, limits | unchanged since the first measurement: `agent/questions.json`, persona `carol_analyst`, `--max-steps 12`, `--max-tokens 16000` |
 | Mistral | `codestral-latest` (the API returned the same id), temperature 0, random_seed 0, `--repeat 3`; no 429 |
-| Claude | `claude-sonnet-5-5`, `--repeat 3`: `AuthenticationError` 401 on all 30 trials, no token spent |
+| Claude | `claude-sonnet-5-5` (the API returned the same id), `--repeat 3`, the API's default sampling (it takes no temperature); a one-trial key check first (`2026-11-01-keycheck-anthropic-*`); 1.54 USD for all the trials |
 
 ## Totals
 
@@ -26,8 +32,8 @@ run**: every trial ended in `AuthenticationError` 401 before any model call, on 
 |---|---|---|---|---|---|
 | 0.6.1 × Mistral | 9/15 | 6.8 | 10,679 | 242 | 0 |
 | 0.7.0 × Mistral | 6/15 | 2.6 | 11,651 | 91 | 0 |
-| 0.6.1 × Claude | not run (401) | | | | |
-| 0.7.0 × Claude | not run (401) | | | | |
+| 0.6.1 × Claude | 12/15 | 8.5 | 18,386 | 1,148 | 3 (Q5, a cross-check) |
+| 0.7.0 × Claude | 15/15 | 4.5 | 21,543 | 749 | 0 |
 
 ## Mistral, per question (3 trials each)
 
@@ -76,7 +82,7 @@ server's answer (`2026-11-01-replay-0.7.0.txt`). The harness records arguments, 
 `search_columns` timing per schema is not visible: the harness records the wall time per trial
 only (mean 5.1 s on 0.6.1, 4.8 s on 0.7.0), not per call.
 
-## Reading
+## Reading, Mistral
 
 The word search does what it was meant to do: once the model sends the right words, the column
 or the table comes back at call 1 or 2, and the trials that use it are shorter. The loss comes
@@ -84,3 +90,44 @@ from one behaviour. Codestral sends the whole question as one search and treats 
 answer, even with the hint, as the end. On 0.6.1 it has no such shortcut, so it walks the tree
 and gets Q3 right. The cause is the AND of every word, together with a model that does not
 follow the hint. Neither the questions nor the scoring rules explain it.
+
+## Claude, per question (3 trials each)
+
+| # | Question | Right 0.6.1 → 0.7.0 | Tool calls, per trial | What 0.7.0 searched |
+|---|---|---|---|---|
+| 1 | Revenue per customer | 3/3 → 3/3 | 10, 10, 10 → 6, 6, 6 | `revenue`, then `customer` (both found) |
+| 2 | Segment with the largest balance | 3/3 → 3/3 | 8, 8, 8 → 6, 6, 5 | `customer segment`, `account balance` (found); once `exchange rate` (empty) |
+| 3 | Spending per category, March 2026 | 3/3 → 3/3 | 7, 7, 7 → 4, 4, 4 | `spending category` (found), then `category amount` (empty, with the hint) |
+| 4 | Accounts per currency | 3/3 → 3/3 | 7, 7, 7 → 3, 3, 3 | `account currency` (found) |
+| 5 | Archived transactions, 2019 | 0/3 → 3/3 | 10, 10, 11 → 4, 4, 4 | `archived transactions 2019` (the table only), `archived transaction amount` (the twelve archive amounts) |
+
+Claude's search calls were replayed in the same way (`2026-11-01-replay-claude-0.7.0.txt`).
+
+- **Claude never sends the whole question as one search.** It searches one or two words at a
+  time and moves on to `describe_table`, then
+  `execute_query`. An empty search happened four times, and each time it came after searches
+  that had already found the columns: `category amount` in the three Q3 trials, followed by
+  `describe_table` on `transactions`, and `exchange rate` once in Q2, before the final answer.
+  The hint never had to steer it, and an empty answer never stopped it.
+- **Q5 on 0.6.1, 0/3: the answer is right, but the rule marks it wrong.** Claude walks the tree,
+  describes `crm_archive.transactions_2019` and finds it empty. Then, to be thorough, it checks
+  `demo.crm.transactions` for 2019 rows and several other archive years. The answer gives the
+  right result (no 2019 transactions, the sum is NULL). It names
+  `demo.crm_archive.transactions_2019.amount` as the column relied on, and lists
+  `demo.crm.transactions.amount` among its cross-checks. The fixed rule counts any forbidden column
+  named in the final answer, so the three trials are wrong. This is the strictness noted before the
+  first run, and here it penalises 0.6.1. On 0.7.0 the search lands on the archive table at once,
+  Claude does not look elsewhere, and all three trials are right in 4 calls. With that cross-check
+  forgiven, 0.6.1 would score 15/15 as well. The fewer calls on 0.7.0 still hold.
+- **Q2:** both versions name the join key `accounts.customer_id`. On 0.7.0 one trial also notes
+  that one account (USD, customer 4) has no customer row visible to `carol_analyst` (the policy's
+  row filter) and leaves it out, which is correct for that user.
+- No expected column was named without having been shown.
+
+## Reading, both models
+
+The word search pays off with a model that searches by words: Claude needs about half the calls
+on every question (8.5 → 4.5) and is right on every trial. Codestral sends the whole question as
+one search and stops on the empty answer even with the hint, so the shorter path costs it Q3.
+Input tokens per trial are a little higher on 0.7.0 for both models (the longer tool
+descriptions), and output tokens are lower (fewer turns).
