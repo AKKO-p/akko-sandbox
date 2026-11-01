@@ -49,10 +49,10 @@ call() { # user, tool, then name=value arguments
 }
 # A Python expression on the JSON read from stdin, as d; prints nothing on bad JSON.
 field() { python3 -c "
-import sys, json
+import os, sys, json
 try: d = json.load(sys.stdin)
 except ValueError: sys.exit(0)
-try: print(eval(sys.argv[1], {}, {'d': d}))
+try: print(eval(sys.argv[1], {'os': os}, {'d': d}))
 except Exception: pass" "$1"; }
 # Straight to Trino (or to the gateway, which the server is told of), from the MCP
 # server's container, with a user's own token for Trino: prints
@@ -98,6 +98,8 @@ for line in sys.stdin:
     except ValueError: pages.append({})
 try: print(eval(sys.argv[1], {}, {'pages': pages}))
 except Exception as e: print('error:', type(e).__name__)" "$1"; }
+# The most words a search takes, as the server itself says in --check.
+search_words_limit() { docker compose exec -T mcp akko-mcp-trino --check 2>&1 | sed -n 's/.* \([0-9][0-9]*\) words at most.*/\1/p' | head -1; }
 names() { field 'sorted({m["table"] for m in d["matches"]})'; }
 # The server's log so far, kept before its container is created again.
 keep_logs() { docker compose logs --no-color mcp >> "$scratch/mcp.log" 2>&1; }
@@ -154,7 +156,11 @@ echo "== 3. dave_viewer sees nothing of crm.customers, nor of accounts.balance"
 # What dave gets, kept for the checks at the end of this section; never what he
 # asks by name himself (a refused SELECT balance, the tpcds catalog), which Trino
 # repeats in its error. Each of his answers has its twin for carol or alice.
-d() { call dave_viewer "$@" | tee -a "$scratch/dave"; }
+# Each call is counted in dave_calls, each page of a tee'd walk or search in dave_pages
+# (dave_count adds them), so that the count of his answers is derived, never written.
+d() { echo >> "$scratch/dave_calls"; call dave_viewer "$@" | tee -a "$scratch/dave"; }
+dave_pages() { grep -c . <<<"$1" >> "$scratch/dave_pages"; }
+dave_count() { cat "$scratch/dave_calls" "$scratch/dave_pages" 2>/dev/null | awk '/^$/ {n++; next} {n += $1} END {print n + 0}'; }
 match() { field '[(m["table"], m["column"]) for m in d["matches"]]'; }
 for word in full_name email segment; do
   check "dave, '$word' in demo: no match, complete" "$(d search_columns text=$word catalog=demo | field '(d["matches"], d["complete"])')" "([], True)"
@@ -162,26 +168,104 @@ for word in full_name email segment; do
 done
 check "carol: segment comes with its comment" "$(call carol_analyst search_columns text=segment catalog=demo | field 'd["matches"][0]["comment"]')" "Retail or business customer"
 check "dave, 'customer' in demo: accounts only" "$(d search_columns text=customer catalog=demo | names)" "['accounts']"
-check "carol, 'customer' in demo: accounts and customers" "$(call carol_analyst search_columns text=customer catalog=demo | names)" "['accounts', 'customers']"
+# A table found by its own name or comment is in `tables`, with no list of its columns;
+# its columns come in `matches` only for a word of their own name or comment.
+customer=$(search_all carol_analyst text=customer catalog=demo)
+check "carol, 'customer' in demo: tables accounts and customers, across the cursor" "$(pages 'sorted({t["table"] for p in pages for t in p["tables"]})' <<<"$customer")" "['accounts', 'customers']"
+check "  the columns listed hold the word in their own name or comment: accounts.customer_id, customers.segment" "$(pages 'sorted({(m["table"], m["column"]) for p in pages for m in p["matches"]})' <<<"$customer")" "[('accounts', 'customer_id'), ('customers', 'segment')]"
+check "  the search is complete, with no hint: something was found" "$(pages '(pages[-1]["complete"], any("hint" in p for p in pages))' <<<"$customer")" "(True, False)"
+check "dave, 'customer' in demo: the table accounts only, customers is not his" "$(d search_columns text=customer catalog=demo | field 'sorted(t["table"] for t in d["tables"])')" "['accounts']"
 # A catalog he may not see and one he may, in the same search: the one he may
 # is searched, every schema of it; the other appears nowhere.
 out=$(d search_columns text=email)
 check "dave, 'email' in every catalog: no match, complete, nothing left" "$(field '(d["matches"], d["complete"], d["not_searched"])' <<<"$out")" "([], True, [])"
 check "  every schema of demo and tpch searched" "$(field 'd["schemas_searched"]' <<<"$out")" "$(( schemas[demo] + schemas[tpch] ))"
-out=$(search_all dave_viewer text=mktsegment | tee -a "$scratch/dave")
+out=$(search_all dave_viewer text=mktsegment | tee -a "$scratch/dave"); dave_pages "$out"
 check "dave, 'mktsegment' in every catalog: tpch.customer in each tpch schema" "$(pages '(sorted({(m["catalog"], m["table"], m["column"]) for p in pages for m in p["matches"]}), sum(len(p["matches"]) for p in pages), pages[-1]["complete"])' <<<"$out")" "([('tpch', 'customer', 'mktsegment')], ${schemas[tpch]}, True)"
+check "dave, 'mktsegment': the table tpch.customer in tables too" "$(pages 'sorted({(t["catalog"], t["table"]) for p in pages for t in p["tables"]})' <<<"$out")" "[('tpch', 'customer')]"
 check "  every schema of demo and tpch searched once" "$(pages 'sum(p["schemas_searched"] for p in pages)' <<<"$out")" "$(( schemas[demo] + schemas[tpch] ))"
 check "dave's catalogs: tpcds is not one" "$(d list_catalogs | field 'd["catalogs"]')" "['demo', 'tpch']"
 check "carol's catalogs: tpcds too" "$(call carol_analyst list_catalogs | field 'd["catalogs"]')" "['demo', 'tpcds', 'tpch']"
 check "carol, 'email' in every catalog: demo and tpcds" "$(call carol_analyst search_columns text=email | field 'sorted({m["catalog"] for m in d["matches"]})')" "['demo', 'tpcds']"
-out=$(walk dave_viewer describe_schema catalog=demo schema=crm | tee -a "$scratch/dave")
+
+echo "== 3b. Search by words: tables, a table's comment, several words, no result, too many words"
+# crm.transactions is commented 'Movements booked on the accounts' (postgres/init.sql):
+# 'movements' is in that comment and in no column's name or comment.
+for who in carol_analyst dave_viewer; do
+  if [ $who = dave_viewer ]; then out=$(d search_columns text=movements catalog=demo); else out=$(call $who search_columns text=movements catalog=demo); fi
+  check "$who, 'movements': the table transactions, none of its columns" "$(field '([(t["schema"], t["table"], t["comment"]) for t in d["tables"]], d["matches"], d["complete"], "hint" in d)' <<<"$out")" "([('crm', 'transactions', 'Movements booked on the accounts')], [], True, False)"
+done
+# Two words: one in the table's comment, one in a column's name. The column answers,
+# and it alone: the other columns of the table hold neither word of their own.
+out=$(call carol_analyst search_columns text="movements amount" catalog=demo)
+check "carol, 'movements amount': the column transactions.amount, and its table" "$(field '([(m["table"], m["column"]) for m in d["matches"]], [t["table"] for t in d["tables"]], d["complete"])' <<<"$out")" "([('transactions', 'amount')], ['transactions'], True)"
+# Nothing matches: a complete empty answer says what to try; one with results does not.
+out=$(call carol_analyst search_columns text=zzqxv catalog=demo)
+check "carol, a word nothing holds: empty, complete, with a hint" "$(field '(d["matches"], d["tables"], d["complete"], bool(d.get("hint")))' <<<"$out")" "([], [], True, True)"
+# A complete search of several words that found nothing goes on to a pass by word: each word
+# alone gives its tables and columns, marked partial, with the words that found them.
+single=$(call carol_analyst search_columns text=zzqxv catalog=demo)
+nohit_hint=$(field 'd["hint"]' <<<"$single")
+out=$(call carol_analyst search_columns text="movements zzqxv" catalog=demo)
+check "carol, 'movements zzqxv': no table holds both words, so the pass by word: the table transactions, found by 'movements'" "$(field '([(t["table"], t["words"]) for t in d["tables"]], d["matches"], d["partial"], d["complete"])' <<<"$out")" "([('transactions', ['movements'])], [], True, True)"
+check "  its hint is not the one of a search that found nothing" "$(NOHIT="$nohit_hint" field 'bool(d["hint"]) and d["hint"] != os.environ["NOHIT"]' <<<"$out")" "True"
+out=$(call carol_analyst search_columns text="zzqxv qqwxj" catalog=demo)
+check "carol, two words nothing holds: empty, complete, the hint of a search that found nothing" "$(NOHIT="$nohit_hint" field '(d["matches"], d["tables"], d["complete"], d["hint"] == os.environ["NOHIT"])' <<<"$out")" "([], [], True, True)"
+# The question as an agent puts it, values included: the words of names and comments found
+# alone, the values (a month, a year) found nothing.
+spend=$(search_all carol_analyst text="spending category March 2026" catalog=demo)
+check "carol, 'spending category March 2026': transactions.category, found by 'spending' and 'category'" "$(pages '[(m["table"], m["column"], sorted(m["words"])) for p in pages for m in p["matches"]]' <<<"$spend")" "[('transactions', 'category', ['category', 'spending'])]"
+check "  partial, complete, the table transactions with it" "$(pages '(all(p["partial"] for p in pages), pages[-1]["complete"], sorted({t["table"] for p in pages for t in p["tables"]}))' <<<"$spend")" "(True, True, ['transactions'])"
+check "  'march' and '2026' found nothing: no row names them" "$(pages 'sorted({w.lower() for p in pages for r in p["matches"] + p["tables"] for w in r["words"]} & {"march", "2026"})' <<<"$spend")" "[]"
+check "  every schema of demo searched by the pass by word" "$(pages 'sum(p["schemas_searched"] for p in pages)' <<<"$spend")" "${schemas[demo]}"
+# What the pass by word shows him: what he sees, no more. 'balance' and 'segment' are in
+# columns he does not see (accounts.balance, customers.segment), 'revenue' in one he does.
+for word in balance segment; do
+  out=$(call carol_analyst search_columns text="revenue $word" catalog=demo)
+  check "carol, 'revenue $word': both columns, each by its word" "$(field 'sorted((m["table"], m["column"], m["words"][0]) for m in d["matches"])' <<<"$out")" "$([ $word = balance ] && echo "[('accounts', 'balance', 'balance'), ('transactions', 'amount', 'revenue')]" || echo "[('customers', 'segment', 'segment'), ('transactions', 'amount', 'revenue')]")"
+  out=$(d search_columns text="revenue $word" catalog=demo)
+  check "dave, 'revenue $word': transactions.amount only, partial" "$(field '(sorted((m["table"], m["column"], m["words"][0]) for m in d["matches"]), sorted(t["table"] for t in d["tables"]), d["partial"])' <<<"$out")" "([('transactions', 'amount', 'revenue')], ['transactions'], True)"
+done
+# A wrong column in his own SQL: the advice names the tables of that SQL, and only them.
+out=$(call carol_analyst execute_query 'sql=SELECT a.nosuchcol FROM demo.crm.accounts a')
+check "carol, a wrong column of accounts: kind column, describe_table on accounts only" "$(field '(d["kind"], "describe_table" in d["hint"], "accounts" in d["hint"], "customers" in d["hint"] or "transactions" in d["hint"])' <<<"$out")" "('column', True, True, False)"
+out=$(call carol_analyst execute_query 'sql=SELECT nosuchcol FROM demo.crm.accounts a, demo.crm.transactions t')
+check "carol, a wrong column over two tables: both named, no other" "$(field '("accounts" in d["hint"], "transactions" in d["hint"], "customers" in d["hint"])' <<<"$out")" "(True, True, False)"
+out=$(call dave_viewer execute_query 'sql=SELECT a.nosuchcol FROM demo.crm.accounts a')
+check "dave, a wrong column of accounts: the advice names accounts" "$(field '(d["kind"], "describe_table" in d["hint"], "accounts" in d["hint"], "customers" in d["hint"])' <<<"$out")" "('column', True, True, False)"
+# He names a table the policy hides next to one he sees. Trino reports the column first:
+# the advice names the tables of his SQL that he sees, never the hidden one, and no column.
+out=$(call dave_viewer execute_query 'sql=SELECT a.nosuchcol FROM demo.crm.accounts a JOIN demo.crm.customers c ON a.customer_id = c.id')
+check "dave, a wrong column qualified by the visible table, next to customers: kind column, advice on accounts alone" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "customers" in d["hint"])' <<<"$out")" "('column', 1, True, False)"
+out=$(call dave_viewer execute_query 'sql=SELECT nosuchcol FROM demo.crm.accounts a, demo.crm.customers c')
+check "dave, a column in neither: the advice names accounts, the table he sees, never customers" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "customers" in d["hint"], "transactions" in d["hint"])' <<<"$out")" "('column', 1, True, False, False)"
+# A column hidden from him in a table he sees: named, it is refused by the policy (no
+# advice); next to a column that does not exist, the advice is on the visible table and
+# lists no column.
+out=$(call dave_viewer execute_query 'sql=SELECT a.balance FROM demo.crm.accounts a')
+check "dave, the hidden column named: kind permission, no advice" "$(field '(d["kind"], "hint" in d)' <<<"$out")" "('permission', False)"
+out=$(call dave_viewer execute_query 'sql=SELECT balance, nosuchcol FROM demo.crm.accounts')
+check "dave, a hidden column and an unknown one: kind column, advice on accounts, no column named in it" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "balance" in d["hint"], d["identifier"])' <<<"$out")" "('column', 1, True, False, 'nosuchcol')"
+# The limit of words: `limit` words are searched, one more is refused, before any query
+# reaches the engine. The witness first: the engine does receive the words of a search.
+limit=$(search_words_limit)
+check "the server says how many words a search takes (--check)" "$([[ $limit =~ ^[1-9][0-9]*$ ]] && echo yes)" "yes"
+words_of() { python3 -c "print(' '.join(f'$1{i}x' for i in range($2)))"; }
+queries() { local n; n=$(received "$1"); [[ $n =~ ^[0-9]+$ ]] && echo "$n" || echo "received failed"; }
+out=$(call carol_analyst search_columns text="$(words_of okword "$limit")" catalog=demo)
+check "carol, exactly $limit words: searched, no error, nothing found, complete" "$(field '("error" not in d, d["matches"], d["complete"])' <<<"$out")" "(True, [], True)"
+check "  the engine received queries with these words (the witness of the count below)" "$([ "$(queries okword0x)" != 0 ] && [ "$(queries okword0x)" != "received failed" ] && echo yes)" "yes"
+out=$(call carol_analyst search_columns text="$(words_of refusedw "$((limit + 1))")" catalog=demo)
+check "carol, $((limit + 1)) words: refused, the error names the words and the limit, no matches" "$(field '(d.get("error", "").count("words") > 0 and "'"$limit"'" in d.get("error", ""), "matches" in d)' <<<"$out")" "(True, False)"
+check "  refused before any query: the engine received none with these words" "$(queries refusedw0x)" "0"
+out=$(walk dave_viewer describe_schema catalog=demo schema=crm | tee -a "$scratch/dave"); dave_pages "$out"
 check "dave, describe_schema crm by pages: one page, accounts and transactions" "$(pages '[([t["table"] for t in p["tables"]], p["shortened"], p["next_offset"]) for p in pages]' <<<"$out")" "[(['accounts', 'transactions'], False, None)]"
 check "dave, describe_schema crm: accounts without balance" "$(pages '[c["column"] for p in pages for t in p["tables"] if t["table"] == "accounts" for c in t["columns"]]' <<<"$out")" "['id', 'customer_id', 'opened_on', 'currency']"
 out=$(walk carol_analyst describe_schema catalog=demo schema=crm)
 check "carol, describe_schema crm by pages: two pages, three tables" "$(pages '[([t["table"] for t in p["tables"]], p["shortened"], p["next_offset"]) for p in pages]' <<<"$out")" "[(['accounts', 'customers'], True, 2), (['transactions'], False, None)]"
 check "carol: balance with its comment" "$(pages '[c["comment"] for p in pages for t in p["tables"] for c in t["columns"] if c["column"] == "balance"]' <<<"$out")" "['Current balance in the account currency']"
 check "carol: customers with its comment and its columns" "$(pages '[(t["comment"], [c["column"] for c in t["columns"]]) for p in pages for t in p["tables"] if t["table"] == "customers"]' <<<"$out")" "[('People and companies who hold an account', ['id', 'full_name', 'email', 'country', 'segment'])]"
-out=$(walk dave_viewer list_tables catalog=demo schema=crm | tee -a "$scratch/dave")
+out=$(walk dave_viewer list_tables catalog=demo schema=crm | tee -a "$scratch/dave"); dave_pages "$out"
 check "dave, list_tables crm by pages: accounts and transactions" "$(pages '[(p["tables"], p["next_offset"]) for p in pages]' <<<"$out")" "[(['accounts', 'transactions'], None)]"
 check "carol, list_tables crm: customers too" "$(call carol_analyst list_tables catalog=demo schema=crm | field 'd["tables"]')" "['accounts', 'customers', 'transactions']"
 check "dave, 'balance' in demo: no match" "$(d search_columns text=balance catalog=demo | field 'd["matches"]')" "[]"
@@ -200,11 +284,36 @@ check "dave, an unknown column of accounts: kind column" "$(d execute_query 'sql
 check "dave, describe_schema of a schema that does not exist: kind schema" "$(d describe_schema catalog=demo schema=nosuch | field 'd["kind"]')" "schema"
 check "dave, describe_schema of tpcds, which he names: kind permission" "$(call dave_viewer describe_schema catalog=tpcds schema=tiny | field 'd["kind"]')" "permission"
 check "carol, describe_schema of tpcds.tiny: its tables" "$(call carol_analyst describe_schema catalog=tpcds schema=tiny | field 'len(d["tables"]) > 0')" "True"
+
+# I1: search_columns with a named schema checks that the caller sees it. A schema
+# that does not exist and one the policy hides answer the same kind schema, never
+# an empty search said to be complete; a catalog he may not use keeps Trino's error.
+check "dave, search_columns demo.crm_missing: kind schema, not found or not visible" "$(call dave_viewer search_columns text=amount catalog=demo schema=crm_missing | field '(d["kind"], d["error"], "complete" in d)')" "('schema', 'Schema demo.crm_missing not found or not visible', False)"
+check "the variant that hides crm_archive from viewers is loaded" "$(opa PUT v07-hide-archive -H 'Content-Type: text/plain' --data-binary 'package trino
+
+forbidden if {
+	role == "viewer"
+	input.action.resource[_].catalogName == "demo"
+	input.action.resource[_].schemaName == "crm_archive"
+}')" "200"
+check "dave, search_columns demo.crm_archive, hidden: the same answer as a missing schema" "$(call dave_viewer search_columns text=amount catalog=demo schema=crm_archive | field '(d["kind"], d["error"], "complete" in d)')" "('schema', 'Schema demo.crm_archive not found or not visible', False)"
+# The row cap (5) is shared by tables and columns: the twelve tables come first, over several pages, then the twelve columns.
+check "carol, search_columns demo.crm_archive, visible to her: the twelve tables and their amount columns, across the cursor" "$(search_all carol_analyst text=amount catalog=demo schema=crm_archive | pages '(sorted({t["table"] for p in pages for t in p["tables"]}), sorted({(m["table"], m["column"]) for p in pages for m in p["matches"]}), pages[-1]["complete"], any("kind" in p for p in pages))')" "(['transactions_2014', 'transactions_2015', 'transactions_2016', 'transactions_2017', 'transactions_2018', 'transactions_2019', 'transactions_2020', 'transactions_2021', 'transactions_2022', 'transactions_2023', 'transactions_2024', 'transactions_2025'], [('transactions_2014', 'amount'), ('transactions_2015', 'amount'), ('transactions_2016', 'amount'), ('transactions_2017', 'amount'), ('transactions_2018', 'amount'), ('transactions_2019', 'amount'), ('transactions_2020', 'amount'), ('transactions_2021', 'amount'), ('transactions_2022', 'amount'), ('transactions_2023', 'amount'), ('transactions_2024', 'amount'), ('transactions_2025', 'amount')], True, False)"
+check "carol, crm_archive: the first page is incomplete and holds tables only (the row cap is shared)" "$(search_all carol_analyst text=amount catalog=demo schema=crm_archive | pages '(pages[0]["complete"], pages[0]["matches"], len(pages[0]["tables"]) > 0)')" "(False, [], True)"
+check "the variant is removed" "$(opa DELETE v07-hide-archive)" "200"
+check "dave, crm_archive again: the first page is incomplete and holds tables only" "$(search_all dave_viewer text=amount catalog=demo schema=crm_archive | pages '(pages[0]["complete"], pages[0]["matches"], len(pages[0]["tables"]) > 0)')" "(False, [], True)"
+check "dave, search_columns demo.crm_archive again: the same tables and columns" "$(search_all dave_viewer text=amount catalog=demo schema=crm_archive | pages '(sorted({t["table"] for p in pages for t in p["tables"]}), sorted({(m["table"], m["column"]) for p in pages for m in p["matches"]}), pages[-1]["complete"], any("kind" in p for p in pages))')" "(['transactions_2014', 'transactions_2015', 'transactions_2016', 'transactions_2017', 'transactions_2018', 'transactions_2019', 'transactions_2020', 'transactions_2021', 'transactions_2022', 'transactions_2023', 'transactions_2024', 'transactions_2025'], [('transactions_2014', 'amount'), ('transactions_2015', 'amount'), ('transactions_2016', 'amount'), ('transactions_2017', 'amount'), ('transactions_2018', 'amount'), ('transactions_2019', 'amount'), ('transactions_2020', 'amount'), ('transactions_2021', 'amount'), ('transactions_2022', 'amount'), ('transactions_2023', 'amount'), ('transactions_2024', 'amount'), ('transactions_2025', 'amount')], True, False)"
+check "carol, search_columns demo.crm, visible: complete, transactions.amount" "$(call carol_analyst search_columns text=revenue catalog=demo schema=crm | field '([(m["table"], m["column"]) for m in d["matches"]], (d["schemas_searched"], d["complete"]) == (1, True))')" "([('transactions', 'amount')], True)"
+check "dave, search_columns tpcds.tiny, a catalog he may not use: Trino's kind permission" "$(call dave_viewer search_columns text=amount catalog=tpcds schema=tiny | field 'd["kind"]')" "permission"
+check "carol, search_columns tpcds.tiny, which she may use: matches, complete" "$(call carol_analyst search_columns text=amount catalog=tpcds schema=tiny | field '(len(d["matches"]) > 0, d["schemas_searched"], d["complete"], "kind" in d)')" "(True, 1, True, False)"
+# Trino asks OPA through the batch rule, not one question per column: the decision
+# log of OPA holds batch decisions, for the operations the rule names only.
+check "OPA's log: Trino asked trino/batch" "$(docker compose logs opa 2>/dev/null | grep -c '"path":"trino/batch"' | awk '{print ($1 > 0)}')" "1"
 # segment as a name of its own: tpch's mktsegment, which dave may see, holds it.
 for word in customers full_name '"segment"' email 'People and companies' 'Retail or business' balance 'Current balance' tpcds; do
   check "nothing dave got names '$word'" "$(grep -ci -- "$word" "$scratch/dave")" "0"
 done
-check "dave got his 16 answers, all JSON" "$(grep -c '^{' "$scratch/dave") $(grep -c . "$scratch/dave")" "16 16"
+check "dave got every answer asked of him, all JSON" "$(grep -c '^{' "$scratch/dave") $(grep -c . "$scratch/dave")" "$(dave_count) $(dave_count)"
 # The same column, straight in Trino, with dave's own token: the policy filters
 # every listing and refuses the read; alice sees it everywhere.
 for who in dave_viewer alice_admin; do
@@ -306,6 +415,12 @@ for view in "jdbc.columns WHERE table_cat = 'demo' AND table_schem" "metadata.ta
   check "system.${view%% *}, the server's form: $want rows read" "$(scanned "$union")" "$want"
   echo "  for reference, table_name IN (...): $(scanned "$in_list") rows read"
 done
+
+echo "== 10b. OPA's batch rule: only the operations it names"
+# Behind the gateway Trino sends no FilterViewQueryOwnedBy, so the check is on what lies outside the list.
+check "OPA's log: every batch operation is one the rule names" "$(docker compose logs opa 2>/dev/null | grep '"path":"trino/batch"' | grep -o '"operation":"[A-Za-z]*"' | sort -u | grep -Ev '"(FilterCatalogs|FilterSchemas|FilterTables|FilterColumns|FilterViewQueryOwnedBy)"' | wc -l)" "0"
+check "OPA's log: the batch rule saw FilterCatalogs, FilterSchemas, FilterTables and FilterColumns" "$(docker compose logs opa 2>/dev/null | grep '"path":"trino/batch"' | grep -o '"operation":"[A-Za-z]*"' | sort -u | grep -Ec '"(FilterCatalogs|FilterSchemas|FilterTables|FilterColumns)"')" "4"
+check "OPA's log: no FilterColumns asked one column at a time at allow" "$(docker compose logs opa 2>/dev/null | grep '"path":"trino/allow"' | grep -c '"operation":"FilterColumns"')" "0"
 
 echo "== 11. Trino stopped: kind unavailable"
 # shellcheck disable=SC2086

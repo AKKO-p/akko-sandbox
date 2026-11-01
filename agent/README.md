@@ -64,6 +64,15 @@ naming the variable, when it is missing. It never prints, logs nor writes a
 key. Compose passes `AGENT_ENV_FILE` to the container's environment only; keep
 that file outside the repository, readable by you alone (`chmod 600`).
 
+`ANTHROPIC_WORKSPACE_ID` (optional, Anthropic only): when set, its value goes
+out as the `anthropic-workspace-id` header on every request, which a key scoped
+to a workspace requires; when unset, no such header is sent. It is never
+logged nor written to a report.
+
+The report records every tool call's arguments in its JSON (`arguments`, in
+the order of `tools`), and the first 200 characters of each search text in the
+Markdown table of tools called. Nothing from the environment is recorded.
+
 ## Same settings on both sides
 
 The same system prompt, the same tools (as the server describes them), the same
