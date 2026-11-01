@@ -14,6 +14,7 @@ import json
 import os
 import re
 import sys
+import textwrap
 import time
 
 import anyio
@@ -156,7 +157,9 @@ def show(r: dict) -> None:
     print(f"   {paint('31', carol['write'] or 'answered (unexpected)')}")
     print()
     step("7. At the door")
-    print(f"   no token                    ->  HTTP {paint('31', str(gate['no_token']))}  {gate['message']}")
+    print(f"   no token                    ->  HTTP {paint('31', str(gate['no_token']))}")
+    for part in textwrap.wrap(gate["message"], 86):
+        print(f"       {part}")
     print(f"   forged signature            ->  HTTP {paint('31', str(gate['forged']))}")
     print(f"   a valid token, for Trino    ->  HTTP {paint('31', str(gate['for_trino']))}  (the server accepts only tokens issued for it)")
 
@@ -194,7 +197,7 @@ def check(r: dict) -> int:
 def main() -> int:
     if "--check" in sys.argv[1:]:
         return check(collect())
-    print(paint("1", "akko-mcp-trino sandbox: two accounts, one question, two answers"))
+    print(paint("1", "akko-mcp-trino sandbox: three accounts, one question, three outcomes"))
     print("Asking through MCP as carol_analyst, alice_admin and dave_viewer...")
     print()
     show(collect())

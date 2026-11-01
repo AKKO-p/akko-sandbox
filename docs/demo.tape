@@ -11,21 +11,21 @@ Require docker
 Set Shell "bash"
 Set FontFamily "JetBrains Mono"
 Set FontSize 16
-Set Width 1280
-Set Height 820
+Set Width 1500
+Set Height 1040
 Set Padding 24
 Set Theme "Catppuccin Mocha"
 Set WindowBar Colorful
-Set Framerate 24
+Set Framerate 15
 Set TypingSpeed 75ms
 
 # Off camera: a first run warms Trino up, so the recorded one answers at once.
-# Then two and a half seconds between the steps of the demo, to read each one.
+# Then four seconds between the seven steps of the demo, to read each one.
 Hide
 Type "export PS1='$ ' && ./demo.sh --check > /dev/null; echo warm''ed"
 Enter
 Wait+Screen@120s /warmed/
-Type "export DEMO_PACE=2.5 && clear"
+Type "export DEMO_PACE=4 && clear"
 Enter
 Sleep 500ms
 Show
@@ -36,4 +36,4 @@ Sleep 700ms
 Enter
 
 Wait+Screen@90s /forged signature/
-Sleep 8s
+Sleep 7s
