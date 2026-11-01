@@ -49,10 +49,10 @@ call() { # user, tool, then name=value arguments
 }
 # A Python expression on the JSON read from stdin, as d; prints nothing on bad JSON.
 field() { python3 -c "
-import sys, json
+import os, sys, json
 try: d = json.load(sys.stdin)
 except ValueError: sys.exit(0)
-try: print(eval(sys.argv[1], {}, {'d': d}))
+try: print(eval(sys.argv[1], {'os': os}, {'d': d}))
 except Exception: pass" "$1"; }
 # Straight to Trino (or to the gateway, which the server is told of), from the MCP
 # server's container, with a user's own token for Trino: prints
@@ -202,8 +202,50 @@ check "carol, 'movements amount': the column transactions.amount, and its table"
 # Nothing matches: a complete empty answer says what to try; one with results does not.
 out=$(call carol_analyst search_columns text=zzqxv catalog=demo)
 check "carol, a word nothing holds: empty, complete, with a hint" "$(field '(d["matches"], d["tables"], d["complete"], bool(d.get("hint")))' <<<"$out")" "([], [], True, True)"
+# A complete search of several words that found nothing goes on to a pass by word: each word
+# alone gives its tables and columns, marked partial, with the words that found them.
+single=$(call carol_analyst search_columns text=zzqxv catalog=demo)
+nohit_hint=$(field 'd["hint"]' <<<"$single")
 out=$(call carol_analyst search_columns text="movements zzqxv" catalog=demo)
-check "carol, 'movements' with a word nothing holds: no table (every word is required), a hint" "$(field '(d["matches"], d["tables"], bool(d.get("hint")))' <<<"$out")" "([], [], True)"
+check "carol, 'movements zzqxv': no table holds both words, so the pass by word: the table transactions, found by 'movements'" "$(field '([(t["table"], t["words"]) for t in d["tables"]], d["matches"], d["partial"], d["complete"])' <<<"$out")" "([('transactions', ['movements'])], [], True, True)"
+check "  its hint is not the one of a search that found nothing" "$(NOHIT="$nohit_hint" field 'bool(d["hint"]) and d["hint"] != os.environ["NOHIT"]' <<<"$out")" "True"
+out=$(call carol_analyst search_columns text="zzqxv qqwxj" catalog=demo)
+check "carol, two words nothing holds: empty, complete, the hint of a search that found nothing" "$(NOHIT="$nohit_hint" field '(d["matches"], d["tables"], d["complete"], d["hint"] == os.environ["NOHIT"])' <<<"$out")" "([], [], True, True)"
+# The question as an agent puts it, values included: the words of names and comments found
+# alone, the values (a month, a year) found nothing.
+spend=$(search_all carol_analyst text="spending category March 2026" catalog=demo)
+check "carol, 'spending category March 2026': transactions.category, found by 'spending' and 'category'" "$(pages '[(m["table"], m["column"], sorted(m["words"])) for p in pages for m in p["matches"]]' <<<"$spend")" "[('transactions', 'category', ['category', 'spending'])]"
+check "  partial, complete, the table transactions with it" "$(pages '(all(p["partial"] for p in pages), pages[-1]["complete"], sorted({t["table"] for p in pages for t in p["tables"]}))' <<<"$spend")" "(True, True, ['transactions'])"
+check "  'march' and '2026' found nothing: no row names them" "$(pages 'sorted({w.lower() for p in pages for r in p["matches"] + p["tables"] for w in r["words"]} & {"march", "2026"})' <<<"$spend")" "[]"
+check "  every schema of demo searched by the pass by word" "$(pages 'sum(p["schemas_searched"] for p in pages)' <<<"$spend")" "${schemas[demo]}"
+# What the pass by word shows him: what he sees, no more. 'balance' and 'segment' are in
+# columns he does not see (accounts.balance, customers.segment), 'revenue' in one he does.
+for word in balance segment; do
+  out=$(call carol_analyst search_columns text="revenue $word" catalog=demo)
+  check "carol, 'revenue $word': both columns, each by its word" "$(field 'sorted((m["table"], m["column"], m["words"][0]) for m in d["matches"])' <<<"$out")" "$([ $word = balance ] && echo "[('accounts', 'balance', 'balance'), ('transactions', 'amount', 'revenue')]" || echo "[('customers', 'segment', 'segment'), ('transactions', 'amount', 'revenue')]")"
+  out=$(d search_columns text="revenue $word" catalog=demo)
+  check "dave, 'revenue $word': transactions.amount only, partial" "$(field '(sorted((m["table"], m["column"], m["words"][0]) for m in d["matches"]), sorted(t["table"] for t in d["tables"]), d["partial"])' <<<"$out")" "([('transactions', 'amount', 'revenue')], ['transactions'], True)"
+done
+# A wrong column in his own SQL: the advice names the tables of that SQL, and only them.
+out=$(call carol_analyst execute_query 'sql=SELECT a.nosuchcol FROM demo.crm.accounts a')
+check "carol, a wrong column of accounts: kind column, describe_table on accounts only" "$(field '(d["kind"], "describe_table" in d["hint"], "accounts" in d["hint"], "customers" in d["hint"] or "transactions" in d["hint"])' <<<"$out")" "('column', True, True, False)"
+out=$(call carol_analyst execute_query 'sql=SELECT nosuchcol FROM demo.crm.accounts a, demo.crm.transactions t')
+check "carol, a wrong column over two tables: both named, no other" "$(field '("accounts" in d["hint"], "transactions" in d["hint"], "customers" in d["hint"])' <<<"$out")" "(True, True, False)"
+out=$(call dave_viewer execute_query 'sql=SELECT a.nosuchcol FROM demo.crm.accounts a')
+check "dave, a wrong column of accounts: the advice names accounts" "$(field '(d["kind"], "describe_table" in d["hint"], "accounts" in d["hint"], "customers" in d["hint"])' <<<"$out")" "('column', True, True, False)"
+# He names a table the policy hides next to one he sees. Trino reports the column first:
+# the advice names the tables of his SQL that he sees, never the hidden one, and no column.
+out=$(call dave_viewer execute_query 'sql=SELECT a.nosuchcol FROM demo.crm.accounts a JOIN demo.crm.customers c ON a.customer_id = c.id')
+check "dave, a wrong column qualified by the visible table, next to customers: kind column, advice on accounts alone" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "customers" in d["hint"])' <<<"$out")" "('column', 1, True, False)"
+out=$(call dave_viewer execute_query 'sql=SELECT nosuchcol FROM demo.crm.accounts a, demo.crm.customers c')
+check "dave, a column in neither: the advice names accounts, the table he sees, never customers" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "customers" in d["hint"], "transactions" in d["hint"])' <<<"$out")" "('column', 1, True, False, False)"
+# A column hidden from him in a table he sees: named, it is refused by the policy (no
+# advice); next to a column that does not exist, the advice is on the visible table and
+# lists no column.
+out=$(call dave_viewer execute_query 'sql=SELECT a.balance FROM demo.crm.accounts a')
+check "dave, the hidden column named: kind permission, no advice" "$(field '(d["kind"], "hint" in d)' <<<"$out")" "('permission', False)"
+out=$(call dave_viewer execute_query 'sql=SELECT balance, nosuchcol FROM demo.crm.accounts')
+check "dave, a hidden column and an unknown one: kind column, advice on accounts, no column named in it" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "balance" in d["hint"], d["identifier"])' <<<"$out")" "('column', 1, True, False, 'nosuchcol')"
 # The limit of words: `limit` words are searched, one more is refused, before any query
 # reaches the engine. The witness first: the engine does receive the words of a search.
 limit=$(search_words_limit)

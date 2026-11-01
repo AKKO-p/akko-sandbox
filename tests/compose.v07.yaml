@@ -15,6 +15,14 @@ services:
   trino:
     volumes:
       - ./tests/v07/catalog:/etc/trino/catalog:ro
+    # The checks ask the engine hundreds of metadata queries, the per-word passes of
+    # search_columns among them: its off-heap memory outgrows the sandbox's 1280 MB
+    # (-Xmx768M) and the kernel kills it. Only here; the sandbox itself keeps its footprint.
+    mem_limit: 2048m
+    # glibc gives each thread its own malloc arena; with Trino's many threads they add
+    # about 0.5 GB off-heap (measured: 1790 -> 1476 MiB after 30 searches with 2 arenas).
+    environment:
+      MALLOC_ARENA_MAX: "2"
 
   # OPA's decisions go to its log, for the check that Trino asks the batch rule.
   opa:
