@@ -234,11 +234,11 @@ check "carol, a wrong column over two tables: both named, no other" "$(field '("
 out=$(call dave_viewer execute_query 'sql=SELECT a.nosuchcol FROM demo.crm.accounts a')
 check "dave, a wrong column of accounts: the advice names accounts" "$(field '(d["kind"], "describe_table" in d["hint"], "accounts" in d["hint"], "customers" in d["hint"])' <<<"$out")" "('column', True, True, False)"
 # He names a table the policy hides next to one he sees. Trino reports the column first:
-# the advice repeats the tables of his own SQL, no table he did not type, and no column.
+# the advice names the tables of his SQL that he sees, never the hidden one, and no column.
 out=$(call dave_viewer execute_query 'sql=SELECT a.nosuchcol FROM demo.crm.accounts a JOIN demo.crm.customers c ON a.customer_id = c.id')
 check "dave, a wrong column qualified by the visible table, next to customers: kind column, advice on accounts alone" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "customers" in d["hint"])' <<<"$out")" "('column', 1, True, False)"
 out=$(call dave_viewer execute_query 'sql=SELECT nosuchcol FROM demo.crm.accounts a, demo.crm.customers c')
-check "dave, a column in neither: the advice names the two tables he wrote, nothing else" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "demo.crm.customers" in d["hint"], "transactions" in d["hint"])' <<<"$out")" "('column', 2, True, True, False)"
+check "dave, a column in neither: the advice names accounts, the table he sees, never customers" "$(field '(d["kind"], d["hint"].count("demo.crm."), "demo.crm.accounts" in d["hint"], "customers" in d["hint"], "transactions" in d["hint"])' <<<"$out")" "('column', 1, True, False, False)"
 # A column hidden from him in a table he sees: named, it is refused by the policy (no
 # advice); next to a column that does not exist, the advice is on the visible table and
 # lists no column.
