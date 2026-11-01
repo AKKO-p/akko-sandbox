@@ -89,3 +89,22 @@ jobs:
         env:
           COMPOSE_FILE: compose.yaml:gateway/compose.gateway.yaml
         run: docker compose --profile tools down -v --remove-orphans
+
+      - name: The tools of akko-mcp-trino 0.7, check everything
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v07
+        run: KEEP=1 tests/v07.sh
+
+      - name: Service logs, the tools of 0.7
+        if: failure()
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v07
+          COMPOSE_FILE: compose.yaml:tests/compose.v07.yaml
+        run: docker compose logs --no-color
+
+      - name: Remove everything, the tools of 0.7
+        if: always()
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v07
+          COMPOSE_FILE: compose.yaml:tests/compose.v07.yaml
+        run: docker compose --profile tools down -v --remove-orphans
