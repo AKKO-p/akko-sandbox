@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `tests/v07.sh`: the checks of `search_columns` by words (akko-mcp-trino PR #30): a table found by its name or comment comes in `tables`, without its columns; a column comes in `matches` for a word of its own name or comment; a word found only in a table's comment returns the table alone; a two-word search mixing a table word and a column word returns that column; an empty complete search carries `hint`; more words than the server's limit (read from `--check`) is refused before any query reaches the engine. The checks that read `matches` of the first page follow the cursor and read `tables`.
 - OPA batch mode: Trino sets `opa.policy.batched-uri`, and the policy has a `batch` rule that keeps the indexes `allow` accepts, so Trino asks OPA once per listing, not once per column (it saturated OPA's queue on tables of 200 columns). Both paths share the same rules.
 - The batch rule answers only the filter operations Trino 482 sends (`FilterCatalogs`, `FilterSchemas`, `FilterTables`, `FilterViewQueryOwnedBy`, and `FilterColumns` by column) and grants nothing to any other. Column masks are batched too (`batchColumnMasks`). `tests/v07.sh` proves from OPA's decision log that Trino asks `trino/batch`.
 - `tests/v07.sh`: `search_columns` with a named schema answers kind `schema` when it is missing or hidden (a hidden one looks like a missing one), and finds it for a user who sees it.

@@ -179,7 +179,11 @@ two more catalogs from [`tests/v07/catalog`](tests/v07/catalog), `tpch` and
 `GATEWAY=1`, [`tests/compose.v07.gateway.yaml`](tests/compose.v07.gateway.yaml)
 gives them to the second cluster too):
 `search_columns` finds `transactions.amount` by the word `revenue` of its
-comment; `dave_viewer` gets nothing of `crm.customers`, of the accounts'
+comment, and searches by words: every word must appear in a column's name or
+comment or its table's, a table found by its own name or comment comes in
+`tables` without its columns, a word found only in a table's comment returns
+that table alone, an empty complete search carries a `hint`, and a text of more
+words than the server's limit is refused before any query; `dave_viewer` gets nothing of `crm.customers`, of the accounts'
 `balance` column or of the `tpcds` catalog, from any tool, error messages
 included, as long as he does not name them himself (see below), while carol or
 alice get each of them; his search of every catalog searches every schema of
