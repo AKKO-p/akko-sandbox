@@ -100,6 +100,7 @@ services:
     image: trinodb/trino:482
     environment:
       OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/sandbox
+      MALLOC_ARENA_MAX: "2"   # see mem_limit below
     volumes:
       - ./trino/etc:/etc/trino:ro
       - certs:/certs:ro
@@ -114,7 +115,12 @@ services:
       timeout: 5s
       retries: 60
       start_period: 20s
-    mem_limit: 1280m
+    # The word searches of search_columns and describe_schema ask the engine many
+    # metadata queries: its off-heap memory outgrows 1280 MB (-Xmx768M) and the
+    # kernel kills it. glibc gives each thread its own malloc arena; with Trino's
+    # many threads they add about 0.5 GB off-heap (measured: 1790 -> 1476 MiB
+    # after 30 searches with 2 arenas).
+    mem_limit: 2048m
 
   # The open source core of akko-mcp-trino, with its defaults: the jwt identity
   # mode and a door that refuses any request without a valid token. It accepts
@@ -123,7 +129,7 @@ services:
   # MCP_IMAGE runs another build of the server, such as a release candidate.
   mcp:
     <<: *defaults
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.6.0}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.0}
     entrypoint: ["/bin/sh", "-c"]
     command: ["TRINO_TOKEN_EXCHANGE_CLIENT_SECRET=$$(cat /certs/mcp-client.secret) exec akko-mcp-trino"]
     environment:
@@ -173,7 +179,7 @@ services:
   # The demo client, started by ./demo.sh: the same image, the official MCP SDK.
   client:
     <<: *defaults
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.6.0}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.0}
     profiles: ["tools"]
     entrypoint: ["python", "/demo/demo.py"]
     environment:

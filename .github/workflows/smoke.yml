@@ -42,15 +42,18 @@ jobs:
     timeout-minutes: 35
     env:
       COMPOSE_PROJECT_NAME: akko-sandbox-ci
+      # Until akko-mcp-trino 0.7.0 is on Docker Hub, the server is built from the
+      # core's main, which holds 0.7.0. Remove both lines then.
+      MCP_CORE_REF: main
+      MCP_IMAGE: akko-mcp-trino:0.7.0-main
     steps:
       - uses: actions/checkout@v7
 
-      - name: Build akko-mcp-trino from source, until 0.6.0 is published
+      - name: Build akko-mcp-trino from source, until 0.7.0 is published
         if: env.MCP_CORE_REF != ''
         run: |
           git clone --quiet --depth 1 --branch "$MCP_CORE_REF" https://github.com/AKKO-p/akko-mcp-trino.git core
-          sed -i 's/^version = "0.6.0"/version = "0.6.0rc1"/' core/pyproject.toml
-          sed -i 's/__version__ = "0.6.0"/__version__ = "0.6.0rc1"/' core/akko_mcp_trino/__init__.py
+          git -C core log --oneline -1
           docker build --quiet --tag "$MCP_IMAGE" core
           docker run --rm "$MCP_IMAGE" akko-mcp-trino --version
 
