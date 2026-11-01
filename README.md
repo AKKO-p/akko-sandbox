@@ -4,7 +4,7 @@
 
 <p align="center"><img src="docs/demo.gif" alt="demo.sh: carol_analyst and alice_admin ask the same question through MCP and get two different answers" width="900"></p>
 
-**Two accounts, one question, two answers.** A five minute sandbox for
+**Three accounts, one question, three outcomes.** A five minute sandbox for
 [akko-mcp-trino](https://github.com/AKKO-p/akko-mcp-trino), the open source MCP
 server that gives AI agents read-only access to Trino, each user with their own rights.
 
