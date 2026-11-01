@@ -11,8 +11,8 @@ Require docker
 Set Shell "bash"
 Set FontFamily "JetBrains Mono"
 Set FontSize 16
-Set Width 1400
-Set Height 980
+Set Width 1500
+Set Height 1040
 Set Padding 24
 Set Theme "Catppuccin Mocha"
 Set WindowBar Colorful
