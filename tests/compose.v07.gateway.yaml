@@ -5,3 +5,4 @@ services:
   trino-2:
     volumes:
       - ./tests/v07/catalog:/etc/trino/catalog:ro
+    mem_limit: 2048m   # as the first cluster (tests/compose.v07.yaml)

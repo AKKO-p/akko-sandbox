@@ -15,6 +15,10 @@ services:
   trino:
     volumes:
       - ./tests/v07/catalog:/etc/trino/catalog:ro
+    # The checks ask the engine hundreds of metadata queries, the per-word passes of
+    # search_columns among them: its off-heap memory outgrows the sandbox's 1280 MB
+    # (-Xmx768M) and the kernel kills it. Only here; the sandbox itself keeps its footprint.
+    mem_limit: 2048m
 
   # OPA's decisions go to its log, for the check that Trino asks the batch rule.
   opa:
