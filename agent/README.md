@@ -43,7 +43,7 @@ docker run --rm --network akko-sandbox_default --env-file /path/to/agent.env \
 
 | Option | Default | Meaning |
 |---|---|---|
-| `--provider` | (required) | `mistral` or `anthropic` |
+| `--provider` | (required unless `--rescore`) | `mistral` or `anthropic` |
 | `--model` | `codestral-latest`, `claude-sonnet-5-5` | the model id sent to the provider's API |
 | `--persona` | `carol_analyst` | the sandbox user whose token opens the session |
 | `--questions` | `questions.json` | the questions and the columns that answer them |
@@ -55,6 +55,7 @@ docker run --rm --network akko-sandbox_default --env-file /path/to/agent.env \
 | `--max-tokens` | `16000` | output tokens per model turn |
 | `--out` | (required unless `--dry-run`) | the Markdown report; its JSON is written beside it |
 | `--dry-run` | | list the tools in the provider's format, call no model, need no key |
+| `--rescore` | | score a report's JSON again by the current rules, into `--out`; needs no provider, no key |
 
 ## Keys
 
@@ -135,7 +136,15 @@ A trial is right when, and only when:
    cut off, refused or failed is never right, whatever its last text says, and
    text written beside tool calls is never read as an answer;
 2. the final answer names every expected column;
-3. the final answer names none of the question's `forbidden` columns.
+3. the final answer names none of the question's `forbidden` columns;
+4. every tool it called is one the server lists. A model that makes up a tool
+   name, or writes its SQL where the name goes, has run nothing it can rely on:
+   the trial is wrong whatever its answer says, and the report counts it under
+   `Invalid tool`.
+
+`--rescore REPORT.json --out NEW.md` scores a report's trials again by these
+rules (a report written before the server's tools were recorded takes them from
+its `server` line), and writes the new report and its JSON.
 
 `questions.json` fixes each question's `expected` and `forbidden` columns before
 any run, with the reason for each (`why`, `why_forbidden`); they are not changed

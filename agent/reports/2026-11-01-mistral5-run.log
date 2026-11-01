@@ -1,0 +1,57 @@
+== akkoai/akko-mcp-trino:0.6.1 trino before: running=true oom=false restarts=0 started=2026-11-01T17:39:42.020783096Z mem_limit=2147483648 env_arena=MALLOC_ARENA_MAX=2
+1/5 trial 1/5: 6 calls, answered, right: False
+1/5 trial 2/5: 6 calls, answered, right: False
+1/5 trial 3/5: 6 calls, answered, right: False
+1/5 trial 4/5: 6 calls, answered, right: False
+1/5 trial 5/5: 6 calls, answered, right: False
+2/5 trial 1/5: 7 calls, answered, right: False
+2/5 trial 2/5: 6 calls, answered, right: False
+2/5 trial 3/5: 6 calls, answered, right: False
+2/5 trial 4/5: 6 calls, answered, right: False
+2/5 trial 5/5: 6 calls, answered, right: False
+3/5 trial 1/5: 7 calls, answered, right: True
+3/5 trial 2/5: 6 calls, answered, right: True
+3/5 trial 3/5: 6 calls, answered, right: True
+3/5 trial 4/5: 6 calls, answered, right: True
+3/5 trial 5/5: 6 calls, answered, right: True
+4/5 trial 1/5: 6 calls, answered, right: True
+4/5 trial 2/5: 5 calls, answered, right: True
+4/5 trial 3/5: 5 calls, answered, right: True
+4/5 trial 4/5: 6 calls, answered, right: True
+4/5 trial 5/5: 5 calls, answered, right: True
+5/5 trial 1/5: 5 calls, answered, right: True
+5/5 trial 2/5: 5 calls, answered, right: True
+5/5 trial 3/5: 5 calls, answered, right: True
+5/5 trial 4/5: 5 calls, answered, right: True
+5/5 trial 5/5: 5 calls, answered, right: True
+report: reports/2026-11-01-mistral5-0.6.1.md
+== akkoai/akko-mcp-trino:0.6.1 trino after: running=true oom=false restarts=0 started=2026-11-01T17:39:42.020783096Z mem_limit=2147483648 env_arena=MALLOC_ARENA_MAX=2
+== akko-mcp-trino:0.7.0-4105967 trino before: running=true oom=false restarts=0 started=2026-11-01T17:42:42.225822247Z mem_limit=2147483648 env_arena=MALLOC_ARENA_MAX=2
+1/5 trial 1/5: 6 calls, answered, right: False
+1/5 trial 2/5: 1 calls, answered, right: False
+1/5 trial 3/5: 1 calls, answered, right: False
+1/5 trial 4/5: 1 calls, answered, right: False
+1/5 trial 5/5: 5 calls, answered, right: False
+2/5 trial 1/5: 4 calls, answered, right: True
+2/5 trial 2/5: 4 calls, answered, right: True
+2/5 trial 3/5: 1 calls, max_tokens, right: False
+2/5 trial 4/5: 4 calls, answered, right: True
+2/5 trial 5/5: 4 calls, answered, right: True
+3/5 trial 1/5: 4 calls, answered, right: True
+3/5 trial 2/5: 4 calls, answered, right: True
+3/5 trial 3/5: 3 calls, answered, right: True
+3/5 trial 4/5: 4 calls, answered, right: True
+3/5 trial 5/5: 4 calls, answered, right: True
+4/5 trial 1/5: 2 calls, answered, right: True
+4/5 trial 2/5: 2 calls, answered, right: True
+4/5 trial 3/5: 2 calls, answered, right: True
+4/5 trial 4/5: 2 calls, answered, right: True
+4/5 trial 5/5: 1 calls, answered, right: True
+5/5 trial 1/5: 3 calls, answered, right: True
+5/5 trial 2/5: 3 calls, answered, right: True
+5/5 trial 3/5: 3 calls, answered, right: True
+5/5 trial 4/5: 3 calls, answered, right: True
+5/5 trial 5/5: 3 calls, answered, right: True
+report: reports/2026-11-01-mistral5-0.7.0-4105967.md
+== akko-mcp-trino:0.7.0-4105967 trino after: running=true oom=false restarts=0 started=2026-11-01T17:42:42.225822247Z mem_limit=2147483648 env_arena=MALLOC_ARENA_MAX=2
+MEASURE5_DONE
