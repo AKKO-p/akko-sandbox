@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `docs/connect-a-host.md` and its French twin: Claude Desktop's bridge is `mcp-remote@0.15.2`, which needs Node.js 20.18.1 or later (its `undici` 7 crashes on Node.js 18 with `ReferenceError: File is not defined`). Both pages point to the full guide of akko-mcp-trino (your own Trino over stdio, a team server, the common errors).
 - akko-mcp-trino 0.7.0 by default (`compose.yaml`, and the image name the agent harness reports). `demo.sh` step 5: the same `search_columns` for carol and dave; the word `email` finds `demo.crm.customers.email` for carol and nothing for dave, in a complete search; `--check` asserts both.
 - Trino runs with 2048 MB and `MALLOC_ARENA_MAX=2`, on both clusters behind the gateway too: the word searches of `search_columns` and `describe_schema` ask it many metadata queries, its off-heap memory outgrew 1280 MB and the kernel killed it; glibc's per-thread malloc arenas added about 0.5 GB. `tests/compose.v07*.yaml` no longer carry these settings. Measured with `docker stats`: 1460 MiB at rest, 1740 MiB at the peak of the demo; behind the gateway, 3058 MiB at the peak of `tests/gateway.sh`, 3220 MiB during `tests/v07.sh`.
 - CI runs `tests/v07.sh` after `tests/gateway.sh`. Until 0.7.0 is on Docker Hub, it builds the server from the core's commit 4105967. A job fails on a placeholder of the typography substitution left in a Markdown file, as `README.fr.md` once held.

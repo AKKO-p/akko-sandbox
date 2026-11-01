@@ -6,6 +6,10 @@ The sandbox's MCP server listens at `http://localhost:3000/mcp` (streamable
 HTTP). It refuses any request without a valid token, so every host sends one in
 an `Authorization` header.
 
+The [full guide](https://github.com/AKKO-p/akko-mcp-trino/blob/main/docs/guides/connect-claude-desktop-cursor.md)
+in akko-mcp-trino also covers your own Trino over stdio, a shared server for a team and the
+common errors.
+
 ## 1. Get a token
 
 ```bash
@@ -65,7 +69,8 @@ keeps it out of the file:
 ### Claude Desktop
 
 Claude Desktop starts local servers from its configuration file, so it reaches
-the sandbox through the `mcp-remote` bridge (Node.js required). In
+the sandbox through the `mcp-remote` bridge. `mcp-remote` 0.15.2 needs Node.js 20.18.1
+or later (`node --version`); Claude Desktop uses the Node.js installed on the system. In
 `claude_desktop_config.json`:
 
 ```json
@@ -73,7 +78,7 @@ the sandbox through the `mcp-remote` bridge (Node.js required). In
   "mcpServers": {
     "akko-sandbox": {
       "command": "npx",
-      "args": ["-y", "mcp-remote@0.14.3", "http://localhost:3000/mcp", "--header", "Authorization:${AUTH_HEADER}"],
+      "args": ["-y", "mcp-remote@0.15.2", "http://localhost:3000/mcp", "--header", "Authorization:${AUTH_HEADER}"],
       "env": {"AUTH_HEADER": "Bearer <token>"}
     }
   }
