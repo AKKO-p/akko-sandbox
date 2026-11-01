@@ -10,6 +10,16 @@ permissions:
   contents: read
 
 jobs:
+  # The READMEs hold no leftover of a substitution template ({NN}, {NB}).
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: No template leftover in the Markdown files
+        run: "! grep -rnE '[{](NN|NB)[}]' --include='*.md' ."
+
   # The real-agent harness's unit tests: no model, no server, no key.
   agent:
     runs-on: ubuntu-latest
@@ -45,12 +55,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Build akko-mcp-trino from source, until 0.6.0 is published
+      - name: Build akko-mcp-trino from source, until 0.7.0 is published
         if: env.MCP_CORE_REF != ''
         run: |
-          git clone --quiet --depth 1 --branch "$MCP_CORE_REF" https://github.com/AKKO-p/akko-mcp-trino.git core
-          sed -i 's/^version = "0.6.0"/version = "0.6.0rc1"/' core/pyproject.toml
-          sed -i 's/__version__ = "0.6.0"/__version__ = "0.6.0rc1"/' core/akko_mcp_trino/__init__.py
+          git clone --quiet https://github.com/AKKO-p/akko-mcp-trino.git core
+          git -C core checkout --quiet "$MCP_CORE_REF"
+          git -C core log --oneline -1
           docker build --quiet --tag "$MCP_IMAGE" core
           docker run --rm "$MCP_IMAGE" akko-mcp-trino --version
 
@@ -85,4 +95,23 @@ jobs:
         if: always()
         env:
           COMPOSE_FILE: compose.yaml:gateway/compose.gateway.yaml
+        run: docker compose --profile tools down -v --remove-orphans
+
+      - name: The tools of akko-mcp-trino 0.7, check everything
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v07
+        run: KEEP=1 tests/v07.sh
+
+      - name: Service logs, the tools of 0.7
+        if: failure()
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v07
+          COMPOSE_FILE: compose.yaml:tests/compose.v07.yaml
+        run: docker compose logs --no-color
+
+      - name: Remove everything, the tools of 0.7
+        if: always()
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v07
+          COMPOSE_FILE: compose.yaml:tests/compose.v07.yaml
         run: docker compose --profile tools down -v --remove-orphans

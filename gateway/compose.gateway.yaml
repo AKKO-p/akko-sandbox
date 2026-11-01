@@ -18,6 +18,7 @@ x-trino: &trino
   image: trinodb/trino:482
   environment:
     OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/sandbox
+    MALLOC_ARENA_MAX: "2"   # as in compose.yaml
   volumes:
     - ./trino/etc:/etc/trino:ro
     - ./gateway/trino-config.properties:/etc/trino/config.properties:ro
@@ -33,7 +34,7 @@ x-trino: &trino
     timeout: 5s
     retries: 60
     start_period: 20s
-  mem_limit: 1280m
+  mem_limit: 2048m   # as in compose.yaml
 
 services:
   trino: *trino

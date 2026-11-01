@@ -19,7 +19,7 @@ server decides none of it.
 
 ## Start
 
-You need Docker with Compose v2, about 2 GB of free memory, and the ports
+You need Docker with Compose v2, about 2.5 GB of free memory, and the ports
 `8080`, `3000` and `6274` free on `localhost`.
 
 ```bash
@@ -39,8 +39,9 @@ ready in about a minute. Stop it and remove everything with
 2. `SELECT current_user`: Trino runs each query as the user whose token it received.
 3. The two answers side by side: masked e-mails and a row filter for the analyst, everything for the admin.
 4. A third user, `dave_viewer`, refused by the policy.
-5. A write, refused by the server before it reaches Trino.
-6. A request without a token, one with a forged signature, and one with a valid token issued for Trino instead of the server: all three refused with `401`.
+5. The same column search for carol and dave (`search_columns`, from akko-mcp-trino 0.7): the word `email` finds `demo.crm.customers.email` for carol, and nothing for dave, from whom the policy hides the table. His search is complete all the same: nothing was skipped, the table is simply not his to see.
+6. A write, refused by the server before it reaches Trino.
+7. A request without a token, one with a forged signature, and one with a valid token issued for Trino instead of the server: all three refused with `401`.
 
 `./demo.sh --check` plays the same steps as assertions.
 
@@ -64,13 +65,19 @@ The Keycloak console is at <http://localhost:8080> (`admin` / `admin`).
 | `postgres` | `postgres:17.11-alpine` | the fictional sample data: customers, accounts, transactions, with comments on tables and columns, and twelve empty archive tables (`crm_archive`) | 128 MB |
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | the identity provider, realm `sandbox`, with standard token exchange | 768 MB |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | the access policy, [`opa/policy.rego`](opa/policy.rego) | 64 MB |
-| `trino` | `trinodb/trino:482` | the engine, https, JWT authentication, OPA access control | 1280 MB |
-| `mcp` | `akkoai/akko-mcp-trino:0.6.0` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 256 MB |
+| `trino` | `trinodb/trino:482` | the engine, https, JWT authentication, OPA access control | 2048 MB |
+| `mcp` | `akkoai/akko-mcp-trino:0.7.0` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 256 MB |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | the official MCP Inspector | 384 MB |
 
-Measured on a Linux host with `docker stats`: about 1.3 GB in use at rest, about
-1.5 GB at the peak of the demo. Trino and Keycloak use most of it; the MCP server
-about 70 MB.
+Measured on a Linux host with `docker stats`: about 1.4 GB in use at rest
+(1460 MiB), about 1.7 GB at the peak of the demo (1740 MiB). Trino and Keycloak
+use most of it (970 and 550 MiB at the peak); the MCP server about 75 MiB.
+
+Trino runs with `MALLOC_ARENA_MAX=2` and 2048 MB. The searches of
+`search_columns` and `describe_schema` ask it many metadata queries; with
+1280 MB its off-heap memory outgrows the limit and the kernel kills it. glibc
+gives each thread its own malloc arena, and with Trino's many threads they add
+about 0.5 GB; two arenas take that back.
 
 Only Keycloak (`8080`), the MCP server (`3000`) and the Inspector (`6274`) are
 published, on `127.0.0.1` only. Set `KEYCLOAK_PORT`, `MCP_PORT` or
@@ -150,6 +157,10 @@ COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose --profile 
 tests/gateway.sh   # the checks, end to end
 ```
 
+This variant runs two Trino of 2048 MB each. Measured with `docker stats`, it
+reaches 3058 MiB at the peak of `tests/gateway.sh` and 3220 MiB during the 0.7
+checks: plan for about 4 GB of free memory.
+
 Start the variant with the same `COMPOSE_FILE` every time, and stop it with it
 too: a `docker compose down` without it leaves the second cluster and the
 gateway behind.
@@ -167,8 +178,8 @@ script's header. The CI runs it after `tests/smoke.sh`.
 ## The tools of akko-mcp-trino 0.7
 
 ```bash
-MCP_IMAGE=<0.7 image> tests/v07.sh
-GATEWAY=1 MCP_IMAGE=<0.7 image> tests/v07.sh   # the same checks behind Trino Gateway
+tests/v07.sh
+GATEWAY=1 tests/v07.sh   # the same checks behind Trino Gateway
 ```
 
 `tests/v07.sh` checks the tools that akko-mcp-trino 0.7 adds or changes, on the
@@ -197,9 +208,8 @@ policy that refuses `system.jdbc` gets an error that says what to allow; the
 agent's own SQL on `system` stays refused and never reaches the engine; the
 server's log holds an audit line for every call and no token. It also
 prints the plans of `describe_schema`'s metadata statements. `V07_SHORT_BUDGET`
-and `V07_SHORT_RESERVE` (3 and 2 seconds) set the short budget. The default
-image is still 0.6.0, on which these checks fail: the CI runs the script once
-0.7 is published.
+and `V07_SHORT_RESERVE` (3 and 2 seconds) set the short budget. The CI runs
+the script after `tests/gateway.sh`.
 
 The policy hides the `balance` column from viewers with two operations of
 Trino's OPA plugin: `FilterColumns` leaves it out of every listing, and

@@ -4,8 +4,9 @@
 # script, after gateway/compose.gateway.yaml and before
 # tests/compose.v07.gateway.yaml when GATEWAY=1.
 #
-#   MCP_IMAGE=<0.7 image> tests/v07.sh
-#   GATEWAY=1 MCP_IMAGE=<0.7 image> tests/v07.sh
+#   tests/v07.sh                 the sandbox's image, 0.7.0
+#   GATEWAY=1 tests/v07.sh
+#   MCP_IMAGE=<image> tests/v07.sh     another build of the server
 
 services:
   # Two more catalogs for searches that span catalogs, tpch and tpcds, which
@@ -15,14 +16,6 @@ services:
   trino:
     volumes:
       - ./tests/v07/catalog:/etc/trino/catalog:ro
-    # The checks ask the engine hundreds of metadata queries, the per-word passes of
-    # search_columns among them: its off-heap memory outgrows the sandbox's 1280 MB
-    # (-Xmx768M) and the kernel kills it. Only here; the sandbox itself keeps its footprint.
-    mem_limit: 2048m
-    # glibc gives each thread its own malloc arena; with Trino's many threads they add
-    # about 0.5 GB off-heap (measured: 1790 -> 1476 MiB after 30 searches with 2 arenas).
-    environment:
-      MALLOC_ARENA_MAX: "2"
 
   # OPA's decisions go to its log, for the check that Trino asks the batch rule.
   opa:

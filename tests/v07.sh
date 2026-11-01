@@ -11,8 +11,9 @@
 # Removes everything at the end unless KEEP=1. GATEWAY=1 runs the same checks
 # behind Trino Gateway. Uses the sandbox's host ports unless told otherwise.
 #
-#   MCP_IMAGE=<0.7 image> tests/v07.sh
-#   GATEWAY=1 MCP_IMAGE=<0.7 image> tests/v07.sh
+#   tests/v07.sh                 the sandbox's image, 0.7.0
+#   GATEWAY=1 tests/v07.sh
+#   MCP_IMAGE=<image> tests/v07.sh     another build of the server
 #   COMPOSE_PROJECT_NAME=akko-v07 KEYCLOAK_PORT=18480 MCP_PORT=13000 INSPECTOR_PORT=16274 tests/v07.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."

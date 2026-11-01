@@ -26,11 +26,12 @@ MCP_URL = os.environ["MCP_URL"]
 PASSWORD = "demo"  # the sandbox's demo password, the same for every user
 QUESTION = "SELECT full_name, email, country FROM demo.crm.customers ORDER BY id"
 EUROPE = {"DE", "ES", "FR", "IT", "NL"}
-# The core's tools: six up to akko-mcp-trino 0.6, eight from 0.7 on. The list of
-# 0.6 is accepted only while the sandbox's default image is 0.6: drop it with the
-# move to 0.7, so that a 0.7 image without its two new tools fails here too.
-TOOLS = ["describe_table", "execute_query", "explain_query", "list_catalogs", "list_schemas", "list_tables"]
-TOOLS_07 = sorted(TOOLS + ["describe_schema", "search_columns"])
+# A word searched in the names and comments of the columns (search_columns, from
+# akko-mcp-trino 0.7): it is only in crm.customers, which the policy hides from viewers.
+SEARCH = {"text": "email", "catalog": "demo"}
+# The core's tools since akko-mcp-trino 0.7.
+TOOLS = sorted(["describe_schema", "describe_table", "execute_query", "explain_query", "list_catalogs",
+                "list_schemas", "list_tables", "search_columns"])
 
 COLOR = sys.stdout.isatty()
 PACE = float(os.environ.get("DEMO_PACE") or 0)  # seconds between steps, for a recording
@@ -52,7 +53,8 @@ def token(user: str, client: str = "sandbox-mcp") -> str:
 
 
 async def ask(user: str) -> dict:
-    """Open an MCP session as `user`, list the tools, ask who Trino sees, ask the question."""
+    """Open an MCP session as `user`, list the tools, ask who Trino sees, ask the question,
+    search for a column, try a write."""
     http = create_mcp_http_client(headers={"Authorization": f"Bearer {token(user)}"})
     async with streamable_http_client(MCP_URL, http_client=http) as (read, write, *_):
         async with ClientSession(read, write) as session:
@@ -65,6 +67,7 @@ async def ask(user: str) -> dict:
 
             who = await run("SELECT current_user")
             answer = await run(QUESTION)
+            search = json.loads((await session.call_tool("search_columns", SEARCH)).content[0].text)
             write = await run("DELETE FROM demo.crm.customers")
     return {
         "user": user,
@@ -72,6 +75,9 @@ async def ask(user: str) -> dict:
         "current_user": (who.get("rows") or [[who.get("error", "")]])[0][0],
         "rows": answer.get("rows", []),
         "error": answer.get("error", ""),
+        "found": [f"{m['catalog']}.{m['schema']}.{m['table']}.{m['column']}" for m in search.get("matches", [])],
+        "search_complete": search.get("complete"),
+        "search_error": search.get("error", ""),
         "write": write.get("error", ""),
     }
 
@@ -140,10 +146,16 @@ def show(r: dict) -> None:
     refusal = re.search(r'message="([^"]+)"', dave["error"])
     print(f"   {paint('31', refusal.group(1) if refusal else dave['error'] or 'answered (unexpected)')}")
     print()
-    step("5. carol asks the server to delete the customers")
+    step("5. carol and dave look for a column (tool search_columns)")
+    print(f"   {paint('36', 'search_columns  ' + json.dumps(SEARCH))}")
+    for x, code in ((carol, "32"), (dave, "31")):
+        found = ", ".join(x["found"]) or x["search_error"] or "no match, the search is complete"
+        print(f"   {x['user']:<14} ->  {paint(code, found)}")
+    print()
+    step("6. carol asks the server to delete the customers")
     print(f"   {paint('31', carol['write'] or 'answered (unexpected)')}")
     print()
-    step("6. At the door")
+    step("7. At the door")
     print(f"   no token                    ->  HTTP {paint('31', str(gate['no_token']))}  {gate['message']}")
     print(f"   forged signature            ->  HTTP {paint('31', str(gate['forged']))}")
     print(f"   a valid token, for Trino    ->  HTTP {paint('31', str(gate['for_trino']))}  (the server accepts only tokens issued for it)")
@@ -154,7 +166,7 @@ def check(r: dict) -> int:
     emails = {k: [row[1] for row in r[k]["rows"]] for k in ("carol", "alice")}
     countries = {k: {row[2] for row in r[k]["rows"]} for k in ("carol", "alice")}
     checks = [
-        ("the core's tools, no more", carol["tools"] == alice["tools"] and carol["tools"] in (TOOLS, TOOLS_07)),
+        ("the core's tools, no more", carol["tools"] == alice["tools"] == TOOLS),
         ("carol: Trino's current_user is carol_analyst", carol["current_user"] == "carol_analyst"),
         ("alice: Trino's current_user is alice_admin", alice["current_user"] == "alice_admin"),
         ("carol: an answer, every e-mail masked", bool(emails["carol"]) and all(e.startswith("***@") for e in emails["carol"])),
@@ -163,6 +175,8 @@ def check(r: dict) -> int:
         ("alice: every customer, Europe and beyond", len(alice["rows"]) == 10 and not countries["alice"] <= EUROPE),
         ("two accounts, two different answers", carol["rows"] != alice["rows"]),
         ("dave: refused by the policy", not dave["rows"] and "Access Denied" in dave["error"]),
+        ("carol: search_columns finds customers.email", carol["found"] == ["demo.crm.customers.email"] and carol["search_complete"] is True),
+        ("dave: the same search finds nothing, and is complete", dave["found"] == [] and dave["search_complete"] is True and not dave["search_error"]),
         ("a write: refused by the server before Trino", "Read-only" in carol["write"]),
         ("no token: 401", gate["no_token"] == 401),
         ("no token: the 401 says what to send", "requires a bearer token" in gate["message"]),
