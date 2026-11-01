@@ -1,0 +1,11 @@
+akko-mcp-trino:0.7.0-f55ef00
+{"text": "revenue"} | matches ['crm.transactions.amount'] | tables ['crm.transactions'] 
+{"text": "customer"} | matches ['crm.accounts.customer_id', 'crm.customers.segment'] | tables ['crm.accounts', 'crm.customers'] 
+{"text": "customer segment"} | matches ['crm.customers.segment'] | tables ['crm.customers'] 
+{"text": "account balance"} | matches ['crm.accounts.balance'] | tables ['crm.accounts'] 
+{"text": "exchange rate"} | matches [] | tables [] | hint
+{"text": "spending category"} | matches ['crm.transactions.category'] | tables ['crm.transactions'] 
+{"text": "category amount"} | matches [] | tables [] | hint
+{"text": "account currency"} | matches ['crm.accounts.currency', 'crm.accounts.balance', 'crm.transactions.amount'] | tables ['crm.accounts', 'crm.transactions'] 
+{"text": "archived transactions 2019"} | matches [] | tables ['crm_archive.transactions_2019'] 
+{"text": "archived transaction amount"} | matches ['crm_archive.transactions_2014.amount', 'crm_archive.transactions_2015.amount', 'crm_archive.transactions_2016.amount', 'crm_archive.transactions_2017.amount', 'crm_archive.transactions_2018.amount', 'crm_archive.transactions_2019.amount', 'crm_archive.transactions_2020.amount', 'crm_archive.transactions_2021.amount', 'crm_archive.transactions_2022.amount', 'crm_archive.transactions_2023.amount', 'crm_archive.transactions_2024.amount', 'crm_archive.transactions_2025.amount'] | tables ['crm_archive.transactions_2014', 'crm_archive.transactions_2015', 'crm_archive.transactions_2016', 'crm_archive.transactions_2017', 'crm_archive.transactions_2018', 'crm_archive.transactions_2019', 'crm_archive.transactions_2020', 'crm_archive.transactions_2021', 'crm_archive.transactions_2022', 'crm_archive.transactions_2023', 'crm_archive.transactions_2024', 'crm_archive.transactions_2025'] 

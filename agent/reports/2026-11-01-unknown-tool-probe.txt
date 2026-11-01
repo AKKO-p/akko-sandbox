@@ -1,0 +1,11 @@
+== akko-mcp-trino:0.7.0-4105967
+trino-mcp 0.7.0, 8 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, search_columns
+is_error: True
+text: Unknown tool: {"sql": "SELECT currency, COUNT(*) AS account_count FROM demo.crm.accounts GROUP BY currency", "max_rows": 1000}
+server: trino-mcp 0.7.0, 8 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, search_columns
+== akkoai/akko-mcp-trino:0.6.1
+trino-mcp (no version announced), 6 tools: describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables
+is_error: True
+text: Unknown tool: {"sql": "SELECT currency, COUNT(*) AS account_count FROM demo.crm.accounts GROUP BY currency", "max_rows": 1000}
+server: trino-mcp (no version announced), 6 tools: describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables
+83 passed, 1 skipped in 1.72s

@@ -11,6 +11,19 @@
 # to the container's environment only: never in the image, never in a report.
 
 services:
+  # The engine as tests/compose.v07.yaml runs it, for every measured server alike:
+  # tests/compose.v07.yaml itself also changes the catalogs and the page sizes,
+  # which a measurement must not.
+  trino:
+    # The checks ask the engine hundreds of metadata queries, the per-word passes of
+    # search_columns among them: its off-heap memory outgrows the sandbox's 1280 MB
+    # (-Xmx768M) and the kernel kills it. Only here; the sandbox itself keeps its footprint.
+    mem_limit: 2048m
+    # glibc gives each thread its own malloc arena; with Trino's many threads they add
+    # about 0.5 GB off-heap (measured: 1790 -> 1476 MiB after 30 searches with 2 arenas).
+    environment:
+      MALLOC_ARENA_MAX: "2"
+
   agent:
     restart: "no"
     security_opt: ["no-new-privileges:true"]

@@ -236,6 +236,13 @@ class Record:
     other_named: list[str] = field(default_factory=list)
     seconds: float = 0.0
     stop: str = ""  # answered, max_steps, max_tokens, refusal, error: <kind>
+    announced: list[str] = field(default_factory=list)  # the tools the server listed
+
+    @property
+    def invalid_tools(self) -> list[str]:
+        """The calls to a tool the server does not list, in order: a model that makes up a
+        tool name (or writes its SQL where the name goes) has run nothing it can rely on."""
+        return [name for name in self.tools if self.announced and name not in self.announced]
 
     @property
     def calls(self) -> int:
@@ -244,10 +251,12 @@ class Record:
 
     @property
     def right(self) -> bool:
-        """A final answer that names every expected column and no forbidden one. A trial
-        stopped before its final answer is never right, whatever its last text says."""
+        """A final answer that names every expected column and no forbidden one, from a trial
+        that called only tools the server lists. A trial stopped before its final answer is
+        never right, whatever its last text says."""
         return (
             self.stop == "answered"
+            and not self.invalid_tools
             and bool(self.expected)
             and all(self.named.get(c, False) for c in self.expected)
             and not self.forbidden_named
@@ -356,9 +365,9 @@ def render_report(meta: dict, records: list[Record]) -> str:
         "",
         (
             "| # | Trials | Right answers | Tool calls | First expected column at call | All expected columns at call "
-            "| Input tokens | Output tokens | Wall time (s) | Named, never shown | Stop |"
+            "| Input tokens | Output tokens | Wall time (s) | Named, never shown | Invalid tool | Stop |"
         ),
-        "|---|---|---|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|---|---|---|",
     ]
     groups = group(records)
     for i, trials in enumerate(groups, 1):
@@ -368,14 +377,15 @@ def render_report(meta: dict, records: list[Record]) -> str:
             f"{spread([r.first_hit for r in trials], n)} | {spread([r.all_hit for r in trials], n)} | "
             f"{spread([r.input_tokens for r in trials], n)} | {spread([r.output_tokens for r in trials], n)} | "
             f"{spread([round(r.seconds, 1) for r in trials], n)} | {sum(bool(r.never_shown) for r in trials)}/{n} | "
-            f"{_cell(_stops(trials))} |"
+            f"{sum(bool(r.invalid_tools) for r in trials)}/{n} | {_cell(_stops(trials))} |"
         )
     medians = [[statistics.median([getattr(r, k) for r in t]) for t in groups] for k in ("calls", "input_tokens")]
     lines.append(
         f"| total | {len(records)} | {sum(r.right for r in records)}/{len(records)} | {sum(medians[0]):g} | | "
         f"| {sum(medians[1]):g} | {sum(statistics.median([r.output_tokens for r in t]) for t in groups):g} | "
         f"{sum(statistics.median([r.seconds for r in t]) for t in groups):.1f} | "
-        f"{sum(bool(r.never_shown) for r in records)}/{len(records)} | |"
+        f"{sum(bool(r.never_shown) for r in records)}/{len(records)} | "
+        f"{sum(bool(r.invalid_tools) for r in records)}/{len(records)} | |"
     )
     lines += ["", "Totals add up each question's median; right answers and trials count every trial."]
     for i, trials in enumerate(groups, 1):
@@ -383,7 +393,10 @@ def render_report(meta: dict, records: list[Record]) -> str:
         for r in trials:
             lines += [
                 "",
-                f"### Trial {r.trial}: {r.calls} tool calls, {_cell(r.stop)}, {'right' if r.right else 'not right'}",
+                (
+                    f"### Trial {r.trial}: {r.calls} tool calls, {_cell(r.stop)}, "
+                    f"{'right' if r.right else 'not right'}{', invalid tool' if r.invalid_tools else ''}"
+                ),
                 "",
                 f"Tools called: {collapse(r.tools)}",
                 "",
@@ -392,7 +405,8 @@ def render_report(meta: dict, records: list[Record]) -> str:
             ]
             for n, name in enumerate(r.tools, 1):
                 given = r.arguments[n - 1] if n <= len(r.arguments) else None
-                lines.append(f"| {n} | `{name}` | {_cell(search_text(name, given))} |")
+                shown = name if not r.announced or name in r.announced else f"{name[:80]} (not a tool the server lists)"
+                lines.append(f"| {n} | `{_cell(shown)}` | {_cell(search_text(name, given))} |")
             lines += [
                 "",
                 "| Column | Kind | First shown at call | Named in the answer |",
@@ -416,9 +430,38 @@ def report_json(meta: dict, records: list[Record]) -> str:
     rows = []
     for r in records:
         row = asdict(r)
-        row.update(calls=r.calls, first_hit=r.first_hit, all_hit=r.all_hit, right=r.right, never_shown=r.never_shown)
+        row.update(
+            calls=r.calls,
+            first_hit=r.first_hit,
+            all_hit=r.all_hit,
+            right=r.right,
+            never_shown=r.never_shown,
+            invalid_tools=r.invalid_tools,
+        )
         rows.append(row)
     return json.dumps({"meta": meta, "trials": rows}, indent=2) + "\n"
+
+
+def announced_tools(server: str) -> list[str]:
+    """The tools a report's server line lists ("name version, n tools: a, b, ...")."""
+    _, _, names = server.partition(" tools: ")
+    return [n for n in names.split(", ") if n]
+
+
+def records_from_json(data: dict) -> list[Record]:
+    """A report's trials as records, scored again by the current rules: the fields a record
+    keeps are read back, the derived ones recomputed. A report written before the server's
+    tools were recorded takes them from its server line."""
+    keep = set(Record.__dataclass_fields__)
+    records = []
+    for row in data["trials"]:
+        r = Record(**{k: v for k, v in row.items() if k in keep})
+        if not r.announced:
+            r.announced = announced_tools(data["meta"].get("server", ""))
+        if r.stop == "answered":
+            r.score(r.answer)
+        records.append(r)
+    return records
 
 
 def load_questions(path: str) -> list[dict]:
@@ -667,6 +710,7 @@ async def ask(args: argparse.Namespace, chat: Any, item: dict, trial: int = 1) -
     try:
         async with mcp_session(args) as (session, init, mcp_tools):
             server = server_name(init, mcp_tools)
+            record.announced = [t.name for t in mcp_tools]
             tools = TOOL_FORMATS[args.provider](mcp_tools)
             messages = chat.start(item["question"])
             steps = 0
@@ -744,7 +788,7 @@ async def run(args: argparse.Namespace, chat: Any, questions: list[dict]) -> tup
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(description="A real agent against the sandbox, counting tool calls.")
-    p.add_argument("--provider", choices=sorted(PROVIDERS), required=True)
+    p.add_argument("--provider", choices=sorted(PROVIDERS))
     p.add_argument("--model", help="the model id; default: " + ", ".join(f"{k} {v}" for k, v in DEFAULT_MODELS.items()))
     p.add_argument("--persona", default="carol_analyst")
     p.add_argument("--questions", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "questions.json"))
@@ -760,7 +804,16 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--max-tokens", type=int, default=16000, help="output tokens per model turn")
     p.add_argument("--out", help="the report, Markdown; its JSON is written beside it")
     p.add_argument("--dry-run", action="store_true", help="list the tools in the provider's format, call no model")
+    p.add_argument(
+        "--rescore", metavar="REPORT.json", help="score a report's trials again by the current rules, into --out"
+    )
     args = p.parse_args(argv)
+    if args.rescore:
+        if not args.out:
+            p.error("--rescore needs --out")
+        return args
+    if not args.provider:
+        p.error("--provider is required")
     args.model = args.model or DEFAULT_MODELS[args.provider]
     if args.max_steps < 1:
         p.error("--max-steps must be at least 1")
@@ -775,18 +828,28 @@ def main(argv: list[str] | None = None) -> int:
     import anyio
 
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    if args.rescore:
+        with open(args.rescore, encoding="utf-8") as f:
+            data = json.load(f)
+        write_reports(args.out, data["meta"], records_from_json(data))
+        return 0
     if args.dry_run:
         return anyio.run(dry_run, args)
     # The key is checked first, before any session or file is opened.
     chat = PROVIDERS[args.provider](api_key(args.provider), args.model, args.max_tokens)
     questions = load_questions(args.questions)
     meta, records = anyio.run(run, args, chat, questions)
-    with open(args.out, "w", encoding="utf-8") as f:
-        f.write(render_report(meta, records))
-    with open(os.path.splitext(args.out)[0] + ".json", "w", encoding="utf-8") as f:
-        f.write(report_json(meta, records))
-    print(f"report: {args.out}")
+    write_reports(args.out, meta, records)
     return 0
+
+
+def write_reports(out: str, meta: dict, records: list[Record]) -> None:
+    """The Markdown report at out, and its JSON beside it."""
+    with open(out, "w", encoding="utf-8") as f:
+        f.write(render_report(meta, records))
+    with open(os.path.splitext(out)[0] + ".json", "w", encoding="utf-8") as f:
+        f.write(report_json(meta, records))
+    print(f"report: {out}")
 
 
 if __name__ == "__main__":

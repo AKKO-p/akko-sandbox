@@ -1,0 +1,225 @@
+{
+  "meta": {
+    "date": "2026-10-30 17:54 UTC",
+    "provider": "mistral",
+    "model_requested": "codestral-latest",
+    "model_returned": "codestral-latest",
+    "server": "trino-mcp 0.7.0, 8 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, search_columns",
+    "server_image": "akko-mcp-trino:0.7.0-rc",
+    "mcp_url": "http://mcp:3000/mcp",
+    "persona": "carol_analyst",
+    "questions": "questions.json",
+    "repeat": 1,
+    "max_steps": 12,
+    "max_tokens": 16000,
+    "sampling": "temperature 0, random_seed 0; tokens compare server against server for one model"
+  },
+  "trials": [
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "execute_query",
+        "search_columns",
+        "execute_query",
+        "search_columns",
+        "execute_query"
+      ],
+      "first_seen": {
+        "demo.crm.transactions.amount": 1,
+        "demo.crm.accounts.customer_id": 2,
+        "demo.crm.transactions.account_id": 4
+      },
+      "input_tokens": 24860,
+      "output_tokens": 232,
+      "answer": "demo.crm.accounts.customer_id, demo.crm.transactions.amount",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.account_id": false,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 8.368636708008125,
+      "stop": "answered",
+      "calls": 7,
+      "first_hit": 1,
+      "all_hit": 4,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "Which customer segment holds the largest total account balance?",
+      "expected": [
+        "demo.crm.customers.segment",
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns"
+      ],
+      "first_seen": {},
+      "input_tokens": 23563,
+      "output_tokens": 279,
+      "answer": "I could not find any columns related to customer segment or account balance in the demo catalog.",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.segment": false,
+        "demo.crm.accounts.balance": false,
+        "demo.crm.accounts.customer_id": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 7.390725269913673,
+      "stop": "answered",
+      "calls": 10,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "How much was spent in each spending category in March 2026?",
+      "expected": [
+        "demo.crm.transactions.category",
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns"
+      ],
+      "first_seen": {},
+      "input_tokens": 5480,
+      "output_tokens": 30,
+      "answer": "I could not find any columns with the name or comment \"spending category\".",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.category": false,
+        "demo.crm.transactions.amount": false,
+        "demo.crm.transactions.booked_at": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 1.6318002089392394,
+      "stop": "answered",
+      "calls": 1,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "How many accounts are held in each currency?",
+      "expected": [
+        "demo.crm.accounts.currency"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "execute_query"
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 2
+      },
+      "input_tokens": 8625,
+      "output_tokens": 138,
+      "answer": "The number of accounts held in each currency is as follows:\n\n- JPY: 1 account\n- EUR: 6 accounts\n- USD: 2 accounts\n- CAD: 1 account\n- GBP: 1 account\n- BRL: 1 account\n\nThe columns used are:\n- demo.crm.accounts.currency\n- demo.crm.accounts.account_count",
+      "last_text": "",
+      "named": {
+        "demo.crm.accounts.currency": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.accounts.account_count"
+      ],
+      "seconds": 2.6371511400211602,
+      "stop": "answered",
+      "calls": 2,
+      "first_hit": 2,
+      "all_hit": 2,
+      "right": true,
+      "never_shown": []
+    },
+    {
+      "question": "What was the total amount of the archived transactions booked in 2019?",
+      "expected": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount",
+        "demo.crm_archive.transactions_2014.amount",
+        "demo.crm_archive.transactions_2015.amount",
+        "demo.crm_archive.transactions_2016.amount",
+        "demo.crm_archive.transactions_2017.amount",
+        "demo.crm_archive.transactions_2018.amount",
+        "demo.crm_archive.transactions_2020.amount",
+        "demo.crm_archive.transactions_2021.amount",
+        "demo.crm_archive.transactions_2022.amount",
+        "demo.crm_archive.transactions_2023.amount",
+        "demo.crm_archive.transactions_2024.amount",
+        "demo.crm_archive.transactions_2025.amount"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "search_columns"
+      ],
+      "first_seen": {},
+      "input_tokens": 42878,
+      "output_tokens": 369,
+      "answer": "",
+      "last_text": "",
+      "named": {},
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 7.6298237920273095,
+      "stop": "max_steps",
+      "calls": 12,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    }
+  ]
+}
