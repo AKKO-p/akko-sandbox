@@ -41,7 +41,7 @@ supprimer : `docker compose down -v`.
 2. `SELECT current_user` : Trino exécute chaque requête au nom de l'utilisateur dont il a reçu le token.
 3. Les deux réponses côte à côte : e-mails masqués et row filter pour l'analyste, tout pour l'administratrice.
 4. Un troisième utilisateur, `dave_viewer`, refusé par la policy.
-5. La même recherche de colonne pour carol et pour dave (`search_columns`, depuis akko-mcp-trino 0.7) : le mot `email` trouve `demo.crm.customers.email` pour carol, et rien pour dave, à qui la policy cache la table. Sa recherche est pourtant complète, rien n'a été sauté{NN}: cette table n'est simplement pas visible pour lui.
+5. La même recherche de colonne pour carol et pour dave (`search_columns`, depuis akko-mcp-trino 0.7) : le mot `email` trouve `demo.crm.customers.email` pour carol, et rien pour dave, à qui la policy cache la table. Sa recherche est pourtant complète, rien n'a été sauté : cette table n'est simplement pas visible pour lui.
 6. Une écriture, refusée par le serveur avant d'atteindre Trino.
 7. Une requête sans token, une autre avec une signature falsifiée, et une troisième avec un token valide mais émis pour Trino au lieu du serveur : les trois refusées par un `401`.
 
@@ -160,6 +160,10 @@ COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml ./demo.sh --check
 COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose --profile tools down -v
 tests/gateway.sh   # les contrôles, de bout en bout
 ```
+
+Cette variante fait tourner deux Trino de 2048 Mo chacun. Mesurée avec `docker stats`,
+elle atteint 3058 Mio au plus fort de `tests/gateway.sh` et 3220 Mio pendant les
+contrôles de la 0.7 : comptez environ 4 Go de mémoire libre.
 
 Démarrez la variante avec le même `COMPOSE_FILE` à chaque fois, et arrêtez-la
 avec lui aussi : un `docker compose down` sans lui laisse derrière lui le second

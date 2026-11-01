@@ -157,6 +157,10 @@ COMPOSE_FILE=compose.yaml:gateway/compose.gateway.yaml docker compose --profile 
 tests/gateway.sh   # the checks, end to end
 ```
 
+This variant runs two Trino of 2048 MB each. Measured with `docker stats`, it
+reaches 3058 MiB at the peak of `tests/gateway.sh` and 3220 MiB during the 0.7
+checks: plan for about 4 GB of free memory.
+
 Start the variant with the same `COMPOSE_FILE` every time, and stop it with it
 too: a `docker compose down` without it leaves the second cluster and the
 gateway behind.

@@ -10,6 +10,16 @@ permissions:
   contents: read
 
 jobs:
+  # The READMEs hold no leftover of a substitution template ({NN}, {NB}).
+  docs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: No template leftover in the Markdown files
+        run: "! grep -rnE '[{](NN|NB)[}]' --include='*.md' ."
+
   # The real-agent harness's unit tests: no model, no server, no key.
   agent:
     runs-on: ubuntu-latest
@@ -43,8 +53,8 @@ jobs:
     env:
       COMPOSE_PROJECT_NAME: akko-sandbox-ci
       # Until akko-mcp-trino 0.7.0 is on Docker Hub, the server is built from the
-      # core's main, which holds 0.7.0. Remove both lines then.
-      MCP_CORE_REF: main
+      # core's commit that holds 0.7.0, as measured. Remove both lines then.
+      MCP_CORE_REF: 4105967553bf2a07f7b6831c787550fc34349a28
       MCP_IMAGE: akko-mcp-trino:0.7.0-main
     steps:
       - uses: actions/checkout@v7
@@ -52,7 +62,8 @@ jobs:
       - name: Build akko-mcp-trino from source, until 0.7.0 is published
         if: env.MCP_CORE_REF != ''
         run: |
-          git clone --quiet --depth 1 --branch "$MCP_CORE_REF" https://github.com/AKKO-p/akko-mcp-trino.git core
+          git clone --quiet https://github.com/AKKO-p/akko-mcp-trino.git core
+          git -C core checkout --quiet "$MCP_CORE_REF"
           git -C core log --oneline -1
           docker build --quiet --tag "$MCP_IMAGE" core
           docker run --rm "$MCP_IMAGE" akko-mcp-trino --version

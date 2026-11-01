@@ -4,8 +4,9 @@
 # script, after gateway/compose.gateway.yaml and before
 # tests/compose.v07.gateway.yaml when GATEWAY=1.
 #
-#   MCP_IMAGE=<0.7 image> tests/v07.sh
-#   GATEWAY=1 MCP_IMAGE=<0.7 image> tests/v07.sh
+#   tests/v07.sh                 the sandbox's image, 0.7.0
+#   GATEWAY=1 tests/v07.sh
+#   MCP_IMAGE=<image> tests/v07.sh     another build of the server
 
 services:
   # Two more catalogs for searches that span catalogs, tpch and tpcds, which
