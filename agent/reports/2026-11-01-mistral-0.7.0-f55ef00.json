@@ -1,0 +1,748 @@
+{
+  "meta": {
+    "date": "2026-11-01 11:00 UTC",
+    "provider": "mistral",
+    "model_requested": "codestral-latest",
+    "model_returned": "codestral-latest",
+    "server": "trino-mcp 0.7.0, 8 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, search_columns",
+    "server_image": "akko-mcp-trino:0.7.0-f55ef00",
+    "mcp_url": "http://mcp:3000/mcp",
+    "persona": "carol_analyst",
+    "questions": "questions.json",
+    "repeat": 3,
+    "max_steps": 12,
+    "max_tokens": 16000,
+    "sampling": "temperature 0, random_seed 0; tokens compare server against server for one model"
+  },
+  "trials": [
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "revenue customer"
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 6003,
+      "output_tokens": 40,
+      "answer": "I could not find any tables or columns that match both \"revenue\" and \"customer\". Please try again with different words.",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": false,
+        "demo.crm.transactions.account_id": false,
+        "demo.crm.accounts.customer_id": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 3.5766445549670607,
+      "stop": "answered",
+      "calls": 1,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "revenue customer"
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 6003,
+      "output_tokens": 40,
+      "answer": "I could not find any tables or columns that match both \"revenue\" and \"customer\". Please try again with different words.",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": false,
+        "demo.crm.transactions.account_id": false,
+        "demo.crm.accounts.customer_id": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 2.453509597107768,
+      "stop": "answered",
+      "calls": 1,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "revenue customer"
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 6003,
+      "output_tokens": 43,
+      "answer": "I could not find any tables or columns that match the words \"revenue\" and \"customer\". Please try again with fewer or different words.",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": false,
+        "demo.crm.transactions.account_id": false,
+        "demo.crm.accounts.customer_id": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 2.9484399270731956,
+      "stop": "answered",
+      "calls": 1,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "Which customer segment holds the largest total account balance?",
+      "expected": [
+        "demo.crm.customers.segment",
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "explain_query",
+        "search_columns",
+        "explain_query",
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "explain_query",
+        "search_columns",
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "customer segment account balance"
+        },
+        {
+          "text": "customer segment"
+        },
+        {
+          "text": "account balance"
+        },
+        {
+          "sql": "SELECT c.segment, SUM(a.balance) AS total_balance FROM demo.crm.customers c JOIN demo.crm.accounts a ON c.customer_id = a.customer_id GROUP BY c.segment ORDER BY total_balance DESC LIMIT 1"
+        },
+        {
+          "text": "customer_id"
+        },
+        {
+          "sql": "SELECT c.segment, SUM(a.balance) AS total_balance FROM demo.crm.customers c JOIN demo.crm.accounts a ON c.customer_id = a.customer_id GROUP BY c.segment ORDER BY total_balance DESC LIMIT 1"
+        },
+        {
+          "text": "customer_id",
+          "catalog": "demo",
+          "schema": "crm"
+        },
+        {
+          "text": "customer_id",
+          "catalog": "demo",
+          "schema": "crm",
+          "cursor": "demo.crm"
+        },
+        {
+          "text": "customer_id",
+          "catalog": "demo",
+          "schema": "crm"
+        },
+        {
+          "sql": "SELECT c.segment, SUM(a.balance) AS total_balance FROM demo.crm.customers c JOIN demo.crm.accounts a ON c.customer_id = a.customer_id GROUP BY c.segment ORDER BY total_balance DESC LIMIT 1"
+        },
+        {
+          "text": "customer_id",
+          "catalog": "demo",
+          "schema": "crm"
+        },
+        {
+          "text": "customer_id",
+          "catalog": "demo",
+          "schema": "crm"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.segment": 2,
+        "demo.crm.accounts.balance": 3,
+        "demo.crm.accounts.customer_id": 5
+      },
+      "input_tokens": 47979,
+      "output_tokens": 414,
+      "answer": "",
+      "last_text": "",
+      "named": {},
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 21.74280980299227,
+      "stop": "max_steps",
+      "calls": 12,
+      "first_hit": 2,
+      "all_hit": 5,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "Which customer segment holds the largest total account balance?",
+      "expected": [
+        "demo.crm.customers.segment",
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "customer segment account balance"
+        },
+        {
+          "text": "customer segment"
+        },
+        {
+          "text": "account balance"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.segment": 2,
+        "demo.crm.accounts.balance": 3
+      },
+      "input_tokens": 12484,
+      "output_tokens": 53,
+      "answer": "demo.crm.customers.segment, demo.crm.accounts.balance",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.segment": true,
+        "demo.crm.accounts.balance": true,
+        "demo.crm.accounts.customer_id": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 5.833461485104635,
+      "stop": "answered",
+      "calls": 3,
+      "first_hit": 2,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "Which customer segment holds the largest total account balance?",
+      "expected": [
+        "demo.crm.customers.segment",
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "customer segment account balance"
+        },
+        {
+          "text": "customer segment"
+        },
+        {
+          "text": "account balance"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.segment": 2,
+        "demo.crm.accounts.balance": 3
+      },
+      "input_tokens": 12484,
+      "output_tokens": 53,
+      "answer": "demo.crm.customers.segment, demo.crm.accounts.balance",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.segment": true,
+        "demo.crm.accounts.balance": true,
+        "demo.crm.accounts.customer_id": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 6.183185039786622,
+      "stop": "answered",
+      "calls": 3,
+      "first_hit": 2,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "How much was spent in each spending category in March 2026?",
+      "expected": [
+        "demo.crm.transactions.category",
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "spending category March 2026"
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 6027,
+      "output_tokens": 40,
+      "answer": "I could not find any tables or columns that match your request. Please try again with different keywords.",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.category": false,
+        "demo.crm.transactions.amount": false,
+        "demo.crm.transactions.booked_at": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 2.3129023779183626,
+      "stop": "answered",
+      "calls": 1,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "How much was spent in each spending category in March 2026?",
+      "expected": [
+        "demo.crm.transactions.category",
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "spending category March 2026"
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 6027,
+      "output_tokens": 40,
+      "answer": "I could not find any tables or columns that match your query. Please try again with different keywords.",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.category": false,
+        "demo.crm.transactions.amount": false,
+        "demo.crm.transactions.booked_at": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 3.0245946091599762,
+      "stop": "answered",
+      "calls": 1,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "How much was spent in each spending category in March 2026?",
+      "expected": [
+        "demo.crm.transactions.category",
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "spending category March 2026"
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 6027,
+      "output_tokens": 42,
+      "answer": "I could not find any tables or columns that match your request. Please try again with different or fewer words.",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.category": false,
+        "demo.crm.transactions.amount": false,
+        "demo.crm.transactions.booked_at": false
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 2.913477452006191,
+      "stop": "answered",
+      "calls": 1,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": []
+    },
+    {
+      "question": "How many accounts are held in each currency?",
+      "expected": [
+        "demo.crm.accounts.currency"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "accounts currency"
+        },
+        {
+          "sql": "SELECT currency, COUNT(*) AS account_count FROM demo.crm.accounts GROUP BY currency",
+          "max_rows": 0
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 1
+      },
+      "input_tokens": 9495,
+      "output_tokens": 54,
+      "answer": "demo.crm.accounts.currency",
+      "last_text": "",
+      "named": {
+        "demo.crm.accounts.currency": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 3.192129591014236,
+      "stop": "answered",
+      "calls": 2,
+      "first_hit": 1,
+      "all_hit": 1,
+      "right": true,
+      "never_shown": []
+    },
+    {
+      "question": "How many accounts are held in each currency?",
+      "expected": [
+        "demo.crm.accounts.currency"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "accounts currency"
+        },
+        {
+          "sql": "SELECT currency, COUNT(*) AS account_count FROM demo.crm.accounts GROUP BY currency"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 1
+      },
+      "input_tokens": 9488,
+      "output_tokens": 97,
+      "answer": "There are 1 accounts held in GBP, 1 in CAD, 1 in JPY, 6 in EUR, 1 in BRL, and 2 in USD.\n\nThe columns used are demo.crm.accounts.currency and demo.crm.accounts.balance.",
+      "last_text": "",
+      "named": {
+        "demo.crm.accounts.currency": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 2.965267638908699,
+      "stop": "answered",
+      "calls": 2,
+      "first_hit": 1,
+      "all_hit": 1,
+      "right": true,
+      "never_shown": []
+    },
+    {
+      "question": "How many accounts are held in each currency?",
+      "expected": [
+        "demo.crm.accounts.currency"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "accounts currency"
+        },
+        {
+          "sql": "SELECT currency, COUNT(*) AS account_count FROM demo.crm.accounts GROUP BY currency",
+          "max_rows": 0
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 1
+      },
+      "input_tokens": 9495,
+      "output_tokens": 129,
+      "answer": "The number of accounts held in each currency is as follows:\n\n- JPY: 1 account\n- GBP: 1 account\n- USD: 2 accounts\n- EUR: 6 accounts\n- CAD: 1 account\n- BRL: 1 account\n\nThe columns used to answer this question are:\n- demo.crm.accounts.currency\n- demo.crm.accounts.balance",
+      "last_text": "",
+      "named": {
+        "demo.crm.accounts.currency": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.accounts.balance"
+      ],
+      "seconds": 3.495108394883573,
+      "stop": "answered",
+      "calls": 2,
+      "first_hit": 1,
+      "all_hit": 1,
+      "right": true,
+      "never_shown": []
+    },
+    {
+      "question": "What was the total amount of the archived transactions booked in 2019?",
+      "expected": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount",
+        "demo.crm_archive.transactions_2014.amount",
+        "demo.crm_archive.transactions_2015.amount",
+        "demo.crm_archive.transactions_2016.amount",
+        "demo.crm_archive.transactions_2017.amount",
+        "demo.crm_archive.transactions_2018.amount",
+        "demo.crm_archive.transactions_2020.amount",
+        "demo.crm_archive.transactions_2021.amount",
+        "demo.crm_archive.transactions_2022.amount",
+        "demo.crm_archive.transactions_2023.amount",
+        "demo.crm_archive.transactions_2024.amount",
+        "demo.crm_archive.transactions_2025.amount"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "archived transactions 2019"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm_archive",
+          "table": "transactions_2019"
+        },
+        {
+          "sql": "SELECT SUM(amount) AS total_amount FROM demo.crm_archive.transactions_2019"
+        }
+      ],
+      "first_seen": {
+        "demo.crm_archive.transactions_2019.amount": 2
+      },
+      "input_tokens": 12415,
+      "output_tokens": 117,
+      "answer": "The total amount of the archived transactions booked in 2019 is null.\n\nThe columns used are:\n- demo.crm_archive.transactions_2019.amount",
+      "last_text": "",
+      "named": {
+        "demo.crm_archive.transactions_2019.amount": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 3.258517858805135,
+      "stop": "answered",
+      "calls": 3,
+      "first_hit": 2,
+      "all_hit": 2,
+      "right": true,
+      "never_shown": []
+    },
+    {
+      "question": "What was the total amount of the archived transactions booked in 2019?",
+      "expected": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount",
+        "demo.crm_archive.transactions_2014.amount",
+        "demo.crm_archive.transactions_2015.amount",
+        "demo.crm_archive.transactions_2016.amount",
+        "demo.crm_archive.transactions_2017.amount",
+        "demo.crm_archive.transactions_2018.amount",
+        "demo.crm_archive.transactions_2020.amount",
+        "demo.crm_archive.transactions_2021.amount",
+        "demo.crm_archive.transactions_2022.amount",
+        "demo.crm_archive.transactions_2023.amount",
+        "demo.crm_archive.transactions_2024.amount",
+        "demo.crm_archive.transactions_2025.amount"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "archived transactions 2019"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm_archive",
+          "table": "transactions_2019"
+        },
+        {
+          "sql": "SELECT SUM(amount) AS total_amount FROM demo.crm_archive.transactions_2019"
+        }
+      ],
+      "first_seen": {
+        "demo.crm_archive.transactions_2019.amount": 2
+      },
+      "input_tokens": 12415,
+      "output_tokens": 116,
+      "answer": "The total amount of the archived transactions booked in 2019 is not available. It relies on demo.crm_archive.transactions_2019.amount.",
+      "last_text": "",
+      "named": {
+        "demo.crm_archive.transactions_2019.amount": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 4.8622817730065435,
+      "stop": "answered",
+      "calls": 3,
+      "first_hit": 2,
+      "all_hit": 2,
+      "right": true,
+      "never_shown": []
+    },
+    {
+      "question": "What was the total amount of the archived transactions booked in 2019?",
+      "expected": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount",
+        "demo.crm_archive.transactions_2014.amount",
+        "demo.crm_archive.transactions_2015.amount",
+        "demo.crm_archive.transactions_2016.amount",
+        "demo.crm_archive.transactions_2017.amount",
+        "demo.crm_archive.transactions_2018.amount",
+        "demo.crm_archive.transactions_2020.amount",
+        "demo.crm_archive.transactions_2021.amount",
+        "demo.crm_archive.transactions_2022.amount",
+        "demo.crm_archive.transactions_2023.amount",
+        "demo.crm_archive.transactions_2024.amount",
+        "demo.crm_archive.transactions_2025.amount"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "archived transactions 2019"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm_archive",
+          "table": "transactions_2019"
+        },
+        {
+          "sql": "SELECT SUM(amount) AS total_amount FROM demo.crm_archive.transactions_2019"
+        }
+      ],
+      "first_seen": {
+        "demo.crm_archive.transactions_2019.amount": 2
+      },
+      "input_tokens": 12415,
+      "output_tokens": 93,
+      "answer": "demo.crm_archive.transactions_2019.amount",
+      "last_text": "",
+      "named": {
+        "demo.crm_archive.transactions_2019.amount": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 3.6728048590011895,
+      "stop": "answered",
+      "calls": 3,
+      "first_hit": 2,
+      "all_hit": 2,
+      "right": true,
+      "never_shown": []
+    }
+  ]
+}

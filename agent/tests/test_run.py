@@ -298,11 +298,11 @@ def test_report_lines_and_totals():
     assert "| server_image | akko-mcp-trino:0.7-t7 |" in text
     assert "| repeat | 3 |" in text
     assert (
-        "| 1 | 3 | 2/3 | 3 (2-4) | 1.5 (1-2) [2/3] | 1.5 (1-2) [2/3] | 1500 (1200-1800) | 80 | 3 | 0/3 | answered x3 |"
+        "| 1 | 3 | 2/3 | 3 (2-4) | 1.5 (1-2) [2/3] | 1.5 (1-2) [2/3] | 1500 (1200-1800) | 80 | 3 | 0/3 | 0/3 | answered x3 |"
         in text
     )
-    assert "| 2 | 1 | 0/1 | 0 | - | - | 0 | 0 | 1 | 0/1 | max_steps |" in text
-    assert "| total | 4 | 2/4 | 3 | | | 1500 | 80 | 4.0 | 0/4 | |" in text
+    assert "| 2 | 1 | 0/1 | 0 | - | - | 0 | 0 | 1 | 0/1 | 0/1 | max_steps |" in text
+    assert "| total | 4 | 2/4 | 3 | | | 1500 | 80 | 4.0 | 0/4 | 0/4 | |" in text
     assert "### Trial 3: 3 tool calls, answered, not right" in text
     assert "| `demo.crm.accounts.balance` | forbidden | | yes |" in text
     assert "demo.crm.transactions.amount \\| summed" not in text  # code blocks keep the answer as written
@@ -736,3 +736,121 @@ def test_other_names_leave_out_forbidden_columns_and_tables():
     )
     assert r.forbidden_named == ["demo.crm.accounts.balance"]
     assert r.other_named == ["crm.customers.full_name"]
+
+
+# A call to a tool the server does not list makes the trial wrong, on every server alike.
+
+TOOL_LIST = ["describe_table", "execute_query", "search_columns"]
+FAKE = '{"sql": "SELECT currency, COUNT(*) FROM demo.crm.accounts GROUP BY currency"}'
+
+
+def test_a_made_up_tool_name_makes_the_trial_wrong():
+    r = run.Record(question="q", expected=["demo.crm.accounts.currency"], announced=TOOL_LIST, stop="answered")
+    r.tools = ["search_columns", FAKE]
+    r.score("demo.crm.accounts.currency")
+    assert r.invalid_tools == [FAKE] and not r.right
+    r.tools = ["search_columns", "execute_query"]
+    assert r.invalid_tools == [] and r.right
+
+
+def test_without_the_server_list_no_tool_is_judged():
+    r = run.Record(question="q", expected=[AMOUNT], tools=["anything"], stop="answered")
+    r.score(AMOUNT)
+    assert r.invalid_tools == [] and r.right
+
+
+def test_the_report_counts_and_marks_invalid_tools():
+    good = run.Record(question="q", expected=[AMOUNT], announced=TOOL_LIST, tools=["search_columns"], stop="answered")
+    good.score(AMOUNT)
+    bad = run.Record(question="q", expected=[AMOUNT], announced=TOOL_LIST, tools=[FAKE], stop="answered", trial=2)
+    bad.score(AMOUNT)
+    text = run.render_report(META, [good, bad])
+    assert "| Invalid tool |" in text
+    assert "| 1 | 2 | 1/2 |" in text and "| 1/2 | answered x2 |" in text
+    assert "### Trial 2: 1 tool calls, answered, not right, invalid tool" in text
+    assert "(not a tool the server lists)" in text
+    assert json.loads(run.report_json(META, [bad]))["trials"][0]["invalid_tools"] == [FAKE]
+
+
+def test_ask_records_the_tools_the_server_lists(monkeypatch):
+    import anyio
+
+    session = FakeSession({"search_columns": "{}", FAKE: '{"error": "Unknown tool"}'})
+    monkeypatch.setattr(run, "mcp_session", fake_mcp(session))
+    chat = mistral_chat(
+        [mistral_response("", [("c1", FAKE, '{"max_rows": 10}')]), mistral_response("demo.crm.transactions.amount")]
+    )
+    record, _, _ = anyio.run(run.ask, loop_args(), chat, {"question": "q", "expected": [AMOUNT]})
+    assert record.announced == ["search_columns"]
+    assert record.invalid_tools == [FAKE] and record.stop == "answered" and not record.right
+
+
+def test_the_server_line_gives_the_tools():
+    assert run.announced_tools("trino-mcp 0.7.0, 2 tools: a, b") == ["a", "b"]
+    assert run.announced_tools("") == []
+
+
+def test_a_report_scored_again_by_the_current_rules():
+    data = {
+        "meta": dict(META, server="trino-mcp 0.7.0, 3 tools: " + ", ".join(TOOL_LIST)),
+        "trials": [
+            {
+                "question": "q",
+                "expected": [AMOUNT],
+                "forbidden": [],
+                "trial": 1,
+                "tools": ["search_columns", FAKE],
+                "answer": AMOUNT,
+                "stop": "answered",
+                "right": True,
+                "calls": 2,
+            },
+            {
+                "question": "q",
+                "expected": [AMOUNT],
+                "forbidden": [],
+                "trial": 2,
+                "tools": ["search_columns"],
+                "answer": "",
+                "last_text": AMOUNT,
+                "stop": "max_steps",
+                "right": False,
+            },
+        ],
+    }
+    first, second = run.records_from_json(data)
+    assert first.announced == TOOL_LIST and first.invalid_tools == [FAKE] and not first.right
+    assert first.named == {AMOUNT: True}
+    assert not second.right and second.named == {}
+
+
+FINAL = os.path.join(os.path.dirname(run.__file__), "reports", "2026-11-01-final-mistral-0.7.0-4105967.json")
+
+
+@pytest.mark.skipif(not os.path.exists(FINAL), reason="the final measurement's report is not in this tree")
+def test_the_final_mistral_report_scored_again():
+    with open(FINAL, encoding="utf-8") as f:
+        records = run.records_from_json(json.load(f))
+    invalid = [(r.question[:8], r.trial) for r in records if r.invalid_tools]
+    assert invalid == [("How many", 3)]
+    assert sum(r.right for r in records) == 9
+
+
+def test_rescore_writes_both_files(tmp_path):
+    src = tmp_path / "in.json"
+    src.write_text(
+        json.dumps(
+            {"meta": META, "trials": [{"question": "q", "expected": [AMOUNT], "stop": "answered", "answer": AMOUNT}]}
+        )
+    )
+    out = tmp_path / "out.md"
+    assert run.main(["--rescore", str(src), "--out", str(out)]) == 0
+    assert "| 1 | 1 | 1/1 |" in out.read_text()
+    assert json.loads((tmp_path / "out.json").read_text())["trials"][0]["right"] is True
+
+
+def test_rescore_and_provider_arguments():
+    for bad in (["--rescore", "x.json"], ["--dry-run"]):
+        with pytest.raises(SystemExit):
+            run.parse_args(bad)
+    assert run.parse_args(["--rescore", "x.json", "--out", "y.md"]).rescore == "x.json"

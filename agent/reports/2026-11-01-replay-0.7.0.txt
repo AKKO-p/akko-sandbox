@@ -1,0 +1,41 @@
+akko-mcp-trino:0.7.0-f55ef00
+trino-mcp 0.7.0, 8 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, search_columns
+
+### search_columns {"text": "revenue customer"}
+{"tables": [], "matches": [], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null, "hint": "Nothing matched every word. Try fewer words or other words (a synonym, a column or table name), or browse with list_tables and describe_schema."}
+
+### search_columns {"text": "spending category March 2026"}
+{"tables": [], "matches": [], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null, "hint": "Nothing matched every word. Try fewer words or other words (a synonym, a column or table name), or browse with list_tables and describe_schema."}
+
+### search_columns {"text": "customer segment account balance"}
+{"tables": [], "matches": [], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null, "hint": "Nothing matched every word. Try fewer words or other words (a synonym, a column or table name), or browse with list_tables and describe_schema."}
+
+### search_columns {"text": "customer segment"}
+{"tables": [{"catalog": "demo", "schema": "crm", "table": "customers", "comment": "People and companies who hold an account"}], "matches": [{"catalog": "demo", "schema": "crm", "table": "customers", "column": "segment", "type": "varchar", "comment": "Retail or business customer"}], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null}
+
+### search_columns {"text": "account balance"}
+{"tables": [{"catalog": "demo", "schema": "crm", "table": "accounts", "comment": "Bank accounts, one currency each, each held by one customer"}], "matches": [{"catalog": "demo", "schema": "crm", "table": "accounts", "column": "balance", "type": "decimal(12,2)", "comment": "Current balance in the account currency"}], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null}
+
+### search_columns {"text": "customer_id"}
+{"tables": [{"catalog": "demo", "schema": "crm", "table": "accounts", "comment": "Bank accounts, one currency each, each held by one customer"}], "matches": [{"catalog": "demo", "schema": "crm", "table": "accounts", "column": "customer_id", "type": "integer", "comment": null}], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null}
+
+### search_columns {"text": "customer_id", "catalog": "demo", "schema": "crm"}
+{"tables": [{"catalog": "demo", "schema": "crm", "table": "accounts", "comment": "Bank accounts, one currency each, each held by one customer"}], "matches": [{"catalog": "demo", "schema": "crm", "table": "accounts", "column": "customer_id", "type": "integer", "comment": null}], "schemas_searched": 1, "not_searched": [], "complete": true, "next_cursor": null}
+
+### search_columns {"text": "customer_id", "catalog": "demo", "schema": "crm", "cursor": "demo.crm"}
+{"error": "Invalid cursor: pass back next_cursor unchanged, or start the search again without a cursor", "kind": "invalid_argument"}
+
+### explain_query {"sql": "SELECT c.segment, SUM(a.balance) AS total_balance FROM demo.crm.customers c JOIN demo.crm.accounts a ON c.customer_id = a.customer_id GROUP BY c.segment ORDER BY total_balance DESC LIMIT 1"}
+{"error": "TrinoUserError(type=USER_ERROR, name=COLUMN_NOT_FOUND, message=\"line 1:113: Column 'c.customer_id' cannot be resolved\", query_id=20261101_110926_00409_rmwbt)", "kind": "column", "identifier": "c.customer_id"}
+
+### search_columns {"text": "revenue"}
+{"tables": [{"catalog": "demo", "schema": "crm", "table": "transactions", "comment": "Movements booked on the accounts"}], "matches": [{"catalog": "demo", "schema": "crm", "table": "transactions", "column": "amount", "type": "decimal(12,2)", "comment": "Booked amount in the account currency: the revenue of a sale"}], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null}
+
+### search_columns {"text": "spending category"}
+{"tables": [{"catalog": "demo", "schema": "crm", "table": "transactions", "comment": "Movements booked on the accounts"}], "matches": [{"catalog": "demo", "schema": "crm", "table": "transactions", "column": "category", "type": "varchar", "comment": "Spending or income category"}], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null}
+
+### search_columns {"text": "currency"}
+{"tables": [{"catalog": "demo", "schema": "crm", "table": "accounts", "comment": "Bank accounts, one currency each, each held by one customer"}, {"catalog": "demo", "schema": "crm", "table": "transactions", "comment": "Movements booked on the accounts"}], "matches": [{"catalog": "demo", "schema": "crm", "table": "accounts", "column": "currency", "type": "char(3)", "comment": null}, {"catalog": "demo", "schema": "crm", "table": "accounts", "column": "balance", "type": "decimal(12,2)", "comment": "Current balance in the account currency"}, {"catalog": "demo", "schema": "crm", "table": "transactions", "column": "amount", "type": "decimal(12,2)", "comment": "Booked amount in the account currency: the revenue of a sale"}], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null}
+
+### search_columns {"text": "archived transactions 2019"}
+{"tables": [{"catalog": "demo", "schema": "crm_archive", "table": "transactions_2019", "comment": "Transactions booked in 2019, archived"}], "matches": [], "schemas_searched": 4, "not_searched": [], "complete": true, "next_cursor": null}
