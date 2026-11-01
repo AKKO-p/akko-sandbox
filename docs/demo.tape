@@ -10,8 +10,8 @@ Require docker
 
 Set Shell "bash"
 Set FontFamily "JetBrains Mono"
-Set FontSize 17
-Set Width 1280
+Set FontSize 16
+Set Width 1400
 Set Height 980
 Set Padding 24
 Set Theme "Catppuccin Mocha"
