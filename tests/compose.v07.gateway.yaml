@@ -6,3 +6,5 @@ services:
     volumes:
       - ./tests/v07/catalog:/etc/trino/catalog:ro
     mem_limit: 2048m   # as the first cluster (tests/compose.v07.yaml)
+    environment:
+      MALLOC_ARENA_MAX: "2"   # as the first cluster: glibc arenas add about 0.5 GB off-heap
