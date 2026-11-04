@@ -129,7 +129,7 @@ services:
   # MCP_IMAGE runs another build of the server, such as a release candidate.
   mcp:
     <<: *defaults
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.0}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
     entrypoint: ["/bin/sh", "-c"]
     command: ["TRINO_TOKEN_EXCHANGE_CLIENT_SECRET=$$(cat /certs/mcp-client.secret) exec akko-mcp-trino"]
     environment:
@@ -142,6 +142,8 @@ services:
       MCP_JWKS_URL: http://keycloak:8080/realms/sandbox/protocol/openid-connect/certs
       MCP_OIDC_ISSUER: http://localhost:${KEYCLOAK_PORT:-8080}/realms/sandbox
       MCP_OIDC_AUDIENCE: akko-mcp
+      # Keycloak's sub is a UUID; the policy knows users by preferred_username.
+      MCP_JWT_USER_CLAIM: preferred_username
       MCP_RESOURCE_URL: http://localhost:${MCP_PORT:-3000}/mcp
       TRINO_TOKEN_EXCHANGE_URL: https://keycloak:8443/realms/sandbox/protocol/openid-connect/token
       TRINO_TOKEN_EXCHANGE_CLIENT_ID: akko-mcp
@@ -179,7 +181,7 @@ services:
   # The demo client, started by ./demo.sh: the same image, the official MCP SDK.
   client:
     <<: *defaults
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.0}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
     profiles: ["tools"]
     entrypoint: ["python", "/demo/demo.py"]
     environment:

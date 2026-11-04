@@ -115,3 +115,22 @@ jobs:
           COMPOSE_PROJECT_NAME: akko-sandbox-v07
           COMPOSE_FILE: compose.yaml:tests/compose.v07.yaml
         run: docker compose --profile tools down -v --remove-orphans
+
+      - name: The read allow-list of akko-mcp-trino 0.7.1 and later, check everything
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v071
+        run: KEEP=1 tests/v071.sh
+
+      - name: Service logs, the read allow-list
+        if: failure()
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v071
+          COMPOSE_FILE: compose.yaml:tests/compose.v071.yaml
+        run: docker compose logs --no-color
+
+      - name: Remove everything, the read allow-list
+        if: always()
+        env:
+          COMPOSE_PROJECT_NAME: akko-sandbox-v071
+          COMPOSE_FILE: compose.yaml:tests/compose.v071.yaml
+        run: docker compose --profile tools down -v --remove-orphans
