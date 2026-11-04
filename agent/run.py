@@ -924,16 +924,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    import anyio
-
     args = parse_args(sys.argv[1:] if argv is None else argv)
     if args.rescore:
         with open(args.rescore, encoding="utf-8") as f:
             data = json.load(f)
         meta, records, questions = data["meta"], records_from_json(data), load_questions(args.questions)
     elif args.dry_run:
+        import anyio
+
         return anyio.run(dry_run, args)
     else:
+        import anyio  # a rescore needs neither the clients nor anyio
+
         # The key is checked first, before any session or file is opened.
         chat = PROVIDERS[args.provider](api_key(args.provider), args.model, args.max_tokens)
         questions = load_questions(args.questions)
