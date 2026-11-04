@@ -11,3 +11,24 @@ suites:
     unlisted: PRF-K6-UNNAMED
 
 cases:
+  - id: PRF-K6-001
+    script: k6-validate
+    check: "the Inspector got 10 answers"
+  - id: PRF-K6-002
+    script: k6-validate
+    check: "k6 ran, a session per call"
+  - id: PRF-K6-003
+    script: k6-validate
+    check: "k6 got 10 answers"
+  - id: PRF-K6-004
+    script: k6-validate
+    check: "k6's answers are the Inspector's, once durations and ids are removed"
+  - id: PRF-K6-005
+    script: k6-validate
+    check: "k6 counted no MCP error"
+  - id: PRF-K6-006
+    script: k6-validate
+    check: "k6 ran, a session per virtual user"
+  - id: PRF-K6-007
+    script: k6-validate
+    check: "every one of the 20 answers is the Inspector's answer to its call"
