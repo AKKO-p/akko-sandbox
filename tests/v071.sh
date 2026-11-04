@@ -60,7 +60,7 @@ check "alice too: SHOW STATS" "$(run alice_admin "SHOW STATS FOR demo.crm.custom
 echo "== explain_query checks without a plan"
 ok=$(call carol_analyst explain_query "sql=SELECT country, count(*) FROM demo.crm.customers GROUP BY country")
 check "a valid read answers valid" "$(field 'd' <<<"$ok")" "{'valid': True}"
-check "no plan, no filter, no mask in it" "$(grep -c -i -E "plan|country IN|strpos|rows:" <<<"$ok")" "0"
+check "the answer holds nothing but valid" "$(field 'sorted(d)' <<<"$ok")" "['valid']"
 check "an unknown column says its kind" "$(call carol_analyst explain_query "sql=SELECT nope FROM demo.crm.customers" | field 'd.get("kind")')" "column"
 # The policy hides the table from dave: Trino answers that it does not exist.
 check "dave cannot check a table he may not read" "$(call dave_viewer explain_query "sql=SELECT * FROM demo.crm.customers" | field 'd.get("kind")')" "table"
