@@ -1,0 +1,45 @@
+{
+  "axis": "correctness",
+  "from_run": "2026-11-01T17:17:00Z-correctness-0.7.0-codestral-latest",
+  "pair": {
+    "server": "0.7",
+    "model": "codestral-latest"
+  },
+  "tolerance": 0,
+  "summary": {
+    "questions": [
+      {
+        "id": "COR-CRM-01",
+        "question": "What is the revenue per customer?",
+        "right": 0,
+        "trials": 3
+      },
+      {
+        "id": "COR-CRM-02",
+        "question": "Which customer segment holds the largest total account balance?",
+        "right": 1,
+        "trials": 3
+      },
+      {
+        "id": "COR-CRM-03",
+        "question": "How much was spent in each spending category in March 2026?",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "COR-CRM-04",
+        "question": "How many accounts are held in each currency?",
+        "right": 2,
+        "trials": 3
+      },
+      {
+        "id": "COR-CRM-05",
+        "question": "What was the total amount of the archived transactions booked in 2019?",
+        "right": 3,
+        "trials": 3
+      }
+    ],
+    "right": 9,
+    "trials": 15
+  }
+}
