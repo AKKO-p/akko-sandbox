@@ -4,7 +4,7 @@
 # script, after gateway/compose.gateway.yaml and before
 # tests/compose.v07.gateway.yaml when GATEWAY=1.
 #
-#   tests/v07.sh                 the sandbox's image, 0.7.0
+#   tests/v07.sh                 the sandbox's image, 0.7.2
 #   GATEWAY=1 tests/v07.sh
 #   MCP_IMAGE=<image> tests/v07.sh     another build of the server
 

@@ -1,0 +1,5 @@
+# tests/v071.sh: the read commands an administrator opens, passed to the server.
+services:
+  mcp:
+    environment:
+      MCP_EXTRA_READ_COMMANDS: ${MCP_EXTRA_READ_COMMANDS:-}
