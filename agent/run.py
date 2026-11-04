@@ -21,6 +21,7 @@ import argparse
 import contextlib
 import datetime
 import json
+import math
 import os
 import re
 import statistics
@@ -329,6 +330,92 @@ def group(records: list[Record]) -> list[list[Record]]:
     return list(groups.values())
 
 
+def wilson(right: int, trials: int, z: float = 1.96) -> tuple[float, float]:
+    """The 95% Wilson score interval of a share of right answers: with 15 trials, 12 right
+    is 0.55 to 0.93, so a run of 15 cannot tell 12 from 14."""
+    if trials == 0:
+        return (0.0, 1.0)
+    p = right / trials
+    centre = (p + z * z / (2 * trials)) / (1 + z * z / trials)
+    half = z * math.sqrt(p * (1 - p) / trials + z * z / (4 * trials * trials)) / (1 + z * z / trials)
+    return (round(max(0.0, centre - half), 4), round(min(1.0, centre + half), 4))
+
+
+def question_ids(questions: list[dict] | None) -> dict[str, str]:
+    """Question text -> its stable id in the questions file (COR-CRM-01)."""
+    return {q["question"]: q["id"] for q in questions or [] if q.get("id")}
+
+
+def summary(records: list[Record], questions: list[dict] | None = None) -> dict:
+    """Right answers per question and in all, with the Wilson interval of the total, and
+    the unstable questions: neither 0/N nor N/N."""
+    ids = question_ids(questions)
+    rows = []
+    for i, trials in enumerate(group(records), 1):
+        text = trials[0].question
+        right = sum(r.right for r in trials)
+        rows.append({"id": ids.get(text, f"Q{i}"), "question": text, "right": right, "trials": len(trials)})
+    right, total = sum(q["right"] for q in rows), sum(q["trials"] for q in rows)
+    return {
+        "questions": rows,
+        "right": right,
+        "trials": total,
+        "wilson95": list(wilson(right, total)),
+        "unstable": [q["id"] for q in rows if 0 < q["right"] < q["trials"]],
+    }
+
+
+def pair(meta: dict) -> dict:
+    """The (server, model) pair a baseline holds for: the server's minor version, from what
+    it announces or else its image tag, and the model id the API returned. A -latest model
+    that changes under the same name opens a new pair, never a regression of the server."""
+    version = None
+    for text in (meta.get("server", ""), meta.get("server_image", "").rpartition(":")[2]):
+        m = re.search(r"(\d+)\.(\d+)\.\d+", text or "")
+        if m:
+            version = f"{m.group(1)}.{m.group(2)}"
+            break
+    return {
+        "server": version or "unknown",
+        "model": meta.get("model_returned") or meta.get("model_requested") or "unknown",
+    }
+
+
+def gate(baseline: dict, candidate: dict, tolerance: int = 0) -> tuple[str, list[str]]:
+    """The correctness gate, question by question, against the baseline of the same pair.
+
+    fail            the total is below the baseline's by more than the tolerance (the spread
+                    of an A/A run of the pair), or a question falls from N/N to under N/2
+    review          the total is lower, within the tolerance: read each wrong trial by hand
+    progress        a question gained: update the baseline in the same commit
+    not_comparable  not the same questions, or not the same trials per question
+    pass            otherwise
+    """
+    base = {q["id"]: q for q in baseline["questions"]}
+    cand = {q["id"]: q for q in candidate["questions"]}
+    if set(base) != set(cand) or any(base[k]["trials"] != cand[k]["trials"] for k in base):
+        return "not_comparable", ["the questions or their trials differ from the baseline's"]
+    reasons, verdicts = [], set()
+    if candidate["right"] < baseline["right"] - tolerance:
+        verdicts.add("fail")
+        reasons.append(f"{candidate['right']} right, baseline {baseline['right']}, tolerance {tolerance}")
+    elif candidate["right"] < baseline["right"]:
+        verdicts.add("review")
+        reasons.append(f"{candidate['right']} right, baseline {baseline['right']}: within the tolerance, read by hand")
+    for k, b in base.items():
+        c, n = cand[k], b["trials"]
+        if b["right"] == n and 2 * c["right"] < n:
+            verdicts.add("fail")
+            reasons.append(f"{k}: {n}/{n} in the baseline, {c['right']}/{n} now")
+        elif c["right"] > b["right"]:
+            verdicts.add("progress")
+            reasons.append(f"{k}: {b['right']}/{n} in the baseline, {c['right']}/{n} now: update the baseline")
+    for v in ("fail", "review", "progress"):
+        if v in verdicts:
+            return v, reasons
+    return "pass", reasons
+
+
 SETTINGS = (
     "provider",
     "model_requested",
@@ -387,7 +474,12 @@ def render_report(meta: dict, records: list[Record]) -> str:
         f"{sum(bool(r.never_shown) for r in records)}/{len(records)} | "
         f"{sum(bool(r.invalid_tools) for r in records)}/{len(records)} | |"
     )
-    lines += ["", "Totals add up each question's median; right answers and trials count every trial."]
+    lo, hi = wilson(sum(r.right for r in records), len(records))
+    lines += [
+        "",
+        "Totals add up each question's median; right answers and trials count every trial.",
+        f"Right answers, 95% Wilson interval: {lo:.2f} to {hi:.2f}.",
+    ]
     for i, trials in enumerate(groups, 1):
         lines += ["", f"## {i}. {trials[0].question}"]
         for r in trials:
@@ -425,8 +517,9 @@ def render_report(meta: dict, records: list[Record]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def report_json(meta: dict, records: list[Record]) -> str:
-    """The same run as JSON, every trial, for a script that compares runs."""
+def report_json(meta: dict, records: list[Record], questions: list[dict] | None = None) -> str:
+    """The same run as JSON, every trial, for a script that compares runs, with its pair
+    and the right answers per question."""
     rows = []
     for r in records:
         row = asdict(r)
@@ -439,7 +532,8 @@ def report_json(meta: dict, records: list[Record]) -> str:
             invalid_tools=r.invalid_tools,
         )
         rows.append(row)
-    return json.dumps({"meta": meta, "trials": rows}, indent=2) + "\n"
+    meta = {**meta, "pair": pair(meta)}
+    return json.dumps({"meta": meta, "summary": summary(records, questions), "trials": rows}, indent=2) + "\n"
 
 
 def announced_tools(server: str) -> list[str]:
@@ -807,6 +901,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument(
         "--rescore", metavar="REPORT.json", help="score a report's trials again by the current rules, into --out"
     )
+    p.add_argument(
+        "--baseline",
+        metavar="BASELINE.json",
+        help="the baseline of the run's (server, model) pair (bench/baselines/correctness/): exit 1 when the gate fails",
+    )
     args = p.parse_args(argv)
     if args.rescore:
         if not args.out:
@@ -831,24 +930,36 @@ def main(argv: list[str] | None = None) -> int:
     if args.rescore:
         with open(args.rescore, encoding="utf-8") as f:
             data = json.load(f)
-        write_reports(args.out, data["meta"], records_from_json(data))
-        return 0
-    if args.dry_run:
+        meta, records, questions = data["meta"], records_from_json(data), load_questions(args.questions)
+    elif args.dry_run:
         return anyio.run(dry_run, args)
-    # The key is checked first, before any session or file is opened.
-    chat = PROVIDERS[args.provider](api_key(args.provider), args.model, args.max_tokens)
-    questions = load_questions(args.questions)
-    meta, records = anyio.run(run, args, chat, questions)
-    write_reports(args.out, meta, records)
-    return 0
+    else:
+        # The key is checked first, before any session or file is opened.
+        chat = PROVIDERS[args.provider](api_key(args.provider), args.model, args.max_tokens)
+        questions = load_questions(args.questions)
+        meta, records = anyio.run(run, args, chat, questions)
+    write_reports(args.out, meta, records, questions)
+    return check_baseline(args.baseline, meta, summary(records, questions)) if args.baseline else 0
 
 
-def write_reports(out: str, meta: dict, records: list[Record]) -> None:
+def check_baseline(path: str, meta: dict, got: dict) -> int:
+    """The gate against a baseline file, printed; 0 only when it passes."""
+    with open(path, encoding="utf-8") as f:
+        base = json.load(f)
+    if base.get("pair") != pair(meta):
+        print(f"gate: not_comparable: the baseline holds for {base.get('pair')}, this run is {pair(meta)}")
+        return 1
+    verdict, reasons = gate(base["summary"], got, int(base.get("tolerance", 0)))
+    print(f"gate: {verdict}" + "".join(f"\n  {r}" for r in reasons))
+    return 0 if verdict == "pass" else 1
+
+
+def write_reports(out: str, meta: dict, records: list[Record], questions: list[dict] | None = None) -> None:
     """The Markdown report at out, and its JSON beside it."""
     with open(out, "w", encoding="utf-8") as f:
         f.write(render_report(meta, records))
     with open(os.path.splitext(out)[0] + ".json", "w", encoding="utf-8") as f:
-        f.write(report_json(meta, records))
+        f.write(report_json(meta, records, questions))
     print(f"report: {out}")
 
 

@@ -1,0 +1,883 @@
+# The security axis: the suites bench/run.sh plays, and a stable id for every check
+# their scripts print. tests/*.sh stay the source of the checks; this file only
+# names them. A check is matched by its name with its numbers folded (a count the
+# server says, an address), and by its rank among checks of the same name (nth).
+#
+# A check a script prints that is not named here fails the run, under the suite's
+# `unlisted` id: name it in the same commit, with
+#   python3 bench/lib/record.py cases-add <suite> bench/evidence/<run>/<suite>.log
+# A case named here that the script did not print is not_run.
+#
+# visibility: private keeps the case's name and detail out of bench/results (only
+# its id and verdict stay); some reads, such as SHOW STATS or EXPLAIN, can show
+# facts beyond a row filter or a column mask; refused by default.
+
+suites:
+  smoke:
+    script: smoke
+    script_path: tests/smoke.sh
+    compose_file: compose.yaml
+    family: SEC-SMK
+    run_case: SEC-SMK-000
+    unlisted: SEC-SMK-UNNAMED
+  gateway:
+    script: gateway
+    script_path: tests/gateway.sh
+    compose_file: compose.yaml:gateway/compose.gateway.yaml
+    family: SEC-GW
+    run_case: SEC-GW-000
+    unlisted: SEC-GW-UNNAMED
+  v07:
+    script: v07
+    script_path: tests/v07.sh
+    compose_file: compose.yaml:tests/compose.v07.yaml
+    family: SEC-V07
+    run_case: SEC-V07-000
+    unlisted: SEC-V07-UNNAMED
+  v07-gateway:
+    script: v07
+    variant: gateway
+    script_path: tests/v07.sh
+    compose_file: compose.yaml:gateway/compose.gateway.yaml:tests/compose.v07.yaml:tests/compose.v07.gateway.yaml
+    env: {GATEWAY: "1"}
+    family: SEC-V07
+    run_case: SEC-V07-000
+    unlisted: SEC-V07-UNNAMED
+  v071:
+    script: v071
+    script_path: tests/v071.sh
+    compose_file: compose.yaml:tests/compose.v071.yaml
+    family: SEC-R
+    run_case: SEC-R-000
+    unlisted: SEC-R-UNNAMED
+  v071-gateway:
+    script: v071
+    variant: gateway
+    script_path: tests/v071.sh
+    compose_file: compose.yaml:gateway/compose.gateway.yaml:tests/compose.v071.yaml
+    env: {GATEWAY: "1"}
+    family: SEC-R
+    run_case: SEC-R-000
+    unlisted: SEC-R-UNNAMED
+  leaks:
+    script: leaks
+    script_path: bench/security/leaks.sh
+    compose_file: compose.yaml:tests/compose.v07.yaml
+    family: SEC-LK
+    run_case: SEC-LK-000
+    unlisted: SEC-LK-UNNAMED
+
+cases:
+  - id: SEC-SMK-001
+    script: smoke
+    check: "the core's tools, no more"
+  - id: SEC-SMK-002
+    script: smoke
+    check: "carol: Trino's current_user is carol_analyst"
+  - id: SEC-SMK-003
+    script: smoke
+    check: "alice: Trino's current_user is alice_admin"
+  - id: SEC-SMK-004
+    script: smoke
+    check: "carol: an answer, every e-mail masked"
+  - id: SEC-SMK-005
+    script: smoke
+    check: "carol: European customers only"
+  - id: SEC-SMK-006
+    script: smoke
+    check: "alice: every e-mail in clear"
+  - id: SEC-SMK-007
+    script: smoke
+    check: "alice: every customer, Europe and beyond"
+  - id: SEC-SMK-008
+    script: smoke
+    check: "two accounts, two different answers"
+  - id: SEC-SMK-009
+    script: smoke
+    check: "dave: refused by the policy"
+  - id: SEC-SMK-010
+    script: smoke
+    check: "carol: search_columns finds customers.email"
+  - id: SEC-SMK-011
+    script: smoke
+    check: "dave: the same search finds nothing, and is complete"
+  - id: SEC-SMK-012
+    script: smoke
+    check: "a write: refused by the server before Trino"
+  - id: SEC-SMK-013
+    script: smoke
+    check: "no token: 401"
+  - id: SEC-SMK-014
+    script: smoke
+    check: "no token: the 401 says what to send"
+  - id: SEC-SMK-015
+    script: smoke
+    check: "forged token: 401"
+  - id: SEC-SMK-016
+    script: smoke
+    check: "a token issued for Trino: 401 at the MCP server"
+  - id: SEC-SMK-017
+    script: smoke
+    check: "Trino over https without a token: 401"
+  - id: SEC-SMK-018
+    script: smoke
+    check: "Trino refuses a token issued for the MCP server: 401"
+  - id: SEC-SMK-019
+    script: smoke
+    check: "Trino, carol's own token, as carol: 5 customers"
+  - id: SEC-SMK-020
+    script: smoke
+    check: "Trino, carol's own token, as alice_admin: refused"
+  - id: SEC-SMK-021
+    script: smoke
+    check: "no token in the server log"
+  - id: SEC-SMK-022
+    script: smoke
+    check: "no client secret in the server log"
+  - id: SEC-SMK-023
+    script: smoke
+    check: "the server exchanged tokens at Keycloak"
+  - id: SEC-SMK-024
+    script: smoke
+    check: "the audit line names carol_analyst"
+  - id: SEC-SMK-025
+    script: smoke
+    check: "Inspector as carol_analyst: 5 customers"
+  - id: SEC-SMK-026
+    script: smoke
+    check: "Inspector as alice_admin: 10 customers"
+  - id: SEC-GW-001
+    script: gateway
+    check: "a second start is healthy"
+  - id: SEC-GW-002
+    script: gateway
+    check: "the second start kept the certificates"
+  - id: SEC-GW-003
+    script: gateway
+    check: "the second start registered both clusters again"
+  - id: SEC-GW-004
+    script: gateway
+    check: "the gateway still knows two clusters"
+  - id: SEC-GW-005
+    script: gateway
+    check: "the core's tools, no more"
+  - id: SEC-GW-006
+    script: gateway
+    check: "carol: Trino's current_user is carol_analyst"
+  - id: SEC-GW-007
+    script: gateway
+    check: "alice: Trino's current_user is alice_admin"
+  - id: SEC-GW-008
+    script: gateway
+    check: "carol: an answer, every e-mail masked"
+  - id: SEC-GW-009
+    script: gateway
+    check: "carol: European customers only"
+  - id: SEC-GW-010
+    script: gateway
+    check: "alice: every e-mail in clear"
+  - id: SEC-GW-011
+    script: gateway
+    check: "alice: every customer, Europe and beyond"
+  - id: SEC-GW-012
+    script: gateway
+    check: "two accounts, two different answers"
+  - id: SEC-GW-013
+    script: gateway
+    check: "dave: refused by the policy"
+  - id: SEC-GW-014
+    script: gateway
+    check: "carol: search_columns finds customers.email"
+  - id: SEC-GW-015
+    script: gateway
+    check: "dave: the same search finds nothing, and is complete"
+  - id: SEC-GW-016
+    script: gateway
+    check: "a write: refused by the server before Trino"
+  - id: SEC-GW-017
+    script: gateway
+    check: "no token: 401"
+  - id: SEC-GW-018
+    script: gateway
+    check: "no token: the 401 says what to send"
+  - id: SEC-GW-019
+    script: gateway
+    check: "forged token: 401"
+  - id: SEC-GW-020
+    script: gateway
+    check: "a token issued for Trino: 401 at the MCP server"
+  - id: SEC-GW-021
+    script: gateway
+    check: "the server reaches the gateway"
+  - id: SEC-GW-022
+    script: gateway
+    check: "the server cannot reach trino"
+  - id: SEC-GW-023
+    script: gateway
+    check: "the server cannot reach trino-2"
+  - id: SEC-GW-024
+    script: gateway
+    check: "the server cannot reach trino by its address (172.19.0.7)"
+  - id: SEC-GW-025
+    script: gateway
+    check: "the gateway has no plain http port"
+  - id: SEC-GW-026
+    script: gateway
+    check: "the server cannot read the gateway's admin password"
+  - id: SEC-GW-027
+    script: gateway
+    check: "the server cannot change a backend: 403"
+  - id: SEC-GW-028
+    script: gateway
+    check: "the server cannot deactivate a backend: 403"
+  - id: SEC-GW-029
+    script: gateway
+    check: "the server cannot read the query history: 403"
+  - id: SEC-GW-030
+    script: gateway
+    check: "a client's X-Forwarded-Proto is refused at the gateway: 406"
+  - id: SEC-GW-031
+    script: gateway
+    check: "a client's X-Forwarded-For is refused at the gateway: 406"
+  - id: SEC-GW-032
+    script: gateway
+    check: "the 10 queries each counted 5 customers"
+  - id: SEC-GW-033
+    script: gateway
+    check: "the gateway sent queries to trino"
+  - id: SEC-GW-034
+    script: gateway
+    check: "the gateway sent queries to trino-2"
+  - id: SEC-GW-035
+    script: gateway
+    check: "every routed query carries a user's own name"
+  - id: SEC-GW-036
+    script: gateway
+    check: "carol's queries are recorded as carol_analyst"
+  - id: SEC-GW-037
+    script: gateway
+    check: "trino ran carol's count as carol_analyst"
+  - id: SEC-GW-038
+    script: gateway
+    check: "trino-2 ran carol's count as carol_analyst"
+  - id: SEC-GW-039
+    script: gateway
+    check: "100 rows, cut by the server's cap"
+  - id: SEC-GW-040
+    script: gateway
+    check: "the answer says it was cut"
+  - id: SEC-GW-041
+    script: gateway
+    check: "the server says the time budget ran out"
+  - id: SEC-GW-042
+    script: gateway
+    check: "the server waited its 30 s budget"
+  - id: SEC-GW-043
+    script: gateway
+    check: "the slow query was cancelled by the client, once"
+  - id: SEC-GW-044
+    script: gateway
+    check: "gateway without a token: 401"
+  - id: SEC-GW-045
+    script: gateway
+    check: "gateway with a token issued for the MCP server: 401"
+  - id: SEC-GW-046
+    script: gateway
+    check: "gateway, carol's own token, as carol: 5 customers"
+  - id: SEC-GW-047
+    script: gateway
+    check: "gateway, carol's own token, as alice_admin: refused"
+  - id: SEC-GW-048
+    script: gateway
+    check: "no token in the server, gateway and Trino logs"
+  - id: SEC-GW-049
+    script: gateway
+    check: "no client secret in those logs"
+  - id: SEC-GW-050
+    script: gateway
+    check: "no gateway admin password in those logs"
+  - id: SEC-GW-051
+    script: gateway
+    check: "empty password: the gateway does not start"
+  - id: SEC-GW-052
+    script: gateway
+    check: "no password file: the gateway does not start"
+  - id: SEC-V07-001
+    script: v07
+    check: "carol, 'revenue' in demo: transactions.amount"
+  - id: SEC-V07-002
+    script: v07
+    check: "carol: the match carries its comment"
+  - id: SEC-V07-003
+    script: v07
+    check: "carol: the search of demo is complete"
+  - id: SEC-V07-004
+    script: v07
+    check: "carol, 'revenue' in every catalog: the same match, complete"
+  - id: SEC-V07-005
+    script: v07
+    check: "every schema of demo, tpch and tpcds searched"
+  - id: SEC-V07-006
+    script: v07
+    check: "carol, 'amount' in demo: 13 columns, over the row cap, resumed to the end"
+  - id: SEC-V07-007
+    script: v07
+    check: "the first answer stopped at the row cap"
+  - id: SEC-V07-008
+    script: v07
+    check: "dave, 'full_name' in demo: no match, complete"
+  - id: SEC-V07-009
+    script: v07
+    check: "carol, 'full_name' in demo: customers.full_name"
+  - id: SEC-V07-010
+    script: v07
+    check: "dave, 'email' in demo: no match, complete"
+  - id: SEC-V07-011
+    script: v07
+    check: "carol, 'email' in demo: customers.email"
+  - id: SEC-V07-012
+    script: v07
+    check: "dave, 'segment' in demo: no match, complete"
+  - id: SEC-V07-013
+    script: v07
+    check: "carol, 'segment' in demo: customers.segment"
+  - id: SEC-V07-014
+    script: v07
+    check: "carol: segment comes with its comment"
+  - id: SEC-V07-015
+    script: v07
+    check: "dave, 'customer' in demo: accounts only"
+  - id: SEC-V07-016
+    script: v07
+    check: "carol, 'customer' in demo: tables accounts and customers, across the cursor"
+  - id: SEC-V07-017
+    script: v07
+    check: "the columns listed hold the word in their own name or comment: accounts.customer_id, customers.segment"
+  - id: SEC-V07-018
+    script: v07
+    check: "the search is complete, with no hint: something was found"
+  - id: SEC-V07-019
+    script: v07
+    check: "dave, 'customer' in demo: the table accounts only, customers is not his"
+  - id: SEC-V07-020
+    script: v07
+    check: "dave, 'email' in every catalog: no match, complete, nothing left"
+  - id: SEC-V07-021
+    script: v07
+    check: "every schema of demo and tpch searched"
+  - id: SEC-V07-022
+    script: v07
+    check: "dave, 'mktsegment' in every catalog: tpch.customer in each tpch schema"
+  - id: SEC-V07-023
+    script: v07
+    check: "dave, 'mktsegment': the table tpch.customer in tables too"
+  - id: SEC-V07-024
+    script: v07
+    check: "every schema of demo and tpch searched once"
+  - id: SEC-V07-025
+    script: v07
+    check: "dave's catalogs: tpcds is not one"
+  - id: SEC-V07-026
+    script: v07
+    check: "carol's catalogs: tpcds too"
+  - id: SEC-V07-027
+    script: v07
+    check: "carol, 'email' in every catalog: demo and tpcds"
+  - id: SEC-V07-028
+    script: v07
+    check: "carol_analyst, 'movements': the table transactions, none of its columns"
+  - id: SEC-V07-029
+    script: v07
+    check: "dave_viewer, 'movements': the table transactions, none of its columns"
+  - id: SEC-V07-030
+    script: v07
+    check: "carol, 'movements amount': the column transactions.amount, and its table"
+  - id: SEC-V07-031
+    script: v07
+    check: "carol, a word nothing holds: empty, complete, with a hint"
+  - id: SEC-V07-032
+    script: v07
+    check: "carol, 'movements zzqxv': no table holds both words, so the pass by word: the table transactions, found by 'movements'"
+  - id: SEC-V07-033
+    script: v07
+    check: "its hint is not the one of a search that found nothing"
+  - id: SEC-V07-034
+    script: v07
+    check: "carol, two words nothing holds: empty, complete, the hint of a search that found nothing"
+  - id: SEC-V07-035
+    script: v07
+    check: "carol, 'spending category March 2026': transactions.category, found by 'spending' and 'category'"
+  - id: SEC-V07-036
+    script: v07
+    check: "partial, complete, the table transactions with it"
+  - id: SEC-V07-037
+    script: v07
+    check: "'march' and '2026' found nothing: no row names them"
+  - id: SEC-V07-038
+    script: v07
+    check: "every schema of demo searched by the pass by word"
+  - id: SEC-V07-039
+    script: v07
+    check: "carol, 'revenue balance': both columns, each by its word"
+  - id: SEC-V07-040
+    script: v07
+    check: "dave, 'revenue balance': transactions.amount only, partial"
+  - id: SEC-V07-041
+    script: v07
+    check: "carol, 'revenue segment': both columns, each by its word"
+  - id: SEC-V07-042
+    script: v07
+    check: "dave, 'revenue segment': transactions.amount only, partial"
+  - id: SEC-V07-043
+    script: v07
+    check: "carol, a wrong column of accounts: kind column, describe_table on accounts only"
+  - id: SEC-V07-044
+    script: v07
+    check: "carol, a wrong column over two tables: both named, no other"
+  - id: SEC-V07-045
+    script: v07
+    check: "dave, a wrong column of accounts: the advice names accounts"
+  - id: SEC-V07-046
+    script: v07
+    check: "dave, a wrong column qualified by the visible table, next to customers: kind column, advice on accounts alone"
+  - id: SEC-V07-047
+    script: v07
+    check: "dave, a column in neither: the advice names accounts, the table he sees, never customers"
+  - id: SEC-V07-048
+    script: v07
+    check: "dave, the hidden column named: kind permission, no advice"
+  - id: SEC-V07-049
+    script: v07
+    check: "dave, a hidden column and an unknown one: kind column, advice on accounts, no column named in it"
+  - id: SEC-V07-050
+    script: v07
+    check: "the server says how many words a search takes (--check)"
+  - id: SEC-V07-051
+    script: v07
+    check: "carol, exactly 8 words: searched, no error, nothing found, complete"
+  - id: SEC-V07-052
+    script: v07
+    check: "the engine received queries with these words (the witness of the count below)"
+  - id: SEC-V07-053
+    script: v07
+    check: "carol, 9 words: refused, the error names the words and the limit, no matches"
+  - id: SEC-V07-054
+    script: v07
+    check: "refused before any query: the engine received none with these words"
+  - id: SEC-V07-055
+    script: v07
+    check: "dave, describe_schema crm by pages: one page, accounts and transactions"
+  - id: SEC-V07-056
+    script: v07
+    check: "dave, describe_schema crm: accounts without balance"
+  - id: SEC-V07-057
+    script: v07
+    check: "carol, describe_schema crm by pages: two pages, three tables"
+  - id: SEC-V07-058
+    script: v07
+    check: "carol: balance with its comment"
+  - id: SEC-V07-059
+    script: v07
+    check: "carol: customers with its comment and its columns"
+  - id: SEC-V07-060
+    script: v07
+    check: "dave, list_tables crm by pages: accounts and transactions"
+  - id: SEC-V07-061
+    script: v07
+    check: "carol, list_tables crm: customers too"
+  - id: SEC-V07-062
+    script: v07
+    check: "dave, 'balance' in demo: no match"
+  - id: SEC-V07-063
+    script: v07
+    check: "carol, 'balance' in demo: accounts.balance"
+  - id: SEC-V07-064
+    script: v07
+    check: "dave, describe_table accounts: four columns, none cut"
+  - id: SEC-V07-065
+    script: v07
+    check: "alice, describe_table accounts: five, balance too"
+  - id: SEC-V07-066
+    script: v07
+    check: "dave, SELECT * of accounts: an answer without balance"
+  - id: SEC-V07-067
+    script: v07
+    check: "alice, SELECT * of accounts: balance too"
+  - id: SEC-V07-068
+    script: v07
+    check: "dave, SELECT balance: refused by the policy"
+  - id: SEC-V07-069
+    script: v07
+    check: "alice, SELECT balance: an answer"
+  - id: SEC-V07-070
+    script: v07
+    check: "dave, SELECT count(*) of accounts: 12"
+  - id: SEC-V07-071
+    script: v07
+    check: "dave, an unknown column of accounts: kind column"
+  - id: SEC-V07-072
+    script: v07
+    check: "dave, describe_schema of a schema that does not exist: kind schema"
+  - id: SEC-V07-073
+    script: v07
+    check: "dave, describe_schema of tpcds, which he names: kind permission"
+  - id: SEC-V07-074
+    script: v07
+    check: "carol, describe_schema of tpcds.tiny: its tables"
+  - id: SEC-V07-075
+    script: v07
+    check: "dave, search_columns demo.crm_missing: kind schema, not found or not visible"
+  - id: SEC-V07-076
+    script: v07
+    check: "the variant that hides crm_archive from viewers is loaded"
+  - id: SEC-V07-077
+    script: v07
+    check: "dave, search_columns demo.crm_archive, hidden: the same answer as a missing schema"
+  - id: SEC-V07-078
+    script: v07
+    check: "carol, search_columns demo.crm_archive, visible to her: the twelve tables and their amount columns, across the cursor"
+  - id: SEC-V07-079
+    script: v07
+    check: "carol, crm_archive: the first page is incomplete and holds tables only (the row cap is shared)"
+  - id: SEC-V07-080
+    script: v07
+    check: "the variant is removed"
+  - id: SEC-V07-081
+    script: v07
+    check: "dave, crm_archive again: the first page is incomplete and holds tables only"
+  - id: SEC-V07-082
+    script: v07
+    check: "dave, search_columns demo.crm_archive again: the same tables and columns"
+  - id: SEC-V07-083
+    script: v07
+    check: "carol, search_columns demo.crm, visible: complete, transactions.amount"
+  - id: SEC-V07-084
+    script: v07
+    check: "dave, search_columns tpcds.tiny, a catalog he may not use: Trino's kind permission"
+  - id: SEC-V07-085
+    script: v07
+    check: "carol, search_columns tpcds.tiny, which she may use: matches, complete"
+  - id: SEC-V07-086
+    script: v07
+    check: "OPA's log: Trino asked trino/batch"
+  - id: SEC-V07-087
+    script: v07
+    check: "nothing dave got names 'customers'"
+  - id: SEC-V07-088
+    script: v07
+    check: "nothing dave got names 'full_name'"
+  - id: SEC-V07-089
+    script: v07
+    check: "nothing dave got names '\"segment\"'"
+  - id: SEC-V07-090
+    script: v07
+    check: "nothing dave got names 'email'"
+  - id: SEC-V07-091
+    script: v07
+    check: "nothing dave got names 'People and companies'"
+  - id: SEC-V07-092
+    script: v07
+    check: "nothing dave got names 'Retail or business'"
+  - id: SEC-V07-093
+    script: v07
+    check: "nothing dave got names 'balance'"
+  - id: SEC-V07-094
+    script: v07
+    check: "nothing dave got names 'Current balance'"
+  - id: SEC-V07-095
+    script: v07
+    check: "nothing dave got names 'tpcds'"
+  - id: SEC-V07-096
+    script: v07
+    check: "dave got every answer asked of him, all JSON"
+  - id: SEC-V07-097
+    script: v07
+    check: "dave_viewer in Trino, information_schema.columns"
+  - id: SEC-V07-098
+    script: v07
+    check: "dave_viewer in Trino, system.jdbc.columns"
+  - id: SEC-V07-099
+    script: v07
+    check: "dave_viewer in Trino, SHOW COLUMNS"
+  - id: SEC-V07-100
+    script: v07
+    check: "dave_viewer in Trino, DESCRIBE"
+  - id: SEC-V07-101
+    script: v07
+    check: "alice_admin in Trino, information_schema.columns"
+  - id: SEC-V07-102
+    script: v07
+    check: "alice_admin in Trino, system.jdbc.columns"
+  - id: SEC-V07-103
+    script: v07
+    check: "alice_admin in Trino, SHOW COLUMNS"
+  - id: SEC-V07-104
+    script: v07
+    check: "alice_admin in Trino, DESCRIBE"
+  - id: SEC-V07-105
+    script: v07
+    check: "dave in Trino, SELECT balance: PERMISSION_DENIED"
+  - id: SEC-V07-106
+    script: v07
+    check: "dave in Trino, SELECT *: every column but balance"
+  - id: SEC-V07-107
+    script: v07
+    check: "three pages of five at most"
+  - id: SEC-V07-108
+    script: v07
+    check: "every table once, in order"
+  - id: SEC-V07-109
+    script: v07
+    check: "truncated exactly when next_offset is set"
+  - id: SEC-V07-110
+    script: v07
+    check: "four pages of three whole tables"
+  - id: SEC-V07-111
+    script: v07
+    check: "every table once, in order"
+    nth: 2
+  - id: SEC-V07-112
+    script: v07
+    check: "every table whole: its three columns"
+  - id: SEC-V07-113
+    script: v07
+    check: "every table with its comment"
+  - id: SEC-V07-114
+    script: v07
+    check: "a page of an offset past the end: empty, the last"
+  - id: SEC-V07-115
+    script: v07
+    check: "the first answer is not complete"
+  - id: SEC-V07-116
+    script: v07
+    check: "it names what it left, for lack of time"
+  - id: SEC-V07-117
+    script: v07
+    check: "the last catalog, tpch, is among them"
+  - id: SEC-V07-118
+    script: v07
+    check: "and it gives a cursor"
+  - id: SEC-V07-119
+    script: v07
+    check: "resumed by its cursor, the search ends complete"
+  - id: SEC-V07-120
+    script: v07
+    check: "every schema searched once over the calls"
+  - id: SEC-V07-121
+    script: v07
+    check: "the same match as with the whole budget"
+  - id: SEC-V07-122
+    script: v07
+    check: "an unknown column: kind column, identifier revenue"
+  - id: SEC-V07-123
+    script: v07
+    check: "error keeps Trino's message"
+  - id: SEC-V07-124
+    script: v07
+    check: "dave, a refused table: kind permission"
+  - id: SEC-V07-125
+    script: v07
+    check: "a text too short: kind invalid_argument"
+  - id: SEC-V07-126
+    script: v07
+    check: "an offset below 0: kind invalid_argument"
+  - id: SEC-V07-127
+    script: v07
+    check: "the variant of the policy is loaded"
+  - id: SEC-V07-128
+    script: v07
+    check: "describe_schema: an error that names system.jdbc.columns and asks to allow it"
+  - id: SEC-V07-129
+    script: v07
+    check: "of kind permission or table"
+  - id: SEC-V07-130
+    script: v07
+    check: "and no other answer"
+  - id: SEC-V07-131
+    script: v07
+    check: "search_columns: an error that names system.jdbc.columns and asks to allow it"
+  - id: SEC-V07-132
+    script: v07
+    check: "of kind permission or table"
+    nth: 2
+  - id: SEC-V07-133
+    script: v07
+    check: "and no other answer"
+    nth: 2
+  - id: SEC-V07-134
+    script: v07
+    check: "the variant is removed"
+    nth: 2
+  - id: SEC-V07-135
+    script: v07
+    check: "describe_schema answers again"
+  - id: SEC-V07-136
+    script: v07
+    check: "search_columns answers again"
+  - id: SEC-V07-137
+    script: v07
+    check: "refused by the server: SELECT * FROM system.runtime.queries WHERE query_id = 'v07-guard'"
+  - id: SEC-V07-138
+    script: v07
+    check: "refused by the server: SELECT * FROM system.jdbc.columns WHERE table_name = 'v07-guard'"
+  - id: SEC-V07-139
+    script: v07
+    check: "refused by the server: SHOW TABLES FROM system.jdbc LIKE 'v07-guard'"
+  - id: SEC-V07-140
+    script: v07
+    check: "an allowed statement with the marker: an answer"
+  - id: SEC-V07-141
+    script: v07
+    check: "the engine received that one only"
+  - id: SEC-V07-142
+    script: v07
+    check: "the server sent that form in section 5"
+  - id: SEC-V07-143
+    script: v07
+    check: "system.jdbc.columns, the server's form: 12 rows read"
+  - id: SEC-V07-144
+    script: v07
+    check: "system.metadata.table_comments, the server's form: 4 rows read"
+  - id: SEC-V07-145
+    script: v07
+    check: "OPA's log: every batch operation is one the rule names"
+  - id: SEC-V07-146
+    script: v07
+    check: "OPA's log: the batch rule saw FilterCatalogs, FilterSchemas, FilterTables and FilterColumns"
+  - id: SEC-V07-147
+    script: v07
+    check: "OPA's log: no FilterColumns asked one column at a time at allow"
+  - id: RES-TRN-001
+    script: v07
+    check: "execute_query: kind unavailable"
+  - id: RES-TRN-002
+    script: v07
+    check: "describe_schema: kind unavailable"
+  - id: SEC-V07-150
+    script: v07
+    check: "the server's log holds an audit line for each of the 119 tool calls"
+  - id: SEC-V07-151
+    script: v07
+    check: "dave's and carol's among them"
+  - id: SEC-V07-152
+    script: v07
+    check: "no token in the server log"
+  - id: SEC-V07-153
+    script: v07
+    check: "no client secret in the server log"
+  - id: SEC-R-001
+    script: v071
+    check: "carol: SHOW STATS FOR demo.crm.customers"
+  - id: SEC-R-002
+    script: v071
+    check: "carol: SHOW STATS FOR (SELECT * FROM demo.crm.customers)"
+  - id: SEC-R-003
+    script: v071
+    check: "carol: EXPLAIN SELECT * FROM demo.crm.customers"
+  - id: SEC-R-004
+    script: v071
+    check: "carol: EXPLAIN (TYPE IO) SELECT * FROM demo.crm.customers"
+  - id: SEC-R-005
+    script: v071
+    check: "carol: SHOW CREATE TABLE demo.crm.customers"
+  - id: SEC-R-006
+    script: v071
+    check: "carol: SHOW GRANTS ON TABLE demo.crm.customers"
+  - id: SEC-R-007
+    script: v071
+    check: "carol: SHOW SESSION"
+  - id: SEC-R-008
+    script: v071
+    check: "alice too: SHOW STATS"
+  - id: SEC-R-009
+    script: v071
+    check: "a valid read answers valid"
+  - id: SEC-R-010
+    script: v071
+    check: "no plan, no filter, no mask in it"
+  - id: SEC-R-011
+    script: v071
+    check: "an unknown column says its kind"
+  - id: SEC-R-012
+    script: v071
+    check: "dave cannot check a table he may not read"
+  - id: SEC-R-013
+    script: v071
+    check: "SHOW TABLES"
+  - id: SEC-R-014
+    script: v071
+    check: "SHOW COLUMNS"
+  - id: SEC-R-015
+    script: v071
+    check: "DESCRIBE"
+  - id: SEC-R-016
+    script: v071
+    check: "carol's e-mails stay masked"
+  - id: SEC-R-017
+    script: v071
+    check: "carol sees European customers only"
+  - id: SEC-R-018
+    script: v071
+    check: "SHOW STATS runs"
+    visibility: private
+  - id: SEC-R-019
+    script: v071
+    check: "explain_query prints the plan"
+    visibility: private
+  - id: SEC-R-020
+    script: v071
+    check: "SHOW CREATE stays refused"
+  - id: SEC-R-021
+    script: v071
+    check: "the start says what is opened"
+  - id: SEC-R-022
+    script: v071
+    check: "--check refuses SHOW STAT (exit 2)"
+  - id: SEC-LK-001
+    script: leaks
+    check: "the table's witness word is in Postgres"
+  - id: SEC-LK-002
+    script: leaks
+    check: "the column's witness word is in Postgres"
+  - id: SEC-LK-003
+    script: leaks
+    check: "alice reads the table's witness word in Trino"
+  - id: SEC-LK-004
+    script: leaks
+    check: "dave got 16 answers, all JSON from the server"
+  - id: SEC-LK-005
+    script: leaks
+    check: "dave's two plays are the same once ids and durations are removed"
+  - id: SEC-LK-006
+    script: leaks
+    check: "dave sees accounts, the scan has something to read"
+  - id: SEC-LK-007
+    script: leaks
+    check: "the server's log holds an audit line for each of dave's calls"
+  - id: SEC-LK-008
+    script: leaks
+    check: "system.runtime.queries holds dave's queries"
+  - id: SEC-LK-009
+    script: leaks
+    check: "OPA's decision log holds dave's decisions"
+  - id: SEC-LK-010
+    script: leaks
+    check: "the scan of dave's channels finds no marker"
+  - id: SEC-LK-011
+    script: leaks
+    check: "the scanner finds the table's witness word in carol's answers"
+  - id: SEC-LK-012
+    script: leaks
+    check: "the scanner finds the column's witness word in carol's answers"
+  - id: SEC-LK-013
+    script: leaks
+    check: "the scanner finds customers in carol's answers"
+  - id: SEC-LK-014
+    script: leaks
+    check: "the scanner finds balance in carol's answers"
+  - id: SEC-LK-015
+    script: leaks
+    check: "the scanner finds Current balance in carol's answers"
+  - id: SEC-LK-016
+    script: leaks
+    check: "the scanner finds People and companies in carol's answers"

@@ -236,6 +236,18 @@ column first shows, the tokens, and whether the answer names the right columns.
 Run against two server images with the same model and settings, the reports
 compare line by line. `--dry-run` lists the tools without any model or key.
 
+## The bench: dated results and a regression gate
+
+[`bench/`](bench/README.md) plays these checks under one entry point,
+`bench/run.sh <axis>`, after a preflight that refuses a host without the memory
+for it. Each run writes a dated result in `bench/results/`, every check under a
+stable id, with the images by digest, the host's state and each suite's memory
+peak, and holds it against the baseline of its pair (server version, model): a
+check that passed and fails now, or one not run, fails the run. It also holds the
+marker scanner that looks for hidden names in every channel a viewer reaches, the
+k6 script checked against the MCP Inspector, and the agent harness's Wilson
+interval.
+
 ## Not for production
 
 Everything here is chosen to start in one command on a laptop: a development

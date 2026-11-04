@@ -1,0 +1,13 @@
+# The perf axis of B0: the k6 script checked against the MCP Inspector, the same way
+# as bench/security/cases.yaml names the checks of its suites.
+
+suites:
+  k6-validate:
+    script: k6-validate
+    script_path: bench/perf/validate.sh
+    compose_file: compose.yaml
+    family: PRF-K6
+    run_case: PRF-K6-000
+    unlisted: PRF-K6-UNNAMED
+
+cases:

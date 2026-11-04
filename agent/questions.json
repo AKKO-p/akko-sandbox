@@ -1,5 +1,6 @@
 [
   {
+    "id": "COR-CRM-01",
     "question": "What is the revenue per customer?",
     "expected": [
       "demo.crm.transactions.amount",
@@ -13,6 +14,7 @@
     "why_forbidden": "A balance is what an account holds, not what was sold."
   },
   {
+    "id": "COR-CRM-02",
     "question": "Which customer segment holds the largest total account balance?",
     "expected": [
       "demo.crm.customers.segment",
@@ -26,6 +28,7 @@
     "why_forbidden": "The sum of the movements is not the balance the accounts hold."
   },
   {
+    "id": "COR-CRM-03",
     "question": "How much was spent in each spending category in March 2026?",
     "expected": [
       "demo.crm.transactions.category",
@@ -39,6 +42,7 @@
     "why_forbidden": "The only other date of demo.crm: when an account was opened, not when money was spent. demo.crm.transactions has no second date column (id, account_id, booked_at, amount, category)."
   },
   {
+    "id": "COR-CRM-04",
     "question": "How many accounts are held in each currency?",
     "expected": [
       "demo.crm.accounts.currency"
@@ -50,6 +54,7 @@
     "why_forbidden": "A customer's country is not an account's currency."
   },
   {
+    "id": "COR-CRM-05",
     "question": "What was the total amount of the archived transactions booked in 2019?",
     "expected": [
       "demo.crm_archive.transactions_2019.amount"

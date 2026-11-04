@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/AKKO-p/akko-sandbox/bench/schema/result.schema.json",
+  "title": "One bench run",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "run_id", "axis", "suites", "command", "bench_commit", "sandbox_commit", "dirty",
+    "server", "stack", "model", "seed", "host", "cases", "summary", "duration_s", "cost_usd"
+  ],
+  "properties": {
+    "schema": {"const": 1},
+    "run_id": {"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z-[a-z]+-[^ ]+$"},
+    "axis": {"enum": ["security", "correctness", "perf", "resilience", "compat"]},
+    "suites": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "exit_code", "duration_s"],
+        "properties": {
+          "name": {"type": "string"},
+          "exit_code": {"type": ["integer", "null"]},
+          "duration_s": {"type": "number", "minimum": 0},
+          "memory": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "samples": {"type": "integer", "minimum": 0},
+              "project_peak_mb": {"type": "number", "minimum": 0},
+              "containers_peak_mb": {"type": "object", "additionalProperties": {"type": "number", "minimum": 0}},
+              "host_available_min_mb": {"type": "number", "minimum": 0}
+            }
+          }
+        }
+      }
+    },
+    "command": {"type": "string"},
+    "bench_commit": {"type": "string"},
+    "sandbox_commit": {"type": "string"},
+    "dirty": {"type": "boolean"},
+    "server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["image", "digest", "announced", "version"],
+      "properties": {
+        "image": {"type": ["string", "null"]},
+        "digest": {"type": ["string", "null"]},
+        "announced": {"type": ["string", "null"]},
+        "version": {"type": ["string", "null"]}
+      }
+    },
+    "stack": {"type": "object", "additionalProperties": {"type": ["string", "null"]}},
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["requested", "returned", "settings"],
+      "properties": {
+        "requested": {"type": ["string", "null"]},
+        "returned": {"type": ["string", "null"]},
+        "settings": {"type": "object"}
+      }
+    },
+    "seed": {"type": ["integer", "null"]},
+    "host": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["start", "end"],
+      "properties": {
+        "start": {"$ref": "#/$defs/host_state"},
+        "end": {"$ref": "#/$defs/host_state"},
+        "refused": {"type": "string"}
+      }
+    },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "suite", "variant", "verdict", "visibility"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^(SEC|COR|PRF|RES|CMP)-[A-Z0-9]+-[A-Z0-9]+$"},
+          "suite": {"type": "string"},
+          "variant": {"type": "string"},
+          "verdict": {"enum": ["pass", "fail", "not_run", "invalid_host"]},
+          "visibility": {"enum": ["public", "private"]},
+          "check": {"type": "string"},
+          "reason": {"type": "string"},
+          "metrics": {"type": "object"},
+          "evidence": {"type": "string"}
+        },
+        "if": {"properties": {"visibility": {"const": "private"}}},
+        "then": {"not": {"anyOf": [{"required": ["check"]}, {"required": ["reason"]}, {"required": ["metrics"]}]}}
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pass", "fail", "not_run", "invalid_host"],
+      "properties": {
+        "pass": {"type": "integer", "minimum": 0},
+        "fail": {"type": "integer", "minimum": 0},
+        "not_run": {"type": "integer", "minimum": 0},
+        "invalid_host": {"type": "integer", "minimum": 0},
+        "right": {"type": "integer", "minimum": 0},
+        "trials": {"type": "integer", "minimum": 0},
+        "wilson95": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+        "unstable": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "duration_s": {"type": "number", "minimum": 0},
+    "cost_usd": {"type": ["number", "null"], "minimum": 0}
+  },
+  "$defs": {
+    "host_state": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mem_available_gb": {"type": "number"},
+        "mem_total_gb": {"type": "number"},
+        "disk_free_gb": {"type": "number"},
+        "disk_used_pct": {"type": "number"},
+        "loadavg": {"type": "array", "items": {"type": "number"}},
+        "cpus": {"type": "integer"}
+      }
+    }
+  }
+}

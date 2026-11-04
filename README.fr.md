@@ -239,6 +239,19 @@ réponse nomme les bonnes colonnes. Lancés contre deux images du serveur avec l
 même modèle et les mêmes réglages, les rapports se comparent ligne à ligne.
 `--dry-run` liste les outils sans modèle ni clé.
 
+## Mesurer : des résultats datés et une porte contre les régressions
+
+[`bench/`](bench/README.md) joue ces contrôles par un seul point d'entrée,
+`bench/run.sh <axe>`, après un contrôle préalable qui refuse une machine sans la
+mémoire nécessaire. Chaque passage écrit un résultat daté dans `bench/results/`,
+chaque contrôle sous un identifiant stable, avec les images par empreinte, l'état
+de la machine et le pic de mémoire de chaque suite, et le compare à la baseline de
+son couple (version du serveur, modèle) : un contrôle qui passait et échoue, ou qui
+n'a pas tourné, fait échouer le passage. Le dossier porte aussi le détecteur de
+marqueurs, qui cherche les noms cachés dans chaque canal qu'atteint un lecteur, le
+script k6 validé contre l'Inspector MCP, et l'intervalle de Wilson du harnais
+d'agent.
+
 ## Pas pour la production
 
 Tout ici est choisi pour démarrer en une commande sur un portable : un Keycloak
