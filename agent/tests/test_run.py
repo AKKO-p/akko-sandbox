@@ -854,3 +854,80 @@ def test_rescore_and_provider_arguments():
         with pytest.raises(SystemExit):
             run.parse_args(bad)
     assert run.parse_args(["--rescore", "x.json", "--out", "y.md"]).rescore == "x.json"
+
+
+def test_wilson_interval_of_twelve_out_of_fifteen():
+    assert run.wilson(12, 15) == (0.5481, 0.9295)
+    assert run.wilson(0, 0) == (0.0, 1.0)
+    lo, hi = run.wilson(15, 15)
+    assert hi == 1.0 and 0.79 < lo < 0.8
+
+
+def _summary(*rights, trials=3):
+    rows = [
+        {"id": f"COR-CRM-{i:02d}", "question": f"q{i}", "right": r, "trials": trials} for i, r in enumerate(rights, 1)
+    ]
+    return {"questions": rows, "right": sum(rights), "trials": trials * len(rights)}
+
+
+def test_gate_passes_on_the_same_counts():
+    assert run.gate(_summary(3, 2, 3), _summary(3, 2, 3)) == ("pass", [])
+
+
+def test_gate_fails_below_the_tolerance_and_reviews_within_it():
+    assert run.gate(_summary(3, 2, 3), _summary(3, 1, 2))[0] == "fail"
+    assert run.gate(_summary(3, 2, 3), _summary(3, 1, 3), tolerance=1)[0] == "review"
+
+
+def test_gate_fails_when_a_question_falls_from_all_to_under_half():
+    verdict, reasons = run.gate(_summary(3, 0, 3), _summary(1, 2, 3), tolerance=5)
+    assert verdict == "fail" and any("COR-CRM-01: 3/3" in r for r in reasons)
+
+
+def test_gate_asks_to_document_an_improvement():
+    assert run.gate(_summary(3, 1, 3), _summary(3, 2, 3))[0] == "improvement"
+
+
+def test_gate_never_lets_an_improvement_hide_a_drop():
+    verdict, reasons = run.gate(_summary(3, 2, 1), _summary(2, 2, 2))
+    assert verdict == "review"
+    assert any(r.startswith("COR-CRM-01: 3/3 in the baseline, 2/3 now") for r in reasons)
+    assert any(r.startswith("COR-CRM-03: 1/3") for r in reasons)
+
+
+def test_gate_lists_a_drop_even_at_an_equal_total():
+    verdict, reasons = run.gate(_summary(3, 1), _summary(2, 2))
+    assert verdict == "review" and any("COR-CRM-01" in r for r in reasons)
+
+
+def test_gate_refuses_other_trials():
+    assert run.gate(_summary(3, 1), _summary(3, 1, trials=5))[0] == "not_comparable"
+
+
+def test_pair_from_the_announced_version_else_the_image_tag():
+    assert run.pair({"server": "trino-mcp 0.7.0, 8 tools: a", "model_returned": "codestral-latest"}) == {
+        "server": "0.7",
+        "model": "codestral-latest",
+    }
+    meta = {"server": "trino-mcp (no version announced)", "server_image": "akkoai/akko-mcp-trino:0.6.1"}
+    assert run.pair({**meta, "model_requested": "m"}) == {"server": "0.6", "model": "m"}
+
+
+def test_summary_names_questions_by_their_id_and_lists_the_unstable():
+    def rec(q, right):
+        r = run.Record(question=q, expected=["demo.crm.t.c"], stop="answered")
+        r.named = {"demo.crm.t.c": right}
+        return r
+
+    records = [rec("a", True), rec("a", False), rec("b", True), rec("b", True)]
+    s = run.summary(records, [{"id": "COR-CRM-01", "question": "a"}, {"id": "COR-CRM-02", "question": "b"}])
+    assert [(q["id"], q["right"], q["trials"]) for q in s["questions"]] == [("COR-CRM-01", 1, 2), ("COR-CRM-02", 2, 2)]
+    assert s["right"] == 3 and s["trials"] == 4 and s["unstable"] == ["COR-CRM-01"]
+
+
+def test_report_json_holds_the_pair_and_the_summary():
+    r = run.Record(question="a", expected=["demo.crm.t.c"], stop="answered")
+    r.named = {"demo.crm.t.c": True}
+    data = json.loads(run.report_json({"server": "trino-mcp 0.7.2", "model_returned": "m"}, [r]))
+    assert data["meta"]["pair"] == {"server": "0.7", "model": "m"}
+    assert data["summary"]["right"] == 1 and data["summary"]["wilson95"][1] == 1.0

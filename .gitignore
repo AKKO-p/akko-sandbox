@@ -3,3 +3,5 @@
 __pycache__/
 *.pyc
 .DS_Store
+# The bench's raw evidence: logs and samples of each run, kept on the host, not versioned.
+bench/evidence/

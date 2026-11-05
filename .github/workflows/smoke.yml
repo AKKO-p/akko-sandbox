@@ -39,6 +39,25 @@ jobs:
           pip install --quiet -r requirements.txt
           python -m pytest -q -p no:cacheprovider tests
 
+  # The bench's own tests and the schema of every committed result: no Docker, no model.
+  bench:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: The bench's tests
+        run: |
+          pip install --quiet -r bench/requirements.txt
+          python -m pytest -q -p no:cacheprovider bench/tests
+
+      - name: Every committed result matches the schema
+        run: find bench/results -name '*.json' -print0 | xargs -0 -r python bench/lib/record.py validate
+
   smoke:
     strategy:
       fail-fast: false

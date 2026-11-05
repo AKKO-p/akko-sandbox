@@ -1,0 +1,3823 @@
+{
+  "schema": 1,
+  "run_id": "2026-11-05T00:06:13Z-security-0.7.2-na",
+  "axis": "security",
+  "suites": [
+    {
+      "name": "smoke",
+      "exit_code": 0,
+      "duration_s": 88,
+      "memory": {
+        "samples": 11,
+        "project_peak_mb": 1664.1,
+        "containers_peak_mb": {
+          "client-run-407a6bb3fc8d": 60.3,
+          "client-run-66f165f81462": 59.2,
+          "inspector-1": 47.6,
+          "keycloak-1": 553.6,
+          "mcp-1": 73.5,
+          "opa-1": 19.9,
+          "postgres-1": 29.1,
+          "trino-1": 885.4
+        },
+        "host_available_min_mb": 11096.5
+      }
+    },
+    {
+      "name": "gateway",
+      "exit_code": 0,
+      "duration_s": 161,
+      "memory": {
+        "samples": 22,
+        "project_peak_mb": 3215.6,
+        "containers_peak_mb": {
+          "client-run-e0e3d2969721": 60.3,
+          "gateway-1": 301.4,
+          "gateway-backends-1": 0.0,
+          "gateway-db-1": 29.3,
+          "inspector-1": 82.8,
+          "keycloak-1": 559.9,
+          "mcp-1": 83.2,
+          "opa-1": 18.1,
+          "postgres-1": 28.9,
+          "probe-1": 0.4,
+          "trino-1": 869.7,
+          "trino-2-1": 1253.4
+        },
+        "host_available_min_mb": 9796.3
+      }
+    },
+    {
+      "name": "v07",
+      "exit_code": 0,
+      "duration_s": 280,
+      "memory": {
+        "samples": 38,
+        "project_peak_mb": 2230.2,
+        "containers_peak_mb": {
+          "inspector-1": 90.3,
+          "keycloak-1": 499.7,
+          "mcp-1": 96.5,
+          "opa-1": 27.0,
+          "opa-admin-1": 1.6,
+          "postgres-1": 30.0,
+          "trino-1": 1530.9
+        },
+        "host_available_min_mb": 10683.2
+      }
+    },
+    {
+      "name": "v07-gateway",
+      "exit_code": 0,
+      "duration_s": 347,
+      "memory": {
+        "samples": 48,
+        "project_peak_mb": 3680.2,
+        "containers_peak_mb": {
+          "gateway-1": 350.5,
+          "gateway-backends-1": 0.0,
+          "gateway-db-1": 33.2,
+          "inspector-1": 93.3,
+          "keycloak-1": 538.5,
+          "mcp-1": 103.0,
+          "opa-1": 28.3,
+          "opa-admin-1": 0.4,
+          "postgres-1": 31.7,
+          "trino-1": 1249.3,
+          "trino-2-1": 1304.6
+        },
+        "host_available_min_mb": 9468.9
+      }
+    },
+    {
+      "name": "v071",
+      "exit_code": 0,
+      "duration_s": 84,
+      "memory": {
+        "samples": 11,
+        "project_peak_mb": 1529.7,
+        "containers_peak_mb": {
+          "inspector-1": 82.8,
+          "keycloak-1": 533.0,
+          "mcp-1": 99.1,
+          "opa-1": 17.1,
+          "postgres-1": 35.0,
+          "trino-1": 801.7
+        },
+        "host_available_min_mb": 11557.1
+      }
+    },
+    {
+      "name": "v071-gateway",
+      "exit_code": 0,
+      "duration_s": 109,
+      "memory": {
+        "samples": 14,
+        "project_peak_mb": 2579.1,
+        "containers_peak_mb": {
+          "gateway-1": 319.4,
+          "gateway-backends-1": 0.6,
+          "gateway-db-1": 28.3,
+          "inspector-1": 78.5,
+          "keycloak-1": 513.3,
+          "mcp-1": 72.9,
+          "opa-1": 16.5,
+          "postgres-1": 28.5,
+          "trino-1": 771.9,
+          "trino-2-1": 787.9
+        },
+        "host_available_min_mb": 10466.5
+      }
+    },
+    {
+      "name": "leaks",
+      "exit_code": 0,
+      "duration_s": 185,
+      "memory": {
+        "samples": 25,
+        "project_peak_mb": 2256.8,
+        "containers_peak_mb": {
+          "inspector-1": 90.3,
+          "keycloak-1": 515.6,
+          "mcp-1": 88.4,
+          "opa-1": 31.4,
+          "postgres-1": 30.0,
+          "trino-1": 1560.6
+        },
+        "host_available_min_mb": 10493.3
+      }
+    }
+  ],
+  "command": "bench/run.sh security --seed 1311",
+  "bench_commit": "5a507463e425c8207dc3b00e26a257b758e3eec8",
+  "sandbox_commit": "5a507463e425c8207dc3b00e26a257b758e3eec8",
+  "dirty": false,
+  "server": {
+    "image": "akkoai/akko-mcp-trino:0.7.2",
+    "digest": "akkoai/akko-mcp-trino@sha256:2e2880ac15eeb9cecebc5d3af111dda715dd895e7a7e029dc36d787a732b6f81",
+    "announced": "akko-mcp-trino 0.7.2",
+    "version": "0.7.2"
+  },
+  "stack": {
+    "akkoai/akko-mcp-trino:0.7.2": "akkoai/akko-mcp-trino@sha256:2e2880ac15eeb9cecebc5d3af111dda715dd895e7a7e029dc36d787a732b6f81",
+    "alpine/openssl:3.5.9": "alpine/openssl@sha256:bf66acee200e5f4959af448eafc9be0634d8ecdf42205873c83cd5ddffb1cdfd",
+    "curlimages/curl:8.23.0": "curlimages/curl@sha256:3fb7e13e5d179a845c97d78204f3f1064d1907037f26a3ebf91710571151fd93",
+    "ghcr.io/modelcontextprotocol/inspector:2.9.0": "ghcr.io/modelcontextprotocol/inspector@sha256:de4f67a6f38a66afcf37b86a89d462cd6068f56e9e5ecfd267382c103492cb90",
+    "openpolicyagent/opa:1.21.1-static": "openpolicyagent/opa@sha256:4675ab04ad1627f74741d2d9c5142698c79e18b7b09f192587d31d6dba20838e",
+    "postgres:17.11-alpine": "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+    "quay.io/keycloak/keycloak:26.7.5": "quay.io/keycloak/keycloak@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85",
+    "trinodb/trino:482": "trinodb/trino@sha256:90b35b7c603eaa1f889bf03981a62b75f998ee6c0f851d9f4e341b49a57022b6",
+    "trinodb/trino-gateway:22": "trinodb/trino-gateway@sha256:85bfd9d9560937a9220c314e448f24a2ebc4c289f69c35dababd27bee7b5f87e"
+  },
+  "model": {
+    "requested": null,
+    "returned": null,
+    "settings": {}
+  },
+  "seed": 1311,
+  "host": {
+    "start": {
+      "disk_free_gb": 1008.2,
+      "disk_used_pct": 45.9,
+      "loadavg": [
+        5.85,
+        5.04,
+        4.32
+      ],
+      "cpus": 16,
+      "mem_available_gb": 12.8,
+      "mem_total_gb": 62.8
+    },
+    "end": {
+      "disk_free_gb": 1008.1,
+      "disk_used_pct": 45.9,
+      "loadavg": [
+        14.02,
+        13.07,
+        10.53
+      ],
+      "cpus": 16,
+      "mem_available_gb": 12.7,
+      "mem_total_gb": 62.8
+    }
+  },
+  "cases": [
+    {
+      "id": "SEC-SMK-000",
+      "suite": "smoke",
+      "variant": "direct",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "tests/smoke.sh ran to its end with status 0"
+    },
+    {
+      "id": "SEC-SMK-001",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the core's tools, no more"
+    },
+    {
+      "id": "SEC-SMK-002",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: Trino's current_user is carol_analyst"
+    },
+    {
+      "id": "SEC-SMK-003",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice: Trino's current_user is alice_admin"
+    },
+    {
+      "id": "SEC-SMK-004",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: an answer, every e-mail masked"
+    },
+    {
+      "id": "SEC-SMK-005",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: European customers only"
+    },
+    {
+      "id": "SEC-SMK-006",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice: every e-mail in clear"
+    },
+    {
+      "id": "SEC-SMK-007",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice: every customer, Europe and beyond"
+    },
+    {
+      "id": "SEC-SMK-008",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "two accounts, two different answers"
+    },
+    {
+      "id": "SEC-SMK-009",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave: refused by the policy"
+    },
+    {
+      "id": "SEC-SMK-010",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: search_columns finds customers.email"
+    },
+    {
+      "id": "SEC-SMK-011",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave: the same search finds nothing, and is complete"
+    },
+    {
+      "id": "SEC-SMK-012",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a write: refused by the server before Trino"
+    },
+    {
+      "id": "SEC-SMK-013",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no token: 401"
+    },
+    {
+      "id": "SEC-SMK-014",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no token: the 401 says what to send"
+    },
+    {
+      "id": "SEC-SMK-015",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "forged token: 401"
+    },
+    {
+      "id": "SEC-SMK-016",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a token issued for Trino: 401 at the MCP server"
+    },
+    {
+      "id": "SEC-SMK-017",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "Trino over https without a token: 401"
+    },
+    {
+      "id": "SEC-SMK-018",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "Trino refuses a token issued for the MCP server: 401"
+    },
+    {
+      "id": "SEC-SMK-019",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "Trino, carol's own token, as carol: 5 customers"
+    },
+    {
+      "id": "SEC-SMK-020",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "Trino, carol's own token, as alice_admin: refused"
+    },
+    {
+      "id": "SEC-SMK-021",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no token in the server log"
+    },
+    {
+      "id": "SEC-SMK-022",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no client secret in the server log"
+    },
+    {
+      "id": "SEC-SMK-023",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server exchanged tokens at Keycloak"
+    },
+    {
+      "id": "SEC-SMK-024",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the audit line names carol_analyst"
+    },
+    {
+      "id": "SEC-SMK-025",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "Inspector as carol_analyst: 5 customers"
+    },
+    {
+      "id": "SEC-SMK-026",
+      "suite": "smoke",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "Inspector as alice_admin: 10 customers"
+    },
+    {
+      "id": "SEC-GW-000",
+      "suite": "gateway",
+      "variant": "direct",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "tests/gateway.sh ran to its end with status 0"
+    },
+    {
+      "id": "SEC-GW-001",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a second start is healthy"
+    },
+    {
+      "id": "SEC-GW-002",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the second start kept the certificates"
+    },
+    {
+      "id": "SEC-GW-003",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the second start registered both clusters again"
+    },
+    {
+      "id": "SEC-GW-004",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the gateway still knows two clusters"
+    },
+    {
+      "id": "SEC-GW-005",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the core's tools, no more"
+    },
+    {
+      "id": "SEC-GW-006",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: Trino's current_user is carol_analyst"
+    },
+    {
+      "id": "SEC-GW-007",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice: Trino's current_user is alice_admin"
+    },
+    {
+      "id": "SEC-GW-008",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: an answer, every e-mail masked"
+    },
+    {
+      "id": "SEC-GW-009",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: European customers only"
+    },
+    {
+      "id": "SEC-GW-010",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice: every e-mail in clear"
+    },
+    {
+      "id": "SEC-GW-011",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice: every customer, Europe and beyond"
+    },
+    {
+      "id": "SEC-GW-012",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "two accounts, two different answers"
+    },
+    {
+      "id": "SEC-GW-013",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave: refused by the policy"
+    },
+    {
+      "id": "SEC-GW-014",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: search_columns finds customers.email"
+    },
+    {
+      "id": "SEC-GW-015",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave: the same search finds nothing, and is complete"
+    },
+    {
+      "id": "SEC-GW-016",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a write: refused by the server before Trino"
+    },
+    {
+      "id": "SEC-GW-017",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no token: 401"
+    },
+    {
+      "id": "SEC-GW-018",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no token: the 401 says what to send"
+    },
+    {
+      "id": "SEC-GW-019",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "forged token: 401"
+    },
+    {
+      "id": "SEC-GW-020",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a token issued for Trino: 401 at the MCP server"
+    },
+    {
+      "id": "SEC-GW-021",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server reaches the gateway"
+    },
+    {
+      "id": "SEC-GW-022",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server cannot reach trino"
+    },
+    {
+      "id": "SEC-GW-023",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server cannot reach trino-2"
+    },
+    {
+      "id": "SEC-GW-024",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server cannot reach trino by its address (172.19.0.8)"
+    },
+    {
+      "id": "SEC-GW-025",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the gateway has no plain http port"
+    },
+    {
+      "id": "SEC-GW-026",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server cannot read the gateway's admin password"
+    },
+    {
+      "id": "SEC-GW-027",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server cannot change a backend: 403"
+    },
+    {
+      "id": "SEC-GW-028",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server cannot deactivate a backend: 403"
+    },
+    {
+      "id": "SEC-GW-029",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server cannot read the query history: 403"
+    },
+    {
+      "id": "SEC-GW-030",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a client's X-Forwarded-Proto is refused at the gateway: 406"
+    },
+    {
+      "id": "SEC-GW-031",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a client's X-Forwarded-For is refused at the gateway: 406"
+    },
+    {
+      "id": "SEC-GW-032",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the 10 queries each counted 5 customers"
+    },
+    {
+      "id": "SEC-GW-033",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the gateway sent queries to trino"
+    },
+    {
+      "id": "SEC-GW-034",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the gateway sent queries to trino-2"
+    },
+    {
+      "id": "SEC-GW-035",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every routed query carries a user's own name"
+    },
+    {
+      "id": "SEC-GW-036",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol's queries are recorded as carol_analyst"
+    },
+    {
+      "id": "SEC-GW-037",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "trino ran carol's count as carol_analyst"
+    },
+    {
+      "id": "SEC-GW-038",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "trino-2 ran carol's count as carol_analyst"
+    },
+    {
+      "id": "SEC-GW-039",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "100 rows, cut by the server's cap"
+    },
+    {
+      "id": "SEC-GW-040",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the answer says it was cut"
+    },
+    {
+      "id": "SEC-GW-041",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server says the time budget ran out"
+    },
+    {
+      "id": "SEC-GW-042",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server waited its 30 s budget"
+    },
+    {
+      "id": "SEC-GW-043",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the slow query was cancelled by the client, once"
+    },
+    {
+      "id": "SEC-GW-044",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "gateway without a token: 401"
+    },
+    {
+      "id": "SEC-GW-045",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "gateway with a token issued for the MCP server: 401"
+    },
+    {
+      "id": "SEC-GW-046",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "gateway, carol's own token, as carol: 5 customers"
+    },
+    {
+      "id": "SEC-GW-047",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "gateway, carol's own token, as alice_admin: refused"
+    },
+    {
+      "id": "SEC-GW-048",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no token in the server, gateway and Trino logs"
+    },
+    {
+      "id": "SEC-GW-049",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no client secret in those logs"
+    },
+    {
+      "id": "SEC-GW-050",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no gateway admin password in those logs"
+    },
+    {
+      "id": "SEC-GW-051",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "empty password: the gateway does not start"
+    },
+    {
+      "id": "SEC-GW-052",
+      "suite": "gateway",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no password file: the gateway does not start"
+    },
+    {
+      "id": "RES-TRN-001",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "execute_query: kind unavailable"
+    },
+    {
+      "id": "RES-TRN-002",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "describe_schema: kind unavailable"
+    },
+    {
+      "id": "SEC-V07-000",
+      "suite": "v07",
+      "variant": "direct",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "tests/v07.sh ran to its end with status 0"
+    },
+    {
+      "id": "SEC-V07-001",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'revenue' in demo: transactions.amount"
+    },
+    {
+      "id": "SEC-V07-002",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: the match carries its comment"
+    },
+    {
+      "id": "SEC-V07-003",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: the search of demo is complete"
+    },
+    {
+      "id": "SEC-V07-004",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'revenue' in every catalog: the same match, complete"
+    },
+    {
+      "id": "SEC-V07-005",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema of demo, tpch and tpcds searched"
+    },
+    {
+      "id": "SEC-V07-006",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'amount' in demo: 13 columns, over the row cap, resumed to the end"
+    },
+    {
+      "id": "SEC-V07-007",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the first answer stopped at the row cap"
+    },
+    {
+      "id": "SEC-V07-008",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'full_name' in demo: no match, complete"
+    },
+    {
+      "id": "SEC-V07-009",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'full_name' in demo: customers.full_name"
+    },
+    {
+      "id": "SEC-V07-010",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'email' in demo: no match, complete"
+    },
+    {
+      "id": "SEC-V07-011",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'email' in demo: customers.email"
+    },
+    {
+      "id": "SEC-V07-012",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'segment' in demo: no match, complete"
+    },
+    {
+      "id": "SEC-V07-013",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'segment' in demo: customers.segment"
+    },
+    {
+      "id": "SEC-V07-014",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: segment comes with its comment"
+    },
+    {
+      "id": "SEC-V07-015",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'customer' in demo: accounts only"
+    },
+    {
+      "id": "SEC-V07-016",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'customer' in demo: tables accounts and customers, across the cursor"
+    },
+    {
+      "id": "SEC-V07-017",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the columns listed hold the word in their own name or comment: accounts.customer_id, customers.segment"
+    },
+    {
+      "id": "SEC-V07-018",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the search is complete, with no hint: something was found"
+    },
+    {
+      "id": "SEC-V07-019",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'customer' in demo: the table accounts only, customers is not his"
+    },
+    {
+      "id": "SEC-V07-020",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'email' in every catalog: no match, complete, nothing left"
+    },
+    {
+      "id": "SEC-V07-021",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema of demo and tpch searched"
+    },
+    {
+      "id": "SEC-V07-022",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'mktsegment' in every catalog: tpch.customer in each tpch schema"
+    },
+    {
+      "id": "SEC-V07-023",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'mktsegment': the table tpch.customer in tables too"
+    },
+    {
+      "id": "SEC-V07-024",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema of demo and tpch searched once"
+    },
+    {
+      "id": "SEC-V07-025",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave's catalogs: tpcds is not one"
+    },
+    {
+      "id": "SEC-V07-026",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol's catalogs: tpcds too"
+    },
+    {
+      "id": "SEC-V07-027",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'email' in every catalog: demo and tpcds"
+    },
+    {
+      "id": "SEC-V07-028",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol_analyst, 'movements': the table transactions, none of its columns"
+    },
+    {
+      "id": "SEC-V07-029",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer, 'movements': the table transactions, none of its columns"
+    },
+    {
+      "id": "SEC-V07-030",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'movements amount': the column transactions.amount, and its table"
+    },
+    {
+      "id": "SEC-V07-031",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, a word nothing holds: empty, complete, with a hint"
+    },
+    {
+      "id": "SEC-V07-032",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'movements zzqxv': no table holds both words, so the pass by word: the table transactions, found by 'movements'"
+    },
+    {
+      "id": "SEC-V07-033",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "its hint is not the one of a search that found nothing"
+    },
+    {
+      "id": "SEC-V07-034",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, two words nothing holds: empty, complete, the hint of a search that found nothing"
+    },
+    {
+      "id": "SEC-V07-035",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'spending category March 2026': transactions.category, found by 'spending' and 'category'"
+    },
+    {
+      "id": "SEC-V07-036",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "partial, complete, the table transactions with it"
+    },
+    {
+      "id": "SEC-V07-037",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "'march' and '2026' found nothing: no row names them"
+    },
+    {
+      "id": "SEC-V07-038",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema of demo searched by the pass by word"
+    },
+    {
+      "id": "SEC-V07-039",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'revenue balance': both columns, each by its word"
+    },
+    {
+      "id": "SEC-V07-040",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'revenue balance': transactions.amount only, partial"
+    },
+    {
+      "id": "SEC-V07-041",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'revenue segment': both columns, each by its word"
+    },
+    {
+      "id": "SEC-V07-042",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'revenue segment': transactions.amount only, partial"
+    },
+    {
+      "id": "SEC-V07-043",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, a wrong column of accounts: kind column, describe_table on accounts only"
+    },
+    {
+      "id": "SEC-V07-044",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, a wrong column over two tables: both named, no other"
+    },
+    {
+      "id": "SEC-V07-045",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a wrong column of accounts: the advice names accounts"
+    },
+    {
+      "id": "SEC-V07-046",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a wrong column qualified by the visible table, next to customers: kind column, advice on accounts alone"
+    },
+    {
+      "id": "SEC-V07-047",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a column in neither: the advice names accounts, the table he sees, never customers"
+    },
+    {
+      "id": "SEC-V07-048",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, the hidden column named: kind permission, no advice"
+    },
+    {
+      "id": "SEC-V07-049",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a hidden column and an unknown one: kind column, advice on accounts, no column named in it"
+    },
+    {
+      "id": "SEC-V07-050",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server says how many words a search takes (--check)"
+    },
+    {
+      "id": "SEC-V07-051",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, exactly 8 words: searched, no error, nothing found, complete"
+    },
+    {
+      "id": "SEC-V07-052",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the engine received queries with these words (the witness of the count below)"
+    },
+    {
+      "id": "SEC-V07-053",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 9 words: refused, the error names the words and the limit, no matches"
+    },
+    {
+      "id": "SEC-V07-054",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "refused before any query: the engine received none with these words"
+    },
+    {
+      "id": "SEC-V07-055",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_schema crm by pages: one page, accounts and transactions"
+    },
+    {
+      "id": "SEC-V07-056",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_schema crm: accounts without balance"
+    },
+    {
+      "id": "SEC-V07-057",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, describe_schema crm by pages: two pages, three tables"
+    },
+    {
+      "id": "SEC-V07-058",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: balance with its comment"
+    },
+    {
+      "id": "SEC-V07-059",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: customers with its comment and its columns"
+    },
+    {
+      "id": "SEC-V07-060",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, list_tables crm by pages: accounts and transactions"
+    },
+    {
+      "id": "SEC-V07-061",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, list_tables crm: customers too"
+    },
+    {
+      "id": "SEC-V07-062",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'balance' in demo: no match"
+    },
+    {
+      "id": "SEC-V07-063",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'balance' in demo: accounts.balance"
+    },
+    {
+      "id": "SEC-V07-064",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_table accounts: four columns, none cut"
+    },
+    {
+      "id": "SEC-V07-065",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice, describe_table accounts: five, balance too"
+    },
+    {
+      "id": "SEC-V07-066",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, SELECT * of accounts: an answer without balance"
+    },
+    {
+      "id": "SEC-V07-067",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice, SELECT * of accounts: balance too"
+    },
+    {
+      "id": "SEC-V07-068",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, SELECT balance: refused by the policy"
+    },
+    {
+      "id": "SEC-V07-069",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice, SELECT balance: an answer"
+    },
+    {
+      "id": "SEC-V07-070",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, SELECT count(*) of accounts: 12"
+    },
+    {
+      "id": "SEC-V07-071",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, an unknown column of accounts: kind column"
+    },
+    {
+      "id": "SEC-V07-072",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_schema of a schema that does not exist: kind schema"
+    },
+    {
+      "id": "SEC-V07-073",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_schema of tpcds, which he names: kind permission"
+    },
+    {
+      "id": "SEC-V07-074",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, describe_schema of tpcds.tiny: its tables"
+    },
+    {
+      "id": "SEC-V07-075",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, search_columns demo.crm_missing: kind schema, not found or not visible"
+    },
+    {
+      "id": "SEC-V07-076",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the variant that hides crm_archive from viewers is loaded"
+    },
+    {
+      "id": "SEC-V07-077",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, search_columns demo.crm_archive, hidden: the same answer as a missing schema"
+    },
+    {
+      "id": "SEC-V07-078",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, search_columns demo.crm_archive, visible to her: the twelve tables and their amount columns, across the cursor"
+    },
+    {
+      "id": "SEC-V07-079",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, crm_archive: the first page is incomplete and holds tables only (the row cap is shared)"
+    },
+    {
+      "id": "SEC-V07-080",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the variant is removed"
+    },
+    {
+      "id": "SEC-V07-081",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, crm_archive again: the first page is incomplete and holds tables only"
+    },
+    {
+      "id": "SEC-V07-082",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, search_columns demo.crm_archive again: the same tables and columns"
+    },
+    {
+      "id": "SEC-V07-083",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, search_columns demo.crm, visible: complete, transactions.amount"
+    },
+    {
+      "id": "SEC-V07-084",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, search_columns tpcds.tiny, a catalog he may not use: Trino's kind permission"
+    },
+    {
+      "id": "SEC-V07-085",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, search_columns tpcds.tiny, which she may use: matches, complete"
+    },
+    {
+      "id": "SEC-V07-086",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's log: Trino asked trino/batch"
+    },
+    {
+      "id": "SEC-V07-087",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'customers'"
+    },
+    {
+      "id": "SEC-V07-088",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'full_name'"
+    },
+    {
+      "id": "SEC-V07-089",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names '\"segment\"'"
+    },
+    {
+      "id": "SEC-V07-090",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'email'"
+    },
+    {
+      "id": "SEC-V07-091",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'People and companies'"
+    },
+    {
+      "id": "SEC-V07-092",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'Retail or business'"
+    },
+    {
+      "id": "SEC-V07-093",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'balance'"
+    },
+    {
+      "id": "SEC-V07-094",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'Current balance'"
+    },
+    {
+      "id": "SEC-V07-095",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'tpcds'"
+    },
+    {
+      "id": "SEC-V07-096",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave got every answer asked of him, all JSON"
+    },
+    {
+      "id": "SEC-V07-097",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer in Trino, information_schema.columns"
+    },
+    {
+      "id": "SEC-V07-098",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer in Trino, system.jdbc.columns"
+    },
+    {
+      "id": "SEC-V07-099",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer in Trino, SHOW COLUMNS"
+    },
+    {
+      "id": "SEC-V07-100",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer in Trino, DESCRIBE"
+    },
+    {
+      "id": "SEC-V07-101",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice_admin in Trino, information_schema.columns"
+    },
+    {
+      "id": "SEC-V07-102",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice_admin in Trino, system.jdbc.columns"
+    },
+    {
+      "id": "SEC-V07-103",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice_admin in Trino, SHOW COLUMNS"
+    },
+    {
+      "id": "SEC-V07-104",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice_admin in Trino, DESCRIBE"
+    },
+    {
+      "id": "SEC-V07-105",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave in Trino, SELECT balance: PERMISSION_DENIED"
+    },
+    {
+      "id": "SEC-V07-106",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave in Trino, SELECT *: every column but balance"
+    },
+    {
+      "id": "SEC-V07-107",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "three pages of five at most"
+    },
+    {
+      "id": "SEC-V07-108",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every table once, in order"
+    },
+    {
+      "id": "SEC-V07-109",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "truncated exactly when next_offset is set"
+    },
+    {
+      "id": "SEC-V07-110",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "four pages of three whole tables"
+    },
+    {
+      "id": "SEC-V07-111",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every table once, in order"
+    },
+    {
+      "id": "SEC-V07-112",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every table whole: its three columns"
+    },
+    {
+      "id": "SEC-V07-113",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every table with its comment"
+    },
+    {
+      "id": "SEC-V07-114",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a page of an offset past the end: empty, the last"
+    },
+    {
+      "id": "SEC-V07-115",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the first answer is not complete"
+    },
+    {
+      "id": "SEC-V07-116",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "it names what it left, for lack of time"
+    },
+    {
+      "id": "SEC-V07-117",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the last catalog, tpch, is among them"
+    },
+    {
+      "id": "SEC-V07-118",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "and it gives a cursor"
+    },
+    {
+      "id": "SEC-V07-119",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "resumed by its cursor, the search ends complete"
+    },
+    {
+      "id": "SEC-V07-120",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema searched once over the calls"
+    },
+    {
+      "id": "SEC-V07-121",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the same match as with the whole budget"
+    },
+    {
+      "id": "SEC-V07-122",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an unknown column: kind column, identifier revenue"
+    },
+    {
+      "id": "SEC-V07-123",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "error keeps Trino's message"
+    },
+    {
+      "id": "SEC-V07-124",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a refused table: kind permission"
+    },
+    {
+      "id": "SEC-V07-125",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a text too short: kind invalid_argument"
+    },
+    {
+      "id": "SEC-V07-126",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an offset below 0: kind invalid_argument"
+    },
+    {
+      "id": "SEC-V07-127",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the variant of the policy is loaded"
+    },
+    {
+      "id": "SEC-V07-128",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "describe_schema: an error that names system.jdbc.columns and asks to allow it"
+    },
+    {
+      "id": "SEC-V07-129",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "of kind permission or table"
+    },
+    {
+      "id": "SEC-V07-130",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "and no other answer"
+    },
+    {
+      "id": "SEC-V07-131",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "search_columns: an error that names system.jdbc.columns and asks to allow it"
+    },
+    {
+      "id": "SEC-V07-132",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "of kind permission or table"
+    },
+    {
+      "id": "SEC-V07-133",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "and no other answer"
+    },
+    {
+      "id": "SEC-V07-134",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the variant is removed"
+    },
+    {
+      "id": "SEC-V07-135",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "describe_schema answers again"
+    },
+    {
+      "id": "SEC-V07-136",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "search_columns answers again"
+    },
+    {
+      "id": "SEC-V07-137",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "refused by the server: SELECT * FROM system.runtime.queries WHERE query_id = 'v07-guard'"
+    },
+    {
+      "id": "SEC-V07-138",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "refused by the server: SELECT * FROM system.jdbc.columns WHERE table_name = 'v07-guard'"
+    },
+    {
+      "id": "SEC-V07-139",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "refused by the server: SHOW TABLES FROM system.jdbc LIKE 'v07-guard'"
+    },
+    {
+      "id": "SEC-V07-140",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an allowed statement with the marker: an answer"
+    },
+    {
+      "id": "SEC-V07-141",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the engine received that one only"
+    },
+    {
+      "id": "SEC-V07-142",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server sent that form in section 5"
+    },
+    {
+      "id": "SEC-V07-143",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "system.jdbc.columns, the server's form: 12 rows read"
+    },
+    {
+      "id": "SEC-V07-144",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "system.metadata.table_comments, the server's form: 4 rows read"
+    },
+    {
+      "id": "SEC-V07-145",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's log: every batch operation is one the rule names"
+    },
+    {
+      "id": "SEC-V07-146",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's log: the batch rule saw FilterCatalogs, FilterSchemas, FilterTables and FilterColumns"
+    },
+    {
+      "id": "SEC-V07-147",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's log: no FilterColumns asked one column at a time at allow"
+    },
+    {
+      "id": "SEC-V07-150",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server's log holds an audit line for each of the 120 tool calls"
+    },
+    {
+      "id": "SEC-V07-151",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave's and carol's among them"
+    },
+    {
+      "id": "SEC-V07-152",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no token in the server log"
+    },
+    {
+      "id": "SEC-V07-153",
+      "suite": "v07",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no client secret in the server log"
+    },
+    {
+      "id": "RES-TRN-001",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "execute_query: kind unavailable"
+    },
+    {
+      "id": "RES-TRN-002",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "describe_schema: kind unavailable"
+    },
+    {
+      "id": "SEC-V07-000",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "tests/v07.sh ran to its end with status 0"
+    },
+    {
+      "id": "SEC-V07-001",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'revenue' in demo: transactions.amount"
+    },
+    {
+      "id": "SEC-V07-002",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: the match carries its comment"
+    },
+    {
+      "id": "SEC-V07-003",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: the search of demo is complete"
+    },
+    {
+      "id": "SEC-V07-004",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'revenue' in every catalog: the same match, complete"
+    },
+    {
+      "id": "SEC-V07-005",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema of demo, tpch and tpcds searched"
+    },
+    {
+      "id": "SEC-V07-006",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'amount' in demo: 13 columns, over the row cap, resumed to the end"
+    },
+    {
+      "id": "SEC-V07-007",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the first answer stopped at the row cap"
+    },
+    {
+      "id": "SEC-V07-008",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'full_name' in demo: no match, complete"
+    },
+    {
+      "id": "SEC-V07-009",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'full_name' in demo: customers.full_name"
+    },
+    {
+      "id": "SEC-V07-010",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'email' in demo: no match, complete"
+    },
+    {
+      "id": "SEC-V07-011",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'email' in demo: customers.email"
+    },
+    {
+      "id": "SEC-V07-012",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'segment' in demo: no match, complete"
+    },
+    {
+      "id": "SEC-V07-013",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'segment' in demo: customers.segment"
+    },
+    {
+      "id": "SEC-V07-014",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: segment comes with its comment"
+    },
+    {
+      "id": "SEC-V07-015",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'customer' in demo: accounts only"
+    },
+    {
+      "id": "SEC-V07-016",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'customer' in demo: tables accounts and customers, across the cursor"
+    },
+    {
+      "id": "SEC-V07-017",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the columns listed hold the word in their own name or comment: accounts.customer_id, customers.segment"
+    },
+    {
+      "id": "SEC-V07-018",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the search is complete, with no hint: something was found"
+    },
+    {
+      "id": "SEC-V07-019",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'customer' in demo: the table accounts only, customers is not his"
+    },
+    {
+      "id": "SEC-V07-020",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'email' in every catalog: no match, complete, nothing left"
+    },
+    {
+      "id": "SEC-V07-021",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema of demo and tpch searched"
+    },
+    {
+      "id": "SEC-V07-022",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'mktsegment' in every catalog: tpch.customer in each tpch schema"
+    },
+    {
+      "id": "SEC-V07-023",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'mktsegment': the table tpch.customer in tables too"
+    },
+    {
+      "id": "SEC-V07-024",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema of demo and tpch searched once"
+    },
+    {
+      "id": "SEC-V07-025",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave's catalogs: tpcds is not one"
+    },
+    {
+      "id": "SEC-V07-026",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol's catalogs: tpcds too"
+    },
+    {
+      "id": "SEC-V07-027",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'email' in every catalog: demo and tpcds"
+    },
+    {
+      "id": "SEC-V07-028",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol_analyst, 'movements': the table transactions, none of its columns"
+    },
+    {
+      "id": "SEC-V07-029",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer, 'movements': the table transactions, none of its columns"
+    },
+    {
+      "id": "SEC-V07-030",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'movements amount': the column transactions.amount, and its table"
+    },
+    {
+      "id": "SEC-V07-031",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, a word nothing holds: empty, complete, with a hint"
+    },
+    {
+      "id": "SEC-V07-032",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'movements zzqxv': no table holds both words, so the pass by word: the table transactions, found by 'movements'"
+    },
+    {
+      "id": "SEC-V07-033",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "its hint is not the one of a search that found nothing"
+    },
+    {
+      "id": "SEC-V07-034",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, two words nothing holds: empty, complete, the hint of a search that found nothing"
+    },
+    {
+      "id": "SEC-V07-035",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'spending category March 2026': transactions.category, found by 'spending' and 'category'"
+    },
+    {
+      "id": "SEC-V07-036",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "partial, complete, the table transactions with it"
+    },
+    {
+      "id": "SEC-V07-037",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "'march' and '2026' found nothing: no row names them"
+    },
+    {
+      "id": "SEC-V07-038",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema of demo searched by the pass by word"
+    },
+    {
+      "id": "SEC-V07-039",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'revenue balance': both columns, each by its word"
+    },
+    {
+      "id": "SEC-V07-040",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'revenue balance': transactions.amount only, partial"
+    },
+    {
+      "id": "SEC-V07-041",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'revenue segment': both columns, each by its word"
+    },
+    {
+      "id": "SEC-V07-042",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'revenue segment': transactions.amount only, partial"
+    },
+    {
+      "id": "SEC-V07-043",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, a wrong column of accounts: kind column, describe_table on accounts only"
+    },
+    {
+      "id": "SEC-V07-044",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, a wrong column over two tables: both named, no other"
+    },
+    {
+      "id": "SEC-V07-045",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a wrong column of accounts: the advice names accounts"
+    },
+    {
+      "id": "SEC-V07-046",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a wrong column qualified by the visible table, next to customers: kind column, advice on accounts alone"
+    },
+    {
+      "id": "SEC-V07-047",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a column in neither: the advice names accounts, the table he sees, never customers"
+    },
+    {
+      "id": "SEC-V07-048",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, the hidden column named: kind permission, no advice"
+    },
+    {
+      "id": "SEC-V07-049",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a hidden column and an unknown one: kind column, advice on accounts, no column named in it"
+    },
+    {
+      "id": "SEC-V07-050",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server says how many words a search takes (--check)"
+    },
+    {
+      "id": "SEC-V07-051",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, exactly 8 words: searched, no error, nothing found, complete"
+    },
+    {
+      "id": "SEC-V07-052",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the engine received queries with these words (the witness of the count below)"
+    },
+    {
+      "id": "SEC-V07-053",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 9 words: refused, the error names the words and the limit, no matches"
+    },
+    {
+      "id": "SEC-V07-054",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "refused before any query: the engine received none with these words"
+    },
+    {
+      "id": "SEC-V07-055",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_schema crm by pages: one page, accounts and transactions"
+    },
+    {
+      "id": "SEC-V07-056",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_schema crm: accounts without balance"
+    },
+    {
+      "id": "SEC-V07-057",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, describe_schema crm by pages: two pages, three tables"
+    },
+    {
+      "id": "SEC-V07-058",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: balance with its comment"
+    },
+    {
+      "id": "SEC-V07-059",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: customers with its comment and its columns"
+    },
+    {
+      "id": "SEC-V07-060",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, list_tables crm by pages: accounts and transactions"
+    },
+    {
+      "id": "SEC-V07-061",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, list_tables crm: customers too"
+    },
+    {
+      "id": "SEC-V07-062",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, 'balance' in demo: no match"
+    },
+    {
+      "id": "SEC-V07-063",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, 'balance' in demo: accounts.balance"
+    },
+    {
+      "id": "SEC-V07-064",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_table accounts: four columns, none cut"
+    },
+    {
+      "id": "SEC-V07-065",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice, describe_table accounts: five, balance too"
+    },
+    {
+      "id": "SEC-V07-066",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, SELECT * of accounts: an answer without balance"
+    },
+    {
+      "id": "SEC-V07-067",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice, SELECT * of accounts: balance too"
+    },
+    {
+      "id": "SEC-V07-068",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, SELECT balance: refused by the policy"
+    },
+    {
+      "id": "SEC-V07-069",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice, SELECT balance: an answer"
+    },
+    {
+      "id": "SEC-V07-070",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, SELECT count(*) of accounts: 12"
+    },
+    {
+      "id": "SEC-V07-071",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, an unknown column of accounts: kind column"
+    },
+    {
+      "id": "SEC-V07-072",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_schema of a schema that does not exist: kind schema"
+    },
+    {
+      "id": "SEC-V07-073",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, describe_schema of tpcds, which he names: kind permission"
+    },
+    {
+      "id": "SEC-V07-074",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, describe_schema of tpcds.tiny: its tables"
+    },
+    {
+      "id": "SEC-V07-075",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, search_columns demo.crm_missing: kind schema, not found or not visible"
+    },
+    {
+      "id": "SEC-V07-076",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the variant that hides crm_archive from viewers is loaded"
+    },
+    {
+      "id": "SEC-V07-077",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, search_columns demo.crm_archive, hidden: the same answer as a missing schema"
+    },
+    {
+      "id": "SEC-V07-078",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, search_columns demo.crm_archive, visible to her: the twelve tables and their amount columns, across the cursor"
+    },
+    {
+      "id": "SEC-V07-079",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, crm_archive: the first page is incomplete and holds tables only (the row cap is shared)"
+    },
+    {
+      "id": "SEC-V07-080",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the variant is removed"
+    },
+    {
+      "id": "SEC-V07-081",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, crm_archive again: the first page is incomplete and holds tables only"
+    },
+    {
+      "id": "SEC-V07-082",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, search_columns demo.crm_archive again: the same tables and columns"
+    },
+    {
+      "id": "SEC-V07-083",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, search_columns demo.crm, visible: complete, transactions.amount"
+    },
+    {
+      "id": "SEC-V07-084",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, search_columns tpcds.tiny, a catalog he may not use: Trino's kind permission"
+    },
+    {
+      "id": "SEC-V07-085",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol, search_columns tpcds.tiny, which she may use: matches, complete"
+    },
+    {
+      "id": "SEC-V07-086",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's log: Trino asked trino/batch"
+    },
+    {
+      "id": "SEC-V07-087",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'customers'"
+    },
+    {
+      "id": "SEC-V07-088",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'full_name'"
+    },
+    {
+      "id": "SEC-V07-089",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names '\"segment\"'"
+    },
+    {
+      "id": "SEC-V07-090",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'email'"
+    },
+    {
+      "id": "SEC-V07-091",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'People and companies'"
+    },
+    {
+      "id": "SEC-V07-092",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'Retail or business'"
+    },
+    {
+      "id": "SEC-V07-093",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'balance'"
+    },
+    {
+      "id": "SEC-V07-094",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'Current balance'"
+    },
+    {
+      "id": "SEC-V07-095",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "nothing dave got names 'tpcds'"
+    },
+    {
+      "id": "SEC-V07-096",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave got every answer asked of him, all JSON"
+    },
+    {
+      "id": "SEC-V07-097",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer in Trino, information_schema.columns"
+    },
+    {
+      "id": "SEC-V07-098",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer in Trino, system.jdbc.columns"
+    },
+    {
+      "id": "SEC-V07-099",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer in Trino, SHOW COLUMNS"
+    },
+    {
+      "id": "SEC-V07-100",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave_viewer in Trino, DESCRIBE"
+    },
+    {
+      "id": "SEC-V07-101",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice_admin in Trino, information_schema.columns"
+    },
+    {
+      "id": "SEC-V07-102",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice_admin in Trino, system.jdbc.columns"
+    },
+    {
+      "id": "SEC-V07-103",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice_admin in Trino, SHOW COLUMNS"
+    },
+    {
+      "id": "SEC-V07-104",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice_admin in Trino, DESCRIBE"
+    },
+    {
+      "id": "SEC-V07-105",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave in Trino, SELECT balance: PERMISSION_DENIED"
+    },
+    {
+      "id": "SEC-V07-106",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave in Trino, SELECT *: every column but balance"
+    },
+    {
+      "id": "SEC-V07-107",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "three pages of five at most"
+    },
+    {
+      "id": "SEC-V07-108",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every table once, in order"
+    },
+    {
+      "id": "SEC-V07-109",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "truncated exactly when next_offset is set"
+    },
+    {
+      "id": "SEC-V07-110",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "four pages of three whole tables"
+    },
+    {
+      "id": "SEC-V07-111",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every table once, in order"
+    },
+    {
+      "id": "SEC-V07-112",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every table whole: its three columns"
+    },
+    {
+      "id": "SEC-V07-113",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every table with its comment"
+    },
+    {
+      "id": "SEC-V07-114",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a page of an offset past the end: empty, the last"
+    },
+    {
+      "id": "SEC-V07-115",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the first answer is not complete"
+    },
+    {
+      "id": "SEC-V07-116",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "it names what it left, for lack of time"
+    },
+    {
+      "id": "SEC-V07-117",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the last catalog, tpch, is among them"
+    },
+    {
+      "id": "SEC-V07-118",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "and it gives a cursor"
+    },
+    {
+      "id": "SEC-V07-119",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "resumed by its cursor, the search ends complete"
+    },
+    {
+      "id": "SEC-V07-120",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "every schema searched once over the calls"
+    },
+    {
+      "id": "SEC-V07-121",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the same match as with the whole budget"
+    },
+    {
+      "id": "SEC-V07-122",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an unknown column: kind column, identifier revenue"
+    },
+    {
+      "id": "SEC-V07-123",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "error keeps Trino's message"
+    },
+    {
+      "id": "SEC-V07-124",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave, a refused table: kind permission"
+    },
+    {
+      "id": "SEC-V07-125",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a text too short: kind invalid_argument"
+    },
+    {
+      "id": "SEC-V07-126",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an offset below 0: kind invalid_argument"
+    },
+    {
+      "id": "SEC-V07-127",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the variant of the policy is loaded"
+    },
+    {
+      "id": "SEC-V07-128",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "describe_schema: an error that names system.jdbc.columns and asks to allow it"
+    },
+    {
+      "id": "SEC-V07-129",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "of kind permission or table"
+    },
+    {
+      "id": "SEC-V07-130",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "and no other answer"
+    },
+    {
+      "id": "SEC-V07-131",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "search_columns: an error that names system.jdbc.columns and asks to allow it"
+    },
+    {
+      "id": "SEC-V07-132",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "of kind permission or table"
+    },
+    {
+      "id": "SEC-V07-133",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "and no other answer"
+    },
+    {
+      "id": "SEC-V07-134",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the variant is removed"
+    },
+    {
+      "id": "SEC-V07-135",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "describe_schema answers again"
+    },
+    {
+      "id": "SEC-V07-136",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "search_columns answers again"
+    },
+    {
+      "id": "SEC-V07-137",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "refused by the server: SELECT * FROM system.runtime.queries WHERE query_id = 'v07-guard'"
+    },
+    {
+      "id": "SEC-V07-138",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "refused by the server: SELECT * FROM system.jdbc.columns WHERE table_name = 'v07-guard'"
+    },
+    {
+      "id": "SEC-V07-139",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "refused by the server: SHOW TABLES FROM system.jdbc LIKE 'v07-guard'"
+    },
+    {
+      "id": "SEC-V07-140",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an allowed statement with the marker: an answer"
+    },
+    {
+      "id": "SEC-V07-141",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the engine received that one only"
+    },
+    {
+      "id": "SEC-V07-142",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server sent that form in section 5"
+    },
+    {
+      "id": "SEC-V07-143",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "system.jdbc.columns, the server's form: 12 rows read"
+    },
+    {
+      "id": "SEC-V07-144",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "system.metadata.table_comments, the server's form: 4 rows read"
+    },
+    {
+      "id": "SEC-V07-145",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's log: every batch operation is one the rule names"
+    },
+    {
+      "id": "SEC-V07-146",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's log: the batch rule saw FilterCatalogs, FilterSchemas, FilterTables and FilterColumns"
+    },
+    {
+      "id": "SEC-V07-147",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's log: no FilterColumns asked one column at a time at allow"
+    },
+    {
+      "id": "SEC-V07-150",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server's log holds an audit line for each of the 125 tool calls"
+    },
+    {
+      "id": "SEC-V07-151",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave's and carol's among them"
+    },
+    {
+      "id": "SEC-V07-152",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no token in the server log"
+    },
+    {
+      "id": "SEC-V07-153",
+      "suite": "v07-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "no client secret in the server log"
+    },
+    {
+      "id": "SEC-R-000",
+      "suite": "v071",
+      "variant": "direct",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "tests/v071.sh ran to its end with status 0"
+    },
+    {
+      "id": "SEC-R-001",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW STATS FOR demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-002",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW STATS FOR (SELECT * FROM demo.crm.customers)"
+    },
+    {
+      "id": "SEC-R-003",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: EXPLAIN SELECT * FROM demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-004",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: EXPLAIN (TYPE IO) SELECT * FROM demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-005",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW CREATE TABLE demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-006",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW GRANTS ON TABLE demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-007",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW SESSION"
+    },
+    {
+      "id": "SEC-R-008",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice too: SHOW STATS"
+    },
+    {
+      "id": "SEC-R-009",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a valid read answers valid"
+    },
+    {
+      "id": "SEC-R-010",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the answer holds nothing but valid"
+    },
+    {
+      "id": "SEC-R-011",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an unknown column says its kind"
+    },
+    {
+      "id": "SEC-R-012",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave cannot check a table he may not read"
+    },
+    {
+      "id": "SEC-R-013",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW TABLES"
+    },
+    {
+      "id": "SEC-R-014",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW COLUMNS"
+    },
+    {
+      "id": "SEC-R-015",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "DESCRIBE"
+    },
+    {
+      "id": "SEC-R-016",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol's e-mails stay masked"
+    },
+    {
+      "id": "SEC-R-017",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol sees European customers only"
+    },
+    {
+      "id": "SEC-R-018",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW STATS runs"
+    },
+    {
+      "id": "SEC-R-019",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "explain_query prints the plan"
+    },
+    {
+      "id": "SEC-R-020",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW CREATE stays refused"
+    },
+    {
+      "id": "SEC-R-021",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the start says what is opened"
+    },
+    {
+      "id": "SEC-R-022",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "--check refuses SHOW STAT (exit 2)"
+    },
+    {
+      "id": "SEC-R-000",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "tests/v071.sh ran to its end with status 0"
+    },
+    {
+      "id": "SEC-R-001",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW STATS FOR demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-002",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW STATS FOR (SELECT * FROM demo.crm.customers)"
+    },
+    {
+      "id": "SEC-R-003",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: EXPLAIN SELECT * FROM demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-004",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: EXPLAIN (TYPE IO) SELECT * FROM demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-005",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW CREATE TABLE demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-006",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW GRANTS ON TABLE demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-007",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol: SHOW SESSION"
+    },
+    {
+      "id": "SEC-R-008",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice too: SHOW STATS"
+    },
+    {
+      "id": "SEC-R-009",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "a valid read answers valid"
+    },
+    {
+      "id": "SEC-R-010",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the answer holds nothing but valid"
+    },
+    {
+      "id": "SEC-R-011",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an unknown column says its kind"
+    },
+    {
+      "id": "SEC-R-012",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave cannot check a table he may not read"
+    },
+    {
+      "id": "SEC-R-013",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW TABLES"
+    },
+    {
+      "id": "SEC-R-014",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW COLUMNS"
+    },
+    {
+      "id": "SEC-R-015",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "DESCRIBE"
+    },
+    {
+      "id": "SEC-R-016",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol's e-mails stay masked"
+    },
+    {
+      "id": "SEC-R-017",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol sees European customers only"
+    },
+    {
+      "id": "SEC-R-018",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW STATS runs"
+    },
+    {
+      "id": "SEC-R-019",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "explain_query prints the plan"
+    },
+    {
+      "id": "SEC-R-020",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW CREATE stays refused"
+    },
+    {
+      "id": "SEC-R-021",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the start says what is opened"
+    },
+    {
+      "id": "SEC-R-022",
+      "suite": "v071-gateway",
+      "variant": "gateway",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "--check refuses SHOW STAT (exit 2)"
+    },
+    {
+      "id": "SEC-LK-000",
+      "suite": "leaks",
+      "variant": "direct",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "bench/security/leaks.sh ran to its end with status 0"
+    },
+    {
+      "id": "SEC-LK-001",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the table's witness word is in Postgres"
+    },
+    {
+      "id": "SEC-LK-002",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the column's witness word is in Postgres"
+    },
+    {
+      "id": "SEC-LK-003",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "alice reads the table's witness word in Trino"
+    },
+    {
+      "id": "SEC-LK-004",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave got 16 answers, all JSON from the server"
+    },
+    {
+      "id": "SEC-LK-005",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave's two plays are the same once ids and durations are removed"
+    },
+    {
+      "id": "SEC-LK-006",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave sees accounts, the scan has something to read"
+    },
+    {
+      "id": "SEC-LK-007",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the server's log holds an audit line for each of dave's calls"
+    },
+    {
+      "id": "SEC-LK-008",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "system.runtime.queries holds dave's queries"
+    },
+    {
+      "id": "SEC-LK-009",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "OPA's decision log holds dave's decisions"
+    },
+    {
+      "id": "SEC-LK-010",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the scan of dave's channels finds no marker"
+    },
+    {
+      "id": "SEC-LK-011",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the scanner finds the table's witness word in carol's answers"
+    },
+    {
+      "id": "SEC-LK-012",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the scanner finds the column's witness word in carol's answers"
+    },
+    {
+      "id": "SEC-LK-013",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the scanner finds customers in carol's answers"
+    },
+    {
+      "id": "SEC-LK-014",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the scanner finds balance in carol's answers"
+    },
+    {
+      "id": "SEC-LK-015",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the scanner finds Current balance in carol's answers"
+    },
+    {
+      "id": "SEC-LK-016",
+      "suite": "leaks",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "the scanner finds People and companies in carol's answers"
+    }
+  ],
+  "summary": {
+    "pass": 451,
+    "fail": 0,
+    "not_run": 0,
+    "invalid_host": 0
+  },
+  "duration_s": 1257,
+  "cost_usd": 0,
+  "suites_requested": "all"
+}

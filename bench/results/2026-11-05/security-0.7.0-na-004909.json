@@ -1,0 +1,274 @@
+{
+  "schema": 1,
+  "run_id": "2026-11-05T00:49:09Z-security-0.7.0-na",
+  "axis": "security",
+  "suites": [
+    {
+      "name": "v071",
+      "exit_code": 1,
+      "duration_s": 82,
+      "memory": {
+        "samples": 11,
+        "project_peak_mb": 1578.7,
+        "containers_peak_mb": {
+          "inspector-1": 71.1,
+          "keycloak-1": 559.0,
+          "mcp-1": 87.3,
+          "opa-1": 17.1,
+          "postgres-1": 26.8,
+          "trino-1": 857.8
+        },
+        "host_available_min_mb": 11173.5
+      }
+    }
+  ],
+  "command": "bench/run.sh security --suite v071 --image akkoai/akko-mcp-trino:0.7.0 --seed 272407328",
+  "bench_commit": "5a507463e425c8207dc3b00e26a257b758e3eec8",
+  "sandbox_commit": "5a507463e425c8207dc3b00e26a257b758e3eec8",
+  "dirty": false,
+  "server": {
+    "image": "akkoai/akko-mcp-trino:0.7.0",
+    "digest": "akkoai/akko-mcp-trino@sha256:5a0d6c472d03d3ac106f110ffd9273ea4dfb7bba8a7a030b4153d70cc0d40b02",
+    "announced": "akko-mcp-trino 0.7.0",
+    "version": "0.7.0"
+  },
+  "stack": {
+    "akkoai/akko-mcp-trino:0.7.0": "akkoai/akko-mcp-trino@sha256:5a0d6c472d03d3ac106f110ffd9273ea4dfb7bba8a7a030b4153d70cc0d40b02",
+    "alpine/openssl:3.5.9": "alpine/openssl@sha256:bf66acee200e5f4959af448eafc9be0634d8ecdf42205873c83cd5ddffb1cdfd",
+    "ghcr.io/modelcontextprotocol/inspector:2.9.0": "ghcr.io/modelcontextprotocol/inspector@sha256:de4f67a6f38a66afcf37b86a89d462cd6068f56e9e5ecfd267382c103492cb90",
+    "openpolicyagent/opa:1.21.1-static": "openpolicyagent/opa@sha256:4675ab04ad1627f74741d2d9c5142698c79e18b7b09f192587d31d6dba20838e",
+    "postgres:17.11-alpine": "postgres@sha256:b0f9560a2de083e2cc7382e75f808c7381a32852a7ec49117deedb300e552b24",
+    "quay.io/keycloak/keycloak:26.7.5": "quay.io/keycloak/keycloak@sha256:37dbaf6f0722c9ec246335f36e1ef8b2e6cb960f7c27e0d8c615121a3d475a85",
+    "trinodb/trino:482": "trinodb/trino@sha256:90b35b7c603eaa1f889bf03981a62b75f998ee6c0f851d9f4e341b49a57022b6"
+  },
+  "model": {
+    "requested": null,
+    "returned": null,
+    "settings": {}
+  },
+  "seed": 272407328,
+  "host": {
+    "start": {
+      "disk_free_gb": 1008.0,
+      "disk_used_pct": 45.9,
+      "loadavg": [
+        5.49,
+        6.67,
+        8.41
+      ],
+      "cpus": 16,
+      "mem_available_gb": 12.5,
+      "mem_total_gb": 62.8
+    },
+    "end": {
+      "disk_free_gb": 1008.0,
+      "disk_used_pct": 45.9,
+      "loadavg": [
+        4.98,
+        6.36,
+        8.17
+      ],
+      "cpus": 16,
+      "mem_available_gb": 12.5,
+      "mem_total_gb": 62.8
+    }
+  },
+  "cases": [
+    {
+      "id": "SEC-R-000",
+      "suite": "v071",
+      "variant": "direct",
+      "verdict": "fail",
+      "visibility": "public",
+      "check": "tests/v071.sh ran to its end with status 0",
+      "reason": "exit status 1"
+    },
+    {
+      "id": "SEC-R-001",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "carol: SHOW STATS FOR demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-002",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "carol: SHOW STATS FOR (SELECT * FROM demo.crm.customers)"
+    },
+    {
+      "id": "SEC-R-003",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "carol: EXPLAIN SELECT * FROM demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-004",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "carol: EXPLAIN (TYPE IO) SELECT * FROM demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-005",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "carol: SHOW CREATE TABLE demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-006",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "carol: SHOW GRANTS ON TABLE demo.crm.customers"
+    },
+    {
+      "id": "SEC-R-007",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "carol: SHOW SESSION"
+    },
+    {
+      "id": "SEC-R-008",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "alice too: SHOW STATS"
+    },
+    {
+      "id": "SEC-R-009",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "a valid read answers valid"
+    },
+    {
+      "id": "SEC-R-010",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "the answer holds nothing but valid"
+    },
+    {
+      "id": "SEC-R-011",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "an unknown column says its kind"
+    },
+    {
+      "id": "SEC-R-012",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "dave cannot check a table he may not read"
+    },
+    {
+      "id": "SEC-R-013",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW TABLES"
+    },
+    {
+      "id": "SEC-R-014",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW COLUMNS"
+    },
+    {
+      "id": "SEC-R-015",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "DESCRIBE"
+    },
+    {
+      "id": "SEC-R-016",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol's e-mails stay masked"
+    },
+    {
+      "id": "SEC-R-017",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "carol sees European customers only"
+    },
+    {
+      "id": "SEC-R-018",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "SHOW STATS runs"
+    },
+    {
+      "id": "SEC-R-019",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "explain_query prints the plan"
+    },
+    {
+      "id": "SEC-R-020",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "SHOW CREATE stays refused"
+    },
+    {
+      "id": "SEC-R-021",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "fail",
+      "check": "the start says what is opened"
+    },
+    {
+      "id": "SEC-R-022",
+      "suite": "v071",
+      "variant": "direct",
+      "visibility": "public",
+      "verdict": "pass",
+      "check": "--check refuses SHOW STAT (exit 2)"
+    }
+  ],
+  "summary": {
+    "pass": 10,
+    "fail": 13,
+    "not_run": 0,
+    "invalid_host": 0
+  },
+  "duration_s": 85,
+  "cost_usd": 0,
+  "suites_requested": [
+    "v071"
+  ]
+}

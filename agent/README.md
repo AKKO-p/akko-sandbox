@@ -146,6 +146,15 @@ A trial is right when, and only when:
 rules (a report written before the server's tools were recorded takes them from
 its `server` line), and writes the new report and its JSON.
 
+The report's totals give the right answers with their 95% Wilson interval: with
+15 trials, 12 right reads 0.55 to 0.93, so a run that small cannot tell 12 from
+14. Its JSON adds `summary` (right answers per question, by the question's `id`,
+the interval, and the unstable questions, neither 0/N nor N/N) and `meta.pair`,
+the (server, model) pair a baseline holds for: the server's minor version and the
+model id the API returned. `--baseline FILE` compares the run with the baseline
+of its pair (`bench/baselines/correctness/`, written by `bench/run.sh`) and exits
+1 unless the gate passes; [bench/README.md](../bench/README.md) gives the rule.
+
 `questions.json` fixes each question's `expected` and `forbidden` columns before
 any run, with the reason for each (`why`, `why_forbidden`); they are not changed
 after a run to get a result. A forbidden column is a wrong but plausible one,

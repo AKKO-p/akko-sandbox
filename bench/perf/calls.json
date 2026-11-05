@@ -1,0 +1,12 @@
+[
+  {"tool": "list_catalogs", "arguments": {}},
+  {"tool": "list_schemas", "arguments": {"catalog": "demo"}},
+  {"tool": "list_tables", "arguments": {"catalog": "demo", "schema": "crm"}},
+  {"tool": "describe_table", "arguments": {"catalog": "demo", "schema": "crm", "table": "accounts"}},
+  {"tool": "describe_table", "arguments": {"catalog": "demo", "schema": "crm", "table": "transactions"}},
+  {"tool": "describe_schema", "arguments": {"catalog": "demo", "schema": "crm"}},
+  {"tool": "search_columns", "arguments": {"text": "revenue", "catalog": "demo"}},
+  {"tool": "execute_query", "arguments": {"sql": "SELECT currency, count(*) AS accounts FROM demo.crm.accounts GROUP BY currency ORDER BY currency"}},
+  {"tool": "execute_query", "arguments": {"sql": "SELECT nope FROM demo.crm.accounts"}},
+  {"tool": "explain_query", "arguments": {"sql": "SELECT count(*) FROM demo.crm.transactions"}}
+]

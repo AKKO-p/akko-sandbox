@@ -1,0 +1,125 @@
+{
+  "schema": 1,
+  "run_id": "2026-11-01T17:17:00Z-correctness-0.7.0-codestral-latest",
+  "axis": "correctness",
+  "suites": [
+    {
+      "name": "agent/2026-11-01-final-mistral-0.7.0-4105967.json",
+      "exit_code": 0,
+      "duration_s": 204.8
+    }
+  ],
+  "command": "bench/run.sh correctness --rescore agent/reports/2026-11-01-final-mistral-0.7.0-4105967.json",
+  "bench_commit": "5a507463e425c8207dc3b00e26a257b758e3eec8",
+  "sandbox_commit": "5a507463e425c8207dc3b00e26a257b758e3eec8",
+  "dirty": false,
+  "server": {
+    "image": "akko-mcp-trino:0.7.0-4105967",
+    "digest": null,
+    "announced": "trino-mcp 0.7.0",
+    "version": "0.7.0"
+  },
+  "stack": {},
+  "model": {
+    "requested": "codestral-latest",
+    "returned": "codestral-latest",
+    "settings": {
+      "provider": "mistral",
+      "persona": "carol_analyst",
+      "repeat": 3,
+      "max_steps": 12,
+      "max_tokens": 16000,
+      "sampling": "temperature 0, random_seed 0; tokens compare server against server for one model"
+    }
+  },
+  "seed": null,
+  "host": {
+    "start": {},
+    "end": {}
+  },
+  "cases": [
+    {
+      "id": "COR-CRM-01",
+      "suite": "agent",
+      "variant": "carol_analyst",
+      "verdict": "fail",
+      "visibility": "public",
+      "check": "What is the revenue per customer?",
+      "metrics": {
+        "right": 0,
+        "trials": 3
+      }
+    },
+    {
+      "id": "COR-CRM-02",
+      "suite": "agent",
+      "variant": "carol_analyst",
+      "verdict": "fail",
+      "visibility": "public",
+      "check": "Which customer segment holds the largest total account balance?",
+      "metrics": {
+        "right": 1,
+        "trials": 3
+      }
+    },
+    {
+      "id": "COR-CRM-03",
+      "suite": "agent",
+      "variant": "carol_analyst",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "How much was spent in each spending category in March 2026?",
+      "metrics": {
+        "right": 3,
+        "trials": 3
+      }
+    },
+    {
+      "id": "COR-CRM-04",
+      "suite": "agent",
+      "variant": "carol_analyst",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "How many accounts are held in each currency?",
+      "metrics": {
+        "right": 2,
+        "trials": 3
+      }
+    },
+    {
+      "id": "COR-CRM-05",
+      "suite": "agent",
+      "variant": "carol_analyst",
+      "verdict": "pass",
+      "visibility": "public",
+      "check": "What was the total amount of the archived transactions booked in 2019?",
+      "metrics": {
+        "right": 3,
+        "trials": 3
+      }
+    }
+  ],
+  "summary": {
+    "pass": 3,
+    "fail": 2,
+    "not_run": 0,
+    "invalid_host": 0,
+    "right": 9,
+    "trials": 15,
+    "wilson95": [
+      0.3575,
+      0.8018
+    ],
+    "unstable": [
+      "COR-CRM-02",
+      "COR-CRM-04"
+    ]
+  },
+  "duration_s": 204.8,
+  "cost_usd": null,
+  "rescored": {
+    "from": "agent/reports/2026-11-01-final-mistral-0.7.0-4105967.json",
+    "source_commit": "6a1f09dd3df6bf2cd358e46485ba88ec78f95a93",
+    "at": "2026-11-05T00:06:06Z"
+  }
+}

@@ -1,0 +1,23 @@
+{
+  "axis": "perf",
+  "from_run": "2026-11-05T00:27:11Z-perf-0.7.2-na",
+  "pair": {
+    "server": "0.7",
+    "model": "na"
+  },
+  "suites": {
+    "k6-validate": {
+      "PRF-K6-000@direct": "pass",
+      "PRF-K6-001@direct": "pass",
+      "PRF-K6-002@direct": "pass",
+      "PRF-K6-003@direct": "pass",
+      "PRF-K6-004@direct": "pass",
+      "PRF-K6-005@direct": "pass",
+      "PRF-K6-006@direct": "pass",
+      "PRF-K6-007@direct": "pass"
+    }
+  },
+  "suites_from": {
+    "k6-validate": "2026-11-05T00:27:11Z-perf-0.7.2-na"
+  }
+}
