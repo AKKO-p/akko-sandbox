@@ -386,10 +386,13 @@ def gate(baseline: dict, candidate: dict, tolerance: int = 0) -> tuple[str, list
 
     fail            the total is below the baseline's by more than the tolerance (the spread
                     of an A/A run of the pair), or a question falls from N/N to under N/2
-    review          the total is lower, within the tolerance: read each wrong trial by hand
-    progress        a question gained: update the baseline in the same commit
+    review          the total is lower within the tolerance, or a question lost right
+                    answers even if the total held or rose: read each wrong trial by hand
+    improvement     a question gained and none lost: update the baseline in the same commit
     not_comparable  not the same questions, or not the same trials per question
     pass            otherwise
+
+    Every question that lost or gained is listed, whatever the verdict.
     """
     base = {q["id"]: q for q in baseline["questions"]}
     cand = {q["id"]: q for q in candidate["questions"]}
@@ -407,10 +410,15 @@ def gate(baseline: dict, candidate: dict, tolerance: int = 0) -> tuple[str, list
         if b["right"] == n and 2 * c["right"] < n:
             verdicts.add("fail")
             reasons.append(f"{k}: {n}/{n} in the baseline, {c['right']}/{n} now")
+        elif c["right"] < b["right"]:
+            verdicts.add("review")
+            reasons.append(
+                f"{k}: {b['right']}/{n} in the baseline, {c['right']}/{n} now: read its wrong trials by hand"
+            )
         elif c["right"] > b["right"]:
-            verdicts.add("progress")
+            verdicts.add("improvement")
             reasons.append(f"{k}: {b['right']}/{n} in the baseline, {c['right']}/{n} now: update the baseline")
-    for v in ("fail", "review", "progress"):
+    for v in ("fail", "review", "improvement"):
         if v in verdicts:
             return v, reasons
     return "pass", reasons

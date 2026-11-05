@@ -16,7 +16,7 @@ K6_IMAGE=${K6_IMAGE:-grafana/k6:1.3.0}
 failed=0
 ev=${BENCH_EVIDENCE:+$BENCH_EVIDENCE/k6-validate}
 ev=${ev:-$(mktemp -d)}
-mkdir -p "$ev" && chmod 0777 "$ev" && ev=$(cd "$ev" && pwd)
+mkdir -p "$ev" && ev=$(cd "$ev" && pwd)
 check() { if [ "$2" = "$3" ]; then printf '  OK    %s\n' "$1"; else printf '  FAIL  %s (got %s, expected %s)\n' "$1" "$2" "$3"; failed=1; fi; }
 cleanup() {
   [ -z "${BENCH_EVIDENCE:-}" ] && rm -rf "$ev"
@@ -29,11 +29,17 @@ n=$(python3 -c "import json; print(len(json.load(open('bench/perf/calls.json')))
 
 k6() { # name, then -e options: runs mcp.js on the project's network
   local name=$1; shift
-  docker run --rm --network "${COMPOSE_PROJECT_NAME}_default" --memory 256m \
-    -v "$PWD/bench/perf:/bench:ro" -v "$ev:/out" -e TOKENS="$(./token.sh carol_analyst)" \
+  # The token goes by a file only this user reads, not on the command line; k6 runs as
+  # this user, so that it writes into the evidence folder without opening it to all.
+  local env_file; env_file=$(mktemp)
+  printf 'TOKENS=%s\n' "$(./token.sh carol_analyst)" > "$env_file"
+  docker run --rm --network "${COMPOSE_PROJECT_NAME}_default" --memory 256m --user "$(id -u):$(id -g)" \
+    -v "$PWD/bench/perf:/bench:ro" -v "$ev:/out" --env-file "$env_file" \
     -e CALLS_FILE=/bench/calls.json -e ECHO=1 -e SUMMARY="/out/$name-summary.json" "$@" \
     "$K6_IMAGE" run --quiet --console-output "/out/$name-console.txt" /bench/mcp.js > "$ev/$name.out" 2>&1
-  echo $?
+  local rc=$?
+  rm -f "$env_file"
+  echo $rc
 }
 answers() { python3 bench/perf/k6_answers.py "$@"; }
 

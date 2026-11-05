@@ -17,7 +17,7 @@ On a Linux host with Docker, from the repository root, one run at a time:
 ```bash
 bench/run.sh security                         # every suite of bench/security/cases.yaml
 bench/run.sh security --suite smoke,v071      # some of them
-bench/run.sh security --image akkoai/akko-mcp-trino:0.7.2
+bench/run.sh security --image akkoai/akko-mcp-trino:0.7.2 --seed 1311
 bench/run.sh perf                             # the k6 script against the Inspector
 bench/run.sh correctness --rescore agent/reports/2026-11-01-final-mistral-0.7.0-4105967.json
 AGENT_ENV_FILE=/root/secrets/agent.env \
@@ -30,8 +30,14 @@ host could not hold the run, 2 a wrong option.
 `bench/lib/preflight.sh <axis>` runs first. It reads the memory available, the free
 disk, the load and the running compose projects, and refuses below the axis's
 thresholds (6 GB of memory at least, `BENCH_MIN_FREE_GB` raises it) or while another
-bench run goes on. It stops and removes nothing. A refused run still writes its result,
-every case `invalid_host`, neither green nor red: play it again later.
+bench run goes on; a lock (`flock` on `BENCH_LOCK`, `/tmp/akko-bench.lock` by default)
+keeps two runs from starting together. It stops and removes nothing. A refused
+security or perf run still writes its result, every case `invalid_host`, neither green
+nor red: play it again later. A refused correctness run writes nothing and exits 3.
+
+The leak suite draws its witness words from `BENCH_SEED` (or `--seed`), drawn at random
+when unset; the seed goes into the result and into its command, so that the run plays
+again the same.
 
 Each suite is its own compose project, `akko-bench-<suite>`, on host ports 18680,
 13200 and 16474, removed at its end. `bench/lib/memsample.sh` samples the project's
@@ -66,6 +72,8 @@ Some reads, such as SHOW STATS or EXPLAIN, can show facts beyond a row filter or
 column mask; refused by default. A case marked `visibility: private` keeps only its id
 and verdict in the public result; its name and detail go to `BENCH_PRIVATE_DIR` when it
 is set, never to `bench/results/`. The schema refuses a private case that carries more.
+No case is private today. A suite marked `unnamed_private` (the read allow-list's) keeps
+a check it prints that `cases.yaml` does not name yet out of the public result too.
 
 ## The result
 
@@ -77,30 +85,40 @@ version it announces, every image the suites ran by digest, the model requested 
 returned, the host's memory, disk and load at the start and the end, each suite's exit
 status, duration and memory peak, and every case with its verdict: `pass`, `fail`,
 `not_run` or `invalid_host`. The raw logs go to `bench/evidence/<run>/`, kept on the
-host and not versioned.
+host for 30 days and not versioned, so a result names no log file.
+
+A result that scores an earlier agent report again (`--rescore`) says so: `rescored`
+names the report, the commit that added it and when it was scored again, and its host
+block is empty, since the machine of the rescore says nothing of the run.
+
+What is committed: the runs a baseline comes from, and the runs a pull request cites.
+Other runs stay on the host with their evidence.
 
 ## The gate
 
 `bench/compare.py gate <result>` holds a result against
 `bench/baselines/<axis>/<server minor>-<model or na>.json`. For the scripts, the gate
 fails on a case that passed in the baseline and does not now, on a case the baseline
-does not hold, and on a case that now passes and did not: a progress the baseline must
-take in the same commit. Only the suites the run played are compared. A baseline changes
-only by
+does not hold, and on a case that now passes and did not: an improvement the baseline
+must take in the same commit. A run of every suite must play every suite of the
+baseline; a `--suite` run is compared on its suites only. A baseline changes only by
 
 ```bash
 BENCH_UPDATE_BASELINE=true bench/run.sh <axis> ...
 ```
 
-in the pull request that says why. `bench/compare.py diff <before> <after>` prints two
-results side by side, case by case.
+in the pull request that says why. A security or perf baseline holds no `fail` and no
+`not_run`, unless `BENCH_BASELINE_ACCEPT_FAILURES` gives the reason, written into the
+baseline. A `--suite` run replaces those suites of the baseline and keeps the others.
+`bench/compare.py diff <before> <after>` prints two results side by side, case by case.
 
 For correctness, the baseline holds the right answers per question, and the rule is
 `gate()` of [`agent/run.py`](../agent/run.py), which `agent/run.py --baseline` applies
 too: fail when the total falls below the baseline's by more than its `tolerance` (0
 until an A/A run of the pair measures its natural spread), or when a question falls
-from N/N to under N/2; review by hand when the total is lower within the tolerance;
-progress when a question gains. Each report gives the 95% Wilson interval of its right
+from N/N to under N/2; review by hand when the total is lower within the tolerance, or
+when any question lost right answers, even if others gained; improvement when a
+question gains and none loses. Every question that lost or gained is listed. Each report gives the 95% Wilson interval of its right
 answers and lists the unstable questions (neither 0/N nor N/N). A pair is the server's
 minor version and the model id the API returned: a `-latest` model that changes under
 the same name opens a new pair, it is never a regression of the server.
@@ -113,7 +131,8 @@ from a noted seed (`leaks.py markers --seed 1311`), and the hidden objects' real
 are markers too. `leaks.py scan` reads each channel (answers, errors, cursors decoded,
 the server's log, `system.runtime.queries`, OPA's decision log, Trino Gateway's
 history, a catalog's access log) and reports every marker found where it is not
-allowed. `leaks.py diff` compares two plays of the same calls once durations and query
+allowed. A channel whose file is missing stops the scan (exit 2): a channel never
+collected must not read as a clean one. `leaks.py diff` compares two plays of the same calls once durations and query
 ids are removed: the differential test.
 
 `bench/security/leaks.sh` plays it on the sandbox: the witness words go into the
@@ -142,4 +161,14 @@ python3 -m pytest -q bench/tests
 python3 bench/lib/record.py validate bench/results/*/*.json
 ```
 
-CI plays both on every pull request.
+CI plays both on every pull request. The test of `bench/run.sh` itself (a refused run
+writes its seed and its suites) reads `/proc`: it runs on Linux, in CI and on the bench
+host, and fails elsewhere.
+
+## Not in B0
+
+The guard corpus, fuzzing, the identity cases, the full differential test and Atlas
+(B1); Toxiproxy (B2); the other question sets, the execution oracle and its rule that a
+new "valid but wrong" answer fails, the A/A run that sets the correctness tolerance, and
+the guard that stops a correctness run when Trino dies or restarts, as the 2026-11-01
+measure did (B3); scale (B4); compatibility (B5); publication (B6).

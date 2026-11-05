@@ -90,8 +90,9 @@ def test_memory_summary_reads_docker_stats_units():
     assert m["host_available_min_mb"] == 2048.0
 
 
-def _result(cases, axis="security", version="0.7.2", model=None, suites=("gw",)):
+def _result(cases, axis="security", version="0.7.2", model=None, suites=("gw",), requested="all"):
     r = record.base_result(axis, "2026-11-04T22:00:00Z", "bench/run.sh security", {"start": {}, "end": {}})
+    r["suites_requested"] = requested
     r["server"].update(image="akkoai/akko-mcp-trino:0.7.2", version=version)
     r["model"]["returned"] = model
     r["suites"] = [{"name": s, "exit_code": 0, "duration_s": 1} for s in suites]
@@ -137,13 +138,14 @@ def test_the_schema_refuses_a_private_case_with_its_name():
         record.validate(r)
 
 
-def _gate(tmp_path, monkeypatch, base_cases, cases, suites=("gw",)):
+def _gate(tmp_path, monkeypatch, base_cases, cases, suites=("gw",), requested="all"):
     monkeypatch.setattr(compare, "BENCH", tmp_path)
     (tmp_path / "baselines" / "security").mkdir(parents=True)
-    base = compare.make_baseline(_result(base_cases))
+    base_suites = tuple(sorted({c["suite"] for c in base_cases}))
+    base = compare.make_baseline(_result(base_cases, suites=base_suites), accept_failures="test")
     (tmp_path / "baselines" / "security" / "0.7-na.json").write_text(json.dumps(base))
     p = tmp_path / "r.json"
-    p.write_text(json.dumps(_result(cases, suites=suites)))
+    p.write_text(json.dumps(_result(cases, suites=suites, requested=requested)))
     return compare.gate(p)
 
 
@@ -163,13 +165,19 @@ def test_gate_fails_on_a_case_the_baseline_does_not_hold(tmp_path, monkeypatch):
     assert _gate(tmp_path, monkeypatch, [_case(1)], [_case(1), _case(2)]) == 1
 
 
-def test_gate_fails_on_an_undocumented_progress(tmp_path, monkeypatch):
+def test_gate_fails_on_an_undocumented_improvement(tmp_path, monkeypatch):
     assert _gate(tmp_path, monkeypatch, [_case(1, "fail")], [_case(1)]) == 1
 
 
-def test_gate_compares_only_the_suites_played(tmp_path, monkeypatch):
+def test_gate_compares_only_the_suites_asked_for(tmp_path, monkeypatch):
     base = [_case(1), _case(2, suite="other")]
-    assert _gate(tmp_path, monkeypatch, base, [_case(1)], suites=("gw",)) == 0
+    assert _gate(tmp_path, monkeypatch, base, [_case(1)], suites=("gw",), requested=["gw"]) == 0
+
+
+def test_gate_fails_a_full_run_that_skipped_a_baseline_suite(tmp_path, monkeypatch, capsys):
+    base = [_case(1), _case(2, suite="leaks")]
+    assert _gate(tmp_path, monkeypatch, base, [_case(1)], suites=("gw",), requested="all") == 1
+    assert "leaks: in the baseline, not played" in capsys.readouterr().out
 
 
 def test_gate_says_invalid_host(tmp_path, monkeypatch):
@@ -231,3 +239,98 @@ def test_every_cases_file_loads_with_unique_ids():
 def test_committed_results_are_valid():
     for path in (BENCH / "results").rglob("*.json"):
         record.validate(json.loads(path.read_text()))
+
+
+def _write_baseline(tmp_path, monkeypatch, result, **env):
+    monkeypatch.setattr(compare, "BENCH", tmp_path)
+    for k, v in env.items():
+        monkeypatch.setenv(k, v)
+    p = tmp_path / "r.json"
+    p.write_text(json.dumps(result))
+    return compare.write_baseline(p)
+
+
+def test_a_security_baseline_refuses_a_failure_without_a_written_reason(tmp_path, monkeypatch):
+    r = _result([_case(1), _case(2, "fail")])
+    assert _write_baseline(tmp_path, monkeypatch, r) == 1
+    assert not (tmp_path / "baselines" / "security" / "0.7-na.json").exists()
+    assert _write_baseline(tmp_path, monkeypatch, r, BENCH_BASELINE_ACCEPT_FAILURES="a known Trino bug") == 0
+    base = json.loads((tmp_path / "baselines" / "security" / "0.7-na.json").read_text())
+    assert base["accepted_failures"] == "a known Trino bug"
+
+
+def test_a_security_baseline_refuses_a_case_not_run(tmp_path, monkeypatch):
+    assert _write_baseline(tmp_path, monkeypatch, _result([_case(1, "not_run")])) == 1
+
+
+def test_a_partial_run_merges_into_the_baseline(tmp_path, monkeypatch):
+    full = _result([_case(1), _case(2, suite="leaks")], suites=("gw", "leaks"))
+    assert _write_baseline(tmp_path, monkeypatch, full) == 0
+    part = _result([_case(1), _case(3)], suites=("gw",), requested=["gw"])
+    assert _write_baseline(tmp_path, monkeypatch, part) == 0
+    base = json.loads((tmp_path / "baselines" / "security" / "0.7-na.json").read_text())
+    assert sorted(base["suites"]) == ["gw", "leaks"] and "SEC-GW-003@direct" in base["suites"]["gw"]
+
+
+def test_scan_exits_2_on_a_missing_channel_file(tmp_path, capsys):
+    present = tmp_path / "a.txt"
+    present.write_text("nothing")
+    code = leaks.main(["scan", "--marker", "x", "--channel", f"a={present}", "--channel", f"b={tmp_path / 'missing'}"])
+    assert code == 2 and "missing" in capsys.readouterr().out
+
+
+def _rescore(tmp_path):
+    report = BENCH.parent / "agent" / "reports" / "2026-11-01-final-mistral-0.7.0-4105967.json"
+    path = record.record_correctness(
+        report,
+        tmp_path,
+        "bench/run.sh correctness --rescore x",
+        BENCH.parent / "agent" / "questions.json",
+        rescored=True,
+    )
+    return path
+
+
+def test_a_rescored_result_says_so_and_holds_no_host_state(tmp_path):
+    path = _rescore(tmp_path)
+    r = json.loads(path.read_text())
+    assert r["host"] == {"start": {}, "end": {}}
+    assert r["rescored"]["from"] == "agent/reports/2026-11-01-final-mistral-0.7.0-4105967.json"
+    assert len(r["rescored"]["source_commit"]) == 40 and r["rescored"]["at"].endswith("Z")
+    assert "rescored" in path.with_suffix(".md").read_text().lower()
+
+
+def test_run_sh_writes_the_seed_and_the_suites_asked_for(tmp_path):
+    """A refused run starts nothing: a fake docker that lists no container is enough."""
+    import os
+    import subprocess
+
+    if not Path("/proc/meminfo").exists():
+        pytest.fail("run.sh reads /proc: play this test on Linux (CI, the bench host)")
+    fake = tmp_path / "bin"
+    fake.mkdir()
+    (fake / "docker").write_text("#!/bin/sh\nexit 0\n")
+    (fake / "docker").chmod(0o755)
+    env = {
+        **os.environ,
+        "PATH": f"{fake}:{os.environ['PATH']}",
+        "BENCH_MIN_FREE_GB": "100000",
+        "BENCH_SEED": "4242",
+        "BENCH_RESULTS_DIR": str(tmp_path / "results"),
+        "BENCH_EVIDENCE_DIR": str(tmp_path / "evidence"),
+        "BENCH_LOCK": str(tmp_path / "lock"),
+    }
+    out = subprocess.run(
+        ["bash", str(BENCH / "run.sh"), "security", "--suite", "smoke"], env=env, capture_output=True, text=True
+    )
+    assert out.returncode == 3, out.stdout + out.stderr
+    r = json.loads(next((tmp_path / "results").rglob("*.json")).read_text())
+    assert r["seed"] == 4242 and r["suites_requested"] == ["smoke"]
+    assert {c["verdict"] for c in r["cases"]} == {"invalid_host"} and "refused" in r["host"]
+
+
+def test_an_unnamed_check_of_a_private_suite_stays_out_of_the_result():
+    cases = {**CASES, "suites": {"gw": {**CASES["suites"]["gw"], "unnamed_private": True}}}
+    rows = record.match_cases(cases, "gw", LOG + "  OK    something new\n", 0)
+    unnamed = next(r for r in rows if r["id"] == "SEC-GW-UNNAMED")
+    assert unnamed["visibility"] == "private" and unnamed["verdict"] == "fail"

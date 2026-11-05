@@ -150,17 +150,13 @@ def match_cases(cases: dict, suite: str, log: str, exit_code: int | None) -> lis
         count[n] += 1
         case = named.get((n, count[n]))
         if case is None:
-            out.append(
-                {
-                    "id": conf["unlisted"],
-                    "suite": suite,
-                    "variant": variant,
-                    "verdict": "fail",
-                    "visibility": "public",
-                    "check": label,
-                    "reason": "a check cases.yaml does not name: give it an id",
-                }
-            )
+            # A suite whose new checks may touch the reads past the access rules keeps an
+            # unnamed check's name out of the public result until someone names it.
+            hidden = conf.get("unnamed_private", False)
+            row = {"id": conf["unlisted"], "suite": suite, "variant": variant, "verdict": "fail"}
+            row["visibility"] = "private" if hidden else "public"
+            row.update(check=label, reason="a check cases.yaml does not name: give it an id")
+            out.append(row)
             continue
         found[case["id"]] = {"verdict": verdict, "label": label}
     for case in named.values():
@@ -296,16 +292,27 @@ def render_md(result: dict) -> str:
     lines = [
         f"# Bench run {result['run_id']}",
         "",
+        *(
+            [
+                f"Rescored on {result['rescored']['at']}: the report {result['rescored']['from']} "
+                f"(added by `{(result['rescored']['source_commit'] or 'unknown')[:12]}`), scored again by the "
+                f"rules of `{result['sandbox_commit'][:12]}`. The run itself is the report's; no host state is recorded.",
+                "",
+            ]
+            if result.get("rescored")
+            else []
+        ),
         "| Field | Value |",
         "|---|---|",
         f"| axis | {result['axis']} |",
         f"| command | `{result['command']}` |",
-        f"| sandbox commit | `{result['sandbox_commit'][:12]}`{' (with local changes)' if result['dirty'] else ''} |",
+        f"| {'scoring commit' if result.get('rescored') else 'sandbox commit'} | `{result['sandbox_commit'][:12]}`{' (with local changes)' if result['dirty'] else ''} |",
+        f"| seed | {result['seed'] if result['seed'] is not None else '-'} |",
         f"| server | {result['server']['image']} ({result['server']['announced'] or 'no version announced'}) |",
         f"| server digest | `{result['server']['digest'] or '-'}` |",
         f"| model | {result['model']['returned'] or '-'} |",
-        f"| host at start | {json.dumps(result['host']['start'])} |",
-        f"| host at end | {json.dumps(result['host']['end'])} |",
+        f"| host at start | {json.dumps(result['host']['start']) if result['host']['start'] else '-'} |",
+        f"| host at end | {json.dumps(result['host']['end']) if result['host']['end'] else '-'} |",
         f"| duration | {result['duration_s']:.0f} s |",
         f"| cost | {'-' if result['cost_usd'] is None else f'{result["cost_usd"]:.2f} USD'} |",
         "",
@@ -411,6 +418,7 @@ def record_scripts(axis: str, evidence: Path, out_root: Path) -> int:
     result = base_result(axis, run["started"], run["command"], {"start": run["host_start"], "end": run["host_end"]})
     if run.get("refused"):
         result["host"]["refused"] = run["refused"]
+    result["suites_requested"] = run.get("suites_requested", "all")
     server = run.get("server", {})
     result["server"].update(
         image=server.get("image"),
@@ -443,8 +451,6 @@ def record_scripts(axis: str, evidence: Path, out_root: Path) -> int:
         metrics_path = evidence / f"{name}.metrics.json"
         metrics = json.loads(metrics_path.read_text()) if metrics_path.exists() else {}
         for r in rows:
-            if r["visibility"] == "public":
-                r["evidence"] = f"evidence/{evidence.name}/{name}.log"
             # The script's metrics, by the name of the check they belong to.
             if r.get("check") in metrics:
                 r["metrics"] = metrics[r["check"]]
@@ -471,7 +477,12 @@ def record_scripts(axis: str, evidence: Path, out_root: Path) -> int:
 PRICES = {"claude-sonnet-5-5": (2e-6, 10e-6)}
 
 
-def record_correctness(report_path: Path, out_root: Path, command: str, questions_path: Path) -> int:
+def record_correctness(
+    report_path: Path, out_root: Path, command: str, questions_path: Path, rescored: bool = False
+) -> Path:
+    """The result of an agent run. rescored: the report is an earlier one scored again, so
+    the result holds no host state (the machine of the rescore says nothing of the run)
+    and says where the report comes from."""
     sys.path.insert(0, str(ROOT / "agent"))
     import run as agent
 
@@ -481,8 +492,18 @@ def record_correctness(report_path: Path, out_root: Path, command: str, question
     questions = agent.load_questions(str(questions_path))
     summary = agent.summary(records, questions)
     started = datetime.datetime.strptime(meta["date"], "%Y-%m-%d %H:%M UTC").strftime("%Y-%m-%dT%H:%M:%SZ")
-    host = json.loads(os.environ["BENCH_HOST"]) if os.environ.get("BENCH_HOST") else {"start": {}, "end": {}}
+    host = {"start": {}, "end": {}}
+    if not rescored and os.environ.get("BENCH_HOST"):
+        host = json.loads(os.environ["BENCH_HOST"])
     result = base_result("correctness", started, command, host)
+    if rescored:
+        source = report_path.resolve()
+        rel = str(source.relative_to(ROOT)) if source.is_relative_to(ROOT) else str(report_path)
+        result["rescored"] = {
+            "from": rel,
+            "source_commit": git("log", "-1", "--diff-filter=A", "--format=%H", "--", rel) or None,
+            "at": datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        }
     announced = meta.get("server", "").split(",")[0] or None
     result["server"].update(
         image=meta.get("server_image") or None,
@@ -516,8 +537,7 @@ def record_correctness(report_path: Path, out_root: Path, command: str, question
         round(sum(r.input_tokens * price[0] + r.output_tokens * price[1] for r in records), 2) if price else None
     )
     result["suites"] = [{"name": f"agent/{report_path.name}", "exit_code": 0, "duration_s": result["duration_s"]}]
-    write(finish(result), out_root)
-    return 0
+    return write(finish(result), out_root)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -534,6 +554,7 @@ def main(argv: list[str] | None = None) -> int:
     s.add_argument("report", type=Path)
     s.add_argument("--questions", type=Path, default=ROOT / "agent" / "questions.json")
     s.add_argument("--command", default="")
+    s.add_argument("--rescored", action="store_true", help="the report is an earlier one, scored again")
     s.add_argument("--out", type=Path, default=BENCH / "results")
     s = sub.add_parser("validate")
     s.add_argument("files", nargs="+", type=Path)
@@ -551,7 +572,8 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "security":
         return record_scripts(args.axis, args.evidence, args.out)
     elif args.cmd == "correctness":
-        return record_correctness(args.report, args.out, args.command or " ".join(sys.argv), args.questions)
+        record_correctness(args.report, args.out, args.command or " ".join(sys.argv), args.questions, args.rescored)
+        return 0
     elif args.cmd == "validate":
         for f in args.files:
             validate(json.loads(f.read_text()))

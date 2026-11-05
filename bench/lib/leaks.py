@@ -23,7 +23,8 @@ order or a status, says that a hidden object exists.
         --channel answers=dave.jsonl --channel server_log=mcp.log --channel opa_log=opa.log
     python3 bench/lib/leaks.py diff with.jsonl without.jsonl
 
-scan and diff print one line per finding and exit 1 when there is one. tests/context.sh
+scan and diff print one line per finding and exit 1 when there is one; scan exits 2
+when a channel's file does not exist. tests/context.sh
 (0.8, lot 7) calls them, as bench/security/leaks.sh does.
 """
 
@@ -209,7 +210,11 @@ def main(argv: list[str] | None = None) -> int:
     channels = {}
     for c in args.channel:
         name, _, path = c.partition("=")
-        channels[name] = Path(path).read_text(errors="replace") if Path(path).exists() else ""
+        if not Path(path).is_file():
+            # A channel never collected must not read as a clean one.
+            print(f"scan: the channel {name} has no file {path}")
+            return 2
+        channels[name] = Path(path).read_text(errors="replace")
     found = scan(channels, rules)
     for f in found:
         print(f)

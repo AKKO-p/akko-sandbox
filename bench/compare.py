@@ -6,16 +6,23 @@
 
 A baseline is bench/baselines/<axis>/<server minor>-<model or na>.json. For the
 scripts' axes it holds each case's verdict, suite by suite; the gate fails on a case
-that passed and does not now (fail or not_run), on one that now passes and did not (a
-progress the baseline must take in the same commit), and on a case the baseline does
-not hold. Only the suites the run played are compared. A case played on a host the
-preflight refused (invalid_host) is neither green nor red: the run is played again.
+that passed and does not now (fail or not_run), on one that now passes and did not (an
+improvement the baseline must take in the same commit), and on a case the baseline does
+not hold. A run of every suite must play every suite of the baseline; a run of some
+suites (--suite) is compared on those only. A case played on a host the preflight
+refused (invalid_host) is neither green nor red: the run is played again.
+
+A baseline of the scripts' axes holds no failure and no case not run, unless
+BENCH_BASELINE_ACCEPT_FAILURES gives the reason, written into it. A run of some suites
+updates those suites of the baseline and keeps the others.
+
 For correctness it holds the right answers per question; the rule is agent/run.py's
 gate().
 """
 
 import argparse
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -55,23 +62,45 @@ def correctness_summary(result: dict) -> dict:
     return {"questions": rows, "right": sum(q["right"] for q in rows), "trials": sum(q["trials"] for q in rows)}
 
 
-def make_baseline(result: dict) -> dict:
+def make_baseline(result: dict, previous: dict | None = None, accept_failures: str = "") -> dict:
+    """The baseline a result makes; a run of some suites only replaces those suites of the
+    previous baseline. Raises ValueError on a failure or a case not run that no reason
+    accepts."""
     server, model = pair(result)
     base = {"axis": result["axis"], "from_run": result["run_id"], "pair": {"server": server, "model": model}}
     if result["axis"] == "correctness":
         base["tolerance"] = 0  # until an A/A run of the pair measures its spread
         base["summary"] = correctness_summary(result)
-    else:
-        suites: dict[str, dict] = {}
-        for c in result["cases"]:
-            suites.setdefault(c["suite"], {})[key(c)] = c["verdict"]
-        base["suites"] = {s: dict(sorted(v.items())) for s, v in sorted(suites.items())}
+        return base
+    bad = sorted(
+        f"{c['suite']} {key(c)}: {c['verdict']}" for c in result["cases"] if c["verdict"] in ("fail", "not_run")
+    )
+    if bad and not accept_failures:
+        raise ValueError("the run holds failures or cases not run: " + "; ".join(bad[:10]))
+    suites: dict[str, dict] = {}
+    for c in result["cases"]:
+        suites.setdefault(c["suite"], {})[key(c)] = c["verdict"]
+    played = {s["name"] for s in result["suites"]}
+    merged, origin = {}, {}
+    if previous and result.get("suites_requested", "all") != "all":
+        merged, origin = dict(previous.get("suites", {})), dict(previous.get("suites_from", {}))
+    for name in played:
+        merged[name] = dict(sorted(suites.get(name, {}).items()))
+        origin[name] = result["run_id"]
+    base["suites"] = dict(sorted(merged.items()))
+    base["suites_from"] = dict(sorted(origin.items()))
+    if bad:
+        base["accepted_failures"] = accept_failures
     return base
 
 
 def gate_scripts(base: dict, result: dict) -> tuple[str, list[str]]:
     reasons, failed, invalid = [], False, False
     played = {s["name"] for s in result["suites"]}
+    if result.get("suites_requested", "all") == "all":
+        for suite in sorted(set(base["suites"]) - played):
+            failed = True
+            reasons.append(f"{suite}: in the baseline, not played")
     got: dict[str, dict[str, str]] = {}
     for c in result["cases"]:
         got.setdefault(c["suite"], {})[key(c)] = c["verdict"]
@@ -126,8 +155,14 @@ def write_baseline(result_path: Path) -> int:
         print("baseline: refused: the result holds cases played on a host the preflight refused")
         return 1
     path = baseline_path(result)
+    previous = json.loads(path.read_text()) if path.exists() else None
+    try:
+        base = make_baseline(result, previous, os.environ.get("BENCH_BASELINE_ACCEPT_FAILURES", "").strip())
+    except ValueError as e:
+        print(f"baseline: refused: {e}; set BENCH_BASELINE_ACCEPT_FAILURES to the reason to accept them")
+        return 1
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(make_baseline(result), indent=2) + "\n")
+    path.write_text(json.dumps(base, indent=2) + "\n")
     print(f"baseline: {path.relative_to(BENCH.parent)} written from {result['run_id']}")
     return 0
 

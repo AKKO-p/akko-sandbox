@@ -88,7 +88,7 @@ read -r table_word column_word < <(python3 bench/lib/leaks.py markers --seed "$s
 psql "COMMENT ON TABLE crm.customers IS 'People and companies who hold an account $table_word'" >/dev/null
 psql "COMMENT ON COLUMN crm.accounts.balance IS 'Current balance in the account currency $column_word'" >/dev/null
 check "the table's witness word is in Postgres" "$(psql "SELECT obj_description('crm.customers'::regclass)" | grep -c "$table_word")" "1"
-check "the column's witness word is in Postgres" "$(psql "SELECT col_description('crm.accounts'::regclass, 5)" | grep -c "$column_word")" "1"
+check "the column's witness word is in Postgres" "$(psql "SELECT col_description('crm.accounts'::regclass, (SELECT attnum FROM pg_attribute WHERE attrelid = 'crm.accounts'::regclass AND attname = 'balance'))" | grep -c "$column_word")" "1"
 check "alice reads the table's witness word in Trino" "$(trino alice_admin "SELECT comment FROM system.metadata.table_comments WHERE catalog_name = 'demo' AND schema_name = 'crm' AND table_name = 'customers'" | grep -c "$table_word")" "1"
 
 echo "== 2. dave plays the calls twice"

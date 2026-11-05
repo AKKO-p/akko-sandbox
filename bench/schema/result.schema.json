@@ -35,6 +35,21 @@
         }
       }
     },
+    "suites_requested": {
+      "description": "all, or the suites a --suite run asked for",
+      "oneOf": [{"const": "all"}, {"type": "array", "items": {"type": "string"}, "minItems": 1}]
+    },
+    "rescored": {
+      "description": "set when the result scores an earlier report again: the report, the commit that added it, when it was scored again",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["from", "source_commit", "at"],
+      "properties": {
+        "from": {"type": "string"},
+        "source_commit": {"type": ["string", "null"]},
+        "at": {"type": "string"}
+      }
+    },
     "command": {"type": "string"},
     "bench_commit": {"type": "string"},
     "sandbox_commit": {"type": "string"},
@@ -90,7 +105,7 @@
           "evidence": {"type": "string"}
         },
         "if": {"properties": {"visibility": {"const": "private"}}},
-        "then": {"not": {"anyOf": [{"required": ["check"]}, {"required": ["reason"]}, {"required": ["metrics"]}]}}
+        "then": {"not": {"anyOf": [{"required": ["check"]}, {"required": ["reason"]}, {"required": ["metrics"]}, {"required": ["evidence"]}]}}
       }
     },
     "summary": {

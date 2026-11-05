@@ -884,8 +884,20 @@ def test_gate_fails_when_a_question_falls_from_all_to_under_half():
     assert verdict == "fail" and any("COR-CRM-01: 3/3" in r for r in reasons)
 
 
-def test_gate_asks_to_document_a_progress():
-    assert run.gate(_summary(3, 1, 3), _summary(3, 2, 3))[0] == "progress"
+def test_gate_asks_to_document_an_improvement():
+    assert run.gate(_summary(3, 1, 3), _summary(3, 2, 3))[0] == "improvement"
+
+
+def test_gate_never_lets_an_improvement_hide_a_drop():
+    verdict, reasons = run.gate(_summary(3, 2, 1), _summary(2, 2, 2))
+    assert verdict == "review"
+    assert any(r.startswith("COR-CRM-01: 3/3 in the baseline, 2/3 now") for r in reasons)
+    assert any(r.startswith("COR-CRM-03: 1/3") for r in reasons)
+
+
+def test_gate_lists_a_drop_even_at_an_equal_total():
+    verdict, reasons = run.gate(_summary(3, 1), _summary(2, 2))
+    assert verdict == "review" and any("COR-CRM-01" in r for r in reasons)
 
 
 def test_gate_refuses_other_trials():
