@@ -8,9 +8,10 @@
 # the glossary Compliance comes out; a renamed table is not_found, an unmapped catalog
 # not_mapped, a deleted entity never served; profile_table agrees with execute_query under a
 # column mask and a row filter; a visible canary serves nothing; a stopped, slow or refused
-# Atlas leaves the call answering in time, the request canceled on Atlas's side, and a
-# refused account is not asked again until its secret changes. Whatever happens, the end of
-# the run removes the allow-all policy, resumes Atlas and puts the reader's secret back.
+# Atlas leaves the call answering in time, its connection closed and Atlas's late answer
+# reaching no one, and a refused account is not asked again until its secret changes.
+# Whatever happens, the end of the run removes the allow-all policy, resumes Atlas and puts
+# the reader's secret back.
 # Removes everything at the end unless KEEP=1. GATEWAY=1 runs the same checks behind Trino
 # Gateway, two clusters sharing the same access control. Uses the sandbox's host ports
 # unless told otherwise.
@@ -290,7 +291,7 @@ check "the variant is removed" "$(opa DELETE v08-allow-all)" "200"
 allow_all=0
 check "carol gets the context again" "$(call carol_analyst describe_table catalog=demo schema=crm table=transactions | field 'd["context_sources"]')" "{'atlas': 'ok', 'file': 'ok'}"
 
-echo "== 8. A slow Atlas: the call answers in time, the request is canceled"
+echo "== 8. A slow Atlas: the call answers in time, and Atlas's late answer reaches no one"
 # ATLAS_TIMEOUT_SECONDS is 30 s here (tests/compose.v08.yaml): only the context deadline can
 # end the read in time. The call may take that deadline, plus the 0.25 s the chain waits past
 # it and the 0.5 s reply margin of the provider contract (akko-mcp-trino's catalog-context
@@ -323,12 +324,27 @@ import json, sys
 before = {json.loads(l)['peer'] for l in open(sys.argv[1]) if l.strip()}
 held = [json.loads(l)['peer'] for l in open(sys.argv[2]) if l.strip() and json.loads(l)['unread'] > 0]
 print(len(held) == 1 and held[0] in before)" "$scratch/sockets.before" "$scratch/sockets.during")" "True"
+# HTTP cannot withdraw a request already sent: the data catalog may still read and answer it,
+# and that answer reaches no one. Once Atlas is resumed, what it served is printed, as its
+# audit log says, and the checks are that its answer reaches no one: Atlas no longer holds
+# that connection, the server holds nothing of it open, and no reply reaches a caller.
+held=$(python3 -c "
+import json, sys
+print(''.join(json.loads(l)['peer'] for l in open(sys.argv[1]) if l.strip() and json.loads(l)['unread'] > 0))" "$scratch/sockets.during")
+read_logs; replies_before=$(grep -c '"tool":"' "$scratch/mcp.log")
 docker compose unpause atlas >/dev/null 2>&1; paused=0
 sleep 5
-served_after=$(reader_requests)
 docker compose exec -T atlas cat /data/logs/audit.log 2>/dev/null | grep '|mcp_reader|' | tail -n +$((served_before + 1)) \
-  | awk -F'|' '{print "  Atlas served after the resume: " $4 " " $5 ", status " $6}'
-check "Atlas resumed: it served no request of the reader since the pause, the stale one included (audit.log)" "$(( served_after - served_before ))" "0"
+  | awk -F'|' '{print "  Atlas, resumed, served: " $4 " " $5 ", status " $6}'
+atlas_sockets "$atlas_id" > "$scratch/sockets.after"
+check "Atlas resumed: it no longer holds the connection of the cut read" "$([ -n "$held" ] && HELD="$held" rows '[r["state"] for r in rows if r["peer"] == __import__("os").environ["HELD"]]' < "$scratch/sockets.after" || echo "no connection held the request")" "[]"
+# The same connection, from the server's side: its address and port are the peer Atlas saw.
+check "  the server holds nothing of it open" "$(docker compose exec -T mcp python -c "
+import sys
+n = sum(1 for t in ('/proc/net/tcp', '/proc/net/tcp6') for l in open(t).readlines()[1:] if l.split()[1] == sys.argv[1])
+print(n)" "$held" | tr -d '\r')" "0"
+read_logs
+check "  and no reply reached a caller meanwhile: no tool call answered since the resume" "$(( $(grep -c '"tool":"' "$scratch/mcp.log") - replies_before ))" "0"
 n=0; until [ "$(call carol_analyst describe_table catalog=demo schema=crm table=accounts | field 'd["context_sources"]["atlas"]')" = ok ] || [ $n -ge 12 ]; do n=$((n + 1)); sleep 5; done
 check "Atlas back: the context comes again" "$(call carol_analyst describe_table catalog=demo schema=crm table=accounts | field 'd["context_sources"]')" "{'atlas': 'ok', 'file': 'ok'}"
 
