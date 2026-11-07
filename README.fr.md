@@ -140,9 +140,8 @@ Le test démarre le sandbox sous son propre nom de projet, joue la démo,
 vérifie les deux réponses différentes, `current_user`, chaque refus (à la porte
 du serveur et chez Trino), le token exchange (lu dans les propres événements de
 Keycloak), la ligne d'audit et l'Inspector, affiche le temps de démarrage et la
-mémoire, puis supprime tout. `KEEP=1` le
-laisse tourner. `MCP_IMAGE` lance une autre version du serveur, par exemple une
-release candidate.
+mémoire, puis supprime tout. `KEEP=1` le laisse tourner. `MCP_IMAGE` lance une
+autre version du serveur, par exemple une release candidate.
 
 ## Derrière Trino Gateway
 
@@ -279,8 +278,9 @@ généré au hasard et rangé dans le volume `atlas-secrets`. Le catalog Trino `
 correspond au cluster Atlas `sandbox`. Seul le glossaire `Sales` est servi.
 
 Le profil ajoute ses propres règles à la policy, dans
-[`catalogs/policy.rego`](catalogs/policy.rego), qu'OPA ne charge qu'avec ce
-profil. La policy par défaut du sandbox reste celle avec laquelle les autres
+[`catalogs/policy.rego`](catalogs/policy.rego), qu'OPA ne charge que lorsque
+`catalogs/compose.atlas.yaml` figure dans `COMPOSE_FILE`, comme dans les commandes
+de ce profil. La policy par défaut du sandbox reste celle avec laquelle les autres
 contrôles ont été mesurés. La première règle cache `accounts.opened_on` aux
 analystes. La deuxième retire les versements de salaire de leurs transactions.
 La troisième cache à tous, administrateurs compris, le témoin `demo.mcp.canary`.
@@ -350,12 +350,16 @@ cache, pour que chaque appel relise Atlas et Trino. Il vérifie ce qui suit :
   quand même. Avec Atlas figé au-delà du délai, la source indique `unavailable`.
   L'appel ne dure pas plus que le même appel avec Atlas sain, plus le délai, plus
   les 0,25 s que le serveur attend au-delà et la marge de réponse de 0,5 s du
-  contrat des fournisseurs. akko-mcp-trino ferme la connexion même du pool qui a
-  porté la requête HTTP, avant qu'Atlas ne la lise. HTTP ne permet pas de retirer
-  une requête déjà envoyée. Le catalogue de données peut encore la lire et y
+  contrat des fournisseurs. akko-mcp-trino ferme la connexion du pool qui a
+  porté la requête HTTP, celle-là même, avant qu'Atlas ne la lise : tant
+  qu'Atlas est encore figé, le socket du serveur a disparu, ou il est en
+  FIN_WAIT2 sans processus qui le tienne. HTTP ne permet pas de retirer une
+  requête déjà envoyée. Le catalogue de données peut encore la lire et y
   répondre, et cette réponse n'arrive à personne. Une fois Atlas repris, il ne
-  garde plus cette connexion, le serveur n'en garde rien d'ouvert, et aucune
-  réponse n'atteint un appelant ;
+  garde plus cette connexion, et le serveur n'a plus de socket pour elle : la
+  réponse d'Atlas ne trouve personne pour la lire. Avant la pause, la même sonde
+  doit trouver la connexion du pool du serveur par ses deux bouts : ce contrôle
+  positif montre que la sonde voit ce qui est là ;
 - quand Atlas rejette le compte, le serveur tente un seul login, puis aucun tant
   que le fichier de secret ne change pas. Il journalise `atlas refused the
   account` une fois. Atlas ne journalise pas lui-même les logins refusés. Avec
@@ -365,8 +369,11 @@ cache, pour que chaque appel relise Atlas et Trino. Il vérifie ce qui suit :
   Log4j 2 core qu'Atlas 2.4.0 livre, en version 2.17.2.
 
 Quoi qu'il arrive, la fin d'une exécution retire la policy permissive du contrôle
-du témoin, reprend Atlas et remet le secret du lecteur, avec `KEEP=1` et après un
-Ctrl-C aussi.
+du témoin, reprend ou redémarre Atlas et remet le secret du lecteur, avec `KEEP=1`
+et après un Ctrl-C aussi, et elle nomme chaque rétablissement qu'elle a fait.
+[`tests/interrupt.sh`](tests/interrupt.sh) le rejoue{N}: il interrompt
+`tests/context.sh` comme le fait un Ctrl-C, en cinq points, et lit l'état depuis
+l'extérieur.
 
 Testé avec Apache Atlas 2.4.0 construit par
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
@@ -374,35 +381,36 @@ Testé avec Apache Atlas 2.4.0 construit par
 `openpolicyagent/opa:1.21.1-static`, `postgres:17.11-alpine`, et akko-mcp-trino
 construit depuis le commit `4bd78f2`. Ce commit ferme la connexion d'une lecture
 du contexte interrompue à son délai. Ce build se déclare encore en version 0.7.2.
-Sans gateway, l'exécution a réussi ses 103 contrôles. Voici sa
+Sans gateway, l'exécution a réussi ses 104 contrôles. Voici sa
 section sur un Atlas lent :
 
 ```text
-== 8. A slow Atlas: the call answers in time, and Atlas's late answer reaches no one
+== 8. A slow Atlas: the call answers in time, and Atlas's late answer finds no reader
   OK    carol, describe_table transactions with Atlas healthy: atlas ok
-  describe_table answered in 3.95 s with Atlas frozen, 1.39 s with Atlas healthy; the context deadline is 3 s
+  OK    the probe sees the server's pooled connection to Atlas from both ends, held by the server
+  describe_table answered in 3.75 s with Atlas frozen, 1.27 s with Atlas healthy; the context deadline is 3 s
   OK    carol, describe_table transactions with Atlas frozen: atlas unavailable, file ok
   OK      the columns and the file's grain still come
-  OK      it waited for Atlas until the deadline: 3 s at least
+  OK      the call took at least the deadline, 3 s, end to end
   OK      and no longer: at most the deadline + 0.25 s + 0.5 s more than with Atlas healthy
   OK    Atlas's side: one connection holds the request unread, and the client closed it (CLOSE_WAIT)
   OK      it is a connection of the pool, open before the pause
+  OK      the server no longer holds it: its socket is gone, or in FIN_WAIT2 with no process
   Atlas, resumed, served: GET http://atlas:21000/api/atlas/v2/entity/bulk/uniqueAttribute/type/hive_table?attr_0%3AqualifiedName=crm.transactions%40sandbox, status 200
   OK    Atlas resumed: it no longer holds the connection of the cut read
-  OK      the server holds nothing of it open
-  OK      and no reply reached a caller meanwhile: no tool call answered since the resume
+  OK      and the server has no socket for it: Atlas's answer finds no reader
   OK    Atlas back: the context comes again
 ```
 
 Ici, le client est akko-mcp-trino, vu depuis Atlas. Avec un serveur construit
-depuis le commit `0e0159c`, avant ce correctif, le contrôle de la connexion fermée
-échouait avec `got closed by the client 0, open with a request unread 1`. Atlas,
+depuis le commit `0e0159c`, avant ce correctif, une forme plus ancienne du
+contrôle de la connexion fermée échouait avec `got closed by the client 0, open with a request unread 1`. Atlas,
 une fois repris, lit encore la requête qu'il avait reçue et y répond ; cette
 réponse n'arrive à personne. Son journal d'audit montre cette réponse, que le
 script affiche.
 
-Derrière le gateway (`GATEWAY=1`), l'exécution a réussi ses 103 contrôles elle
-aussi, et `describe_table` avec Atlas figé a répondu en 4,31 s. Le contrôle lit
+Derrière le gateway (`GATEWAY=1`), l'exécution a réussi ses 104 contrôles elle
+aussi, et `describe_table` avec Atlas figé a répondu en 3,92 s. Le contrôle lit
 l'historique des requêtes sur les deux clusters.
 
 Avec akko-mcp-trino 0.7.2, `tests/context.sh` échoue au démarrage, parce que ce
@@ -413,14 +421,14 @@ mcp-1         | ValueError: unknown extension 'fingerprint-audit'; installed ext
 ```
 
 Au repos, sans gateway et juste après le démarrage, `docker stats` mesure ces
-mémoires : Atlas 1,995 Gio (limite 3 Gio), Trino 799,2 Mio, Keycloak 481,4 Mio, le
-serveur MCP 72,64 Mio, l'Inspector 50,89 Mio, PostgreSQL 26,32 Mio, OPA 15,93 Mio.
-Comptez environ 4 Go de mémoire libre. Le démarrage a pris 335 s, dont l'essentiel
+mémoires : Atlas 1,934 Gio (limite 3 Gio), Trino 812,4 Mio, Keycloak 547,5 Mio, le
+serveur MCP 90,68 Mio, l'Inspector 113,2 Mio, PostgreSQL 36,27 Mio, OPA 11,98 Mio.
+Comptez environ 4 Go de mémoire libre. Le démarrage a pris 318 s, dont l'essentiel
 pour Atlas.
 
-Derrière le gateway, au repos, `docker stats` mesure : Atlas 2,002 Gio, les deux
-clusters Trino 743,2 Mio et 769,9 Mio, Keycloak 498,1 Mio, le gateway 308,3 Mio,
-le serveur MCP 81,73 Mio. Comptez environ 5 Go de mémoire libre.
+Derrière le gateway, au repos, `docker stats` mesure : Atlas 1,922 Gio, les deux
+clusters Trino 742,8 Mio et 778,3 Mio, Keycloak 495,9 Mio, le gateway 346,5 Mio,
+le serveur MCP 81,54 Mio. Comptez environ 5 Go de mémoire libre.
 
 ## Un agent réel : combien d'appels jusqu'à la bonne colonne
 
