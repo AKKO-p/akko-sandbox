@@ -2,7 +2,8 @@
 # Smoke test of the sandbox, end to end, on a machine with Docker:
 # starts the compose project, plays the demo, checks the two different answers,
 # current_user, the refusals (401 at the door, 401 at Trino without a token or
-# with a token issued for the MCP server), the token exchange, the audit line,
+# with a token issued for the MCP server), the token exchange (from Keycloak's own
+# events), the audit line,
 # and measures start time and memory. Removes everything at the
 # end unless KEEP=1.
 #
@@ -28,6 +29,24 @@ if ! docker compose up -d --wait --wait-timeout 420; then
 fi
 echo "  all services healthy in $(( $(date +%s) - start )) s"
 docker compose ps --format '  {{.Service}}: {{.Status}}'
+
+# Keycloak records each token exchange as an event (TOKEN_EXCHANGE), whatever the MCP server
+# logs: turned on here, for this run, through Keycloak's own admin CLI, with the sandbox's
+# development admin account (compose.yaml).
+kcadm() { docker compose exec -T keycloak /opt/keycloak/bin/kcadm.sh "$@" --config /tmp/kcadm.config; }
+# The exchanges Keycloak recorded for the server's client: as many as were made for $1,
+# for Trino, from a token of the client sandbox-mcp.
+exchanges() {
+  kcadm get events -r sandbox -q type=TOKEN_EXCHANGE -q client=akko-mcp 2>/dev/null | python3 -c "
+import sys, json
+try: events = json.load(sys.stdin)
+except ValueError: events = []
+print(sum(1 for e in events if e.get('details', {}).get('username') == sys.argv[1]
+          and e['details'].get('audience') == 'trino' and e['details'].get('subject_token_client_id') == 'sandbox-mcp'))" "$1"
+}
+kcadm config credentials --server http://localhost:8080 --realm master --user admin --password admin >/dev/null 2>&1
+check "Keycloak records token exchanges from now on" "$(kcadm update events/config -r sandbox -s eventsEnabled=true -s 'enabledEventTypes=["TOKEN_EXCHANGE"]' >/dev/null 2>&1 && echo yes)" "yes"
+check "  none recorded for carol before the demo" "$(exchanges carol_analyst)" "0"
 
 echo "== 2. Memory at rest"
 stats | sed 's/^/  /'
@@ -74,7 +93,7 @@ check "Trino, carol's own token, as alice_admin: refused" "$(trino_as "$carol_fo
 logs=$(docker compose logs mcp)
 check "no token in the server log" "$(grep -c 'eyJ' <<<"$logs")" "0"
 check "no client secret in the server log" "$(grep -c "$(docker compose exec -T mcp cat /certs/mcp-client.secret)" <<<"$logs")" "0"
-check "the server exchanged tokens at Keycloak" "$(grep -q 'POST https://keycloak:8443/realms/sandbox/protocol/openid-connect/token "HTTP/1.1 200' <<<"$logs" && echo yes)" "yes"
+check "the server exchanged carol's token at Keycloak for one issued for Trino (Keycloak's events)" "$([ "$(exchanges carol_analyst)" -gt 0 ] 2>/dev/null && echo yes)" "yes"
 check "the audit line names carol_analyst" "$(grep -q 'carol_analyst' <<<"$logs" && echo yes)" "yes"
 
 echo "== 6. The MCP Inspector reaches the server with a bearer header"

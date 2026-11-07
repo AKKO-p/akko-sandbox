@@ -138,7 +138,7 @@ tests/smoke.sh
 
 Le test démarre le sandbox sous son propre nom de projet, joue la démo,
 vérifie les deux réponses différentes, `current_user`, chaque refus (à la porte
-du serveur et chez Trino), le token exchange, la ligne d'audit et l'Inspector,
+du serveur et chez Trino), le token exchange (lu dans les événements de Keycloak), la ligne d'audit et l'Inspector,
 affiche le temps de démarrage et la mémoire, puis supprime tout. `KEEP=1` le
 laisse tourner. `MCP_IMAGE` lance une autre version du serveur, par exemple une
 release candidate.
@@ -313,10 +313,15 @@ vérifie que :
 - `dave_viewer` ne reçoit rien sur `crm.customers` : ni dans ses réponses, ni dans
   ses lignes d'audit, ni dans son historique de requêtes sur chaque cluster, lu
   par l'admin. Le journal de décisions d'OPA ne nomme la table pour lui que dans
-  le filtre de listing propre à Trino, qui l'a refusée. Les requêtes du filtre de
-  visibilité portent le tag client `mcp-gate`, et elles seules ;
+  le filtre de listing propre à Trino, qui l'a refusée : Trino doit la lui
+  envoyer pour filtrer son listing. Les requêtes du filtre de visibilité portent
+  le tag client `mcp-gate`, et elles seules. La liste des requêtes de Trino n'a pas
+  de colonne pour les tags client, donc le contrôle les lit dans `/v1/query` du
+  coordinateur ;
 - la colonne que la policy cache à carol, `accounts.opened_on`, sort du contexte,
-  du grain et des jointures, et son terme n'est pas nommé. Le terme rattaché à
+  du grain et des jointures, et son terme n'est pas nommé. C'est la seule colonne
+  que voit carol dont aucun contrôle plus ancien ni aucune question d'`agent/`
+  n'a besoin. Le terme rattaché à
   `crm.customers` seulement n'est jamais nommé à côté d'une autre table. Rien de
   `Compliance` ne sort ;
 - la table renommée est `not_found`, le catalogue `tpch` est `not_mapped`, et la
@@ -329,8 +334,10 @@ vérifie que :
   au-delà du délai donne `unavailable` dans le budget de l'appel ;
 - un compte refusé coûte une connexion à Atlas, puis aucune tant que son fichier de
   secret ne change pas, et le serveur journalise `atlas refused the account` une
-  fois. Atlas écrit chaque connexion qu'il refuse dans un journal à part pour ce
-  contrôle ([`catalogs/atlas/start.sh`](catalogs/atlas/start.sh)).
+  fois. Atlas ne journalise pas les connexions qu'il refuse : avec
+  `ATLAS_LOG_REFUSED_LOGINS=true`, que seul `tests/compose.v08.yaml` fixe,
+  [`catalogs/atlas/start.sh`](catalogs/atlas/start.sh) les écrit dans
+  `/data/logs/logins.log`, jamais avec un mot de passe.
 
 Testé avec Apache Atlas 2.4.0 construit par
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,

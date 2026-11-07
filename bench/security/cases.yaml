@@ -74,7 +74,7 @@ suites:
 cases:
   - id: SEC-SMK-001
     script: smoke
-    check: "the core's tools, no more"
+    check: "the core's tools, every one of 0.7, no unknown one"
   - id: SEC-SMK-002
     script: smoke
     check: "carol: Trino's current_user is carol_analyst"
@@ -140,7 +140,7 @@ cases:
     check: "no client secret in the server log"
   - id: SEC-SMK-023
     script: smoke
-    check: "the server exchanged tokens at Keycloak"
+    check: "the server exchanged carol's token at Keycloak for one issued for Trino (Keycloak's events)"
   - id: SEC-SMK-024
     script: smoke
     check: "the audit line names carol_analyst"
@@ -150,6 +150,12 @@ cases:
   - id: SEC-SMK-026
     script: smoke
     check: "Inspector as alice_admin: 10 customers"
+  - id: SEC-SMK-027
+    script: smoke
+    check: "Keycloak records token exchanges from now on"
+  - id: SEC-SMK-028
+    script: smoke
+    check: "none recorded for carol before the demo"
   - id: SEC-GW-001
     script: gateway
     check: "a second start is healthy"
@@ -164,7 +170,7 @@ cases:
     check: "the gateway still knows two clusters"
   - id: SEC-GW-005
     script: gateway
-    check: "the core's tools, no more"
+    check: "the core's tools, every one of 0.7, no unknown one"
   - id: SEC-GW-006
     script: gateway
     check: "carol: Trino's current_user is carol_analyst"

@@ -135,7 +135,7 @@ tests/smoke.sh
 
 It starts the sandbox under its own project name, plays the demo, checks the
 two different answers, `current_user`, every refusal (the server's door and
-Trino's own), the token exchange, the audit line and the Inspector, prints the
+Trino's own), the token exchange (from Keycloak's own events), the audit line and the Inspector, prints the
 start time and the memory, and removes everything. `KEEP=1` leaves it running.
 `MCP_IMAGE` runs another build of the server, such as a release candidate.
 
@@ -309,10 +309,13 @@ seconds; and no cache, so that each call reads Atlas and Trino again. It checks:
 - `dave_viewer` gets nothing about `crm.customers`: not in his answers, not in his
   audit lines, not in his query history on each cluster, read by the admin. OPA's
   decision log names the table for him only in Trino's own listing filter, which
-  refused it. The statements of the visibility filter carry the client tag
-  `mcp-gate`, and only they do;
+  refused it: Trino must send it there to filter his listing. The statements of
+  the visibility filter carry the client tag `mcp-gate`, and only they do. Trino's
+  list of queries has no column for client tags, so the check reads them from the
+  coordinator's `/v1/query`;
 - the column the policy hides from carol, `accounts.opened_on`, leaves the
-  context, the grain and the joins, and its term is not named. The term attached
+  context, the grain and the joins, and its term is not named. It is the one
+  column carol sees that no older check and no question of `agent/` needs. The term attached
   only to `crm.customers` is never named next to another table. Nothing of
   `Compliance` comes out;
 - the renamed table is `not_found`, the catalog `tpch` is `not_mapped`, and the
@@ -325,9 +328,10 @@ seconds; and no cache, so that each call reads Atlas and Trino again. It checks:
 - Atlas stopped gives `unavailable`, and the call still answers. Atlas frozen past
   the deadline gives `unavailable` within the call's budget;
 - a refused account costs one login at Atlas, then none until its secret file
-  changes, and the server logs `atlas refused the account` once. Atlas writes each
-  login it refuses to a log of its own for this check
-  ([`catalogs/atlas/start.sh`](catalogs/atlas/start.sh)).
+  changes, and the server logs `atlas refused the account` once. Atlas does not log
+  the logins it refuses: with `ATLAS_LOG_REFUSED_LOGINS=true`, which only
+  `tests/compose.v08.yaml` sets, [`catalogs/atlas/start.sh`](catalogs/atlas/start.sh)
+  writes them to `/data/logs/logins.log`, never with a password.
 
 Tested with Apache Atlas 2.4.0 built by
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,

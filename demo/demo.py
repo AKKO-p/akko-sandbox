@@ -30,9 +30,14 @@ EUROPE = {"DE", "ES", "FR", "IT", "NL"}
 # A word searched in the names and comments of the columns (search_columns, from
 # akko-mcp-trino 0.7): it is only in crm.customers, which the policy hides from viewers.
 SEARCH = {"text": "email", "catalog": "demo"}
-# The core's tools since akko-mcp-trino 0.7.
+# The core's tools since akko-mcp-trino 0.7: every one must be there.
 TOOLS = sorted(["describe_schema", "describe_table", "execute_query", "explain_query", "list_catalogs",
                 "list_schemas", "list_tables", "search_columns"])
+# The tools a later version of the core adds, and the version that adds each: the server may
+# list them too. Any tool in neither list fails the check.
+KNOWN_EXTRA_TOOLS = {
+    "profile_table": "0.8",
+}
 
 COLOR = sys.stdout.isatty()
 PACE = float(os.environ.get("DEMO_PACE") or 0)  # seconds between steps, for a recording
@@ -169,7 +174,8 @@ def check(r: dict) -> int:
     emails = {k: [row[1] for row in r[k]["rows"]] for k in ("carol", "alice")}
     countries = {k: {row[2] for row in r[k]["rows"]} for k in ("carol", "alice")}
     checks = [
-        ("the core's tools, no more", carol["tools"] == alice["tools"] == TOOLS),
+        ("the core's tools, every one of 0.7, no unknown one",
+         carol["tools"] == alice["tools"] and set(TOOLS) <= set(carol["tools"]) <= set(TOOLS) | set(KNOWN_EXTRA_TOOLS)),
         ("carol: Trino's current_user is carol_analyst", carol["current_user"] == "carol_analyst"),
         ("alice: Trino's current_user is alice_admin", alice["current_user"] == "alice_admin"),
         ("carol: an answer, every e-mail masked", bool(emails["carol"]) and all(e.startswith("***@") for e in emails["carol"])),
