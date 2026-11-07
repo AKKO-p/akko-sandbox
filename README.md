@@ -135,9 +135,10 @@ tests/smoke.sh
 
 It starts the sandbox under its own project name, plays the demo, checks the
 two different answers, `current_user`, every refusal (the server's door and
-Trino's own), the token exchange, the audit line and the Inspector, prints the
-start time and the memory, and removes everything. `KEEP=1` leaves it running.
-`MCP_IMAGE` runs another build of the server, such as a release candidate.
+Trino's own), the token exchange (in Keycloak's own event log), the audit line
+and the Inspector, prints the start time and the memory, and removes everything.
+`KEEP=1` leaves it running. `MCP_IMAGE` runs another build of the server, such as
+a release candidate.
 
 ## Behind Trino Gateway
 
@@ -170,7 +171,7 @@ answers through the gateway, that the server can neither reach a cluster
 directly nor use the gateway's admin API, that the gateway refuses forwarded
 headers sent by a client, that queries spread over both clusters and that each
 cluster runs them as the user who asked, that a capped result goes through the
-gateway, that a query past its time budget is cancelled in Trino through the
+gateway, that a query past its time budget is canceled in Trino through the
 gateway, and that the refusals stay the same. It uses the sandbox's host ports
 (8080, 3000, 6274); to run it next to a running sandbox, set the ports as in the
 script's header. The CI runs it after `tests/smoke.sh`.
@@ -227,6 +228,197 @@ read the error code, not the text. In the same way, a catalog he names gets
 Trino's refusal (`Cannot access catalog tpcds`, kind `permission`) where a
 missing one gets `not found` (kind `catalog`): Trino tells the two apart.
 
+## Context from a data catalog: Apache Atlas
+
+```bash
+COMPOSE_FILE=compose.yaml:catalogs/compose.atlas.yaml COMPOSE_PROFILES=catalogs \
+  MCP_IMAGE=<an image of akko-mcp-trino 0.8> docker compose up -d --wait
+MCP_IMAGE=<an image of akko-mcp-trino 0.8> tests/context.sh
+MCP_IMAGE=<an image of akko-mcp-trino 0.8> GATEWAY=1 tests/context.sh   # behind Trino Gateway
+```
+
+akko-mcp-trino 0.8 reads a data catalog and adds its context to `describe_table`
+and `describe_schema`. It serves that context only for the tables and columns
+that Trino shows the caller. The `catalogs` profile
+([`catalogs/compose.atlas.yaml`](catalogs/compose.atlas.yaml)) adds Apache Atlas
+2.4.0 and turns on the server's Atlas provider.
+
+Version 0.8 is not on Docker Hub yet. Until it is, build the image from the
+`main` branch of akko-mcp-trino and pass its name in `MCP_IMAGE`. The image
+includes the Atlas provider. It stays inactive until `MCP_CONTEXT_PROVIDERS`
+lists it.
+
+Apache Atlas publishes source releases only.
+[`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile) builds the server from
+the official source release. The build checks it against the SHA-512 that the
+Apache Software Foundation (ASF) publishes next to it. HBase 2.5.0 and Solr
+8.11.3, the versions this release is built against, come from the ASF archive,
+each checked against its SHA-512. The first start builds the image. On a machine
+with 16 processors, the Maven build took 7 min 18 s. The image is 2.98 GB. Atlas
+has no data volume: removing its container deletes the catalog, and the seed
+writes it again on the next start.
+
+[`catalogs/seed.py`](catalogs/seed.py) writes the demo catalog through Atlas's
+REST API v2, as the `admin` user:
+
+- a data steward's description of each table and column in `crm`;
+- the glossary `Sales`, with five terms, each with a status: `Customer`
+  (attached to `crm.customers` only), `Account`, `Revenue`, `Turnover` (a synonym
+  of `Revenue`) and `Opening date`;
+- the glossary `Compliance`, with the term `Personal data`, attached to columns
+  that every user can see;
+- a renamed table, a deleted table and a deleted column;
+- a table under the Atlas cluster `tpch`, which no Trino catalog maps to.
+
+The server reads Atlas as `mcp_reader`, a user with Atlas's built-in read-only
+role `DATA_SCIENTIST`. Its password is generated at random and stored in the
+`atlas-secrets` volume. Trino's `demo` catalog maps to the Atlas cluster
+`sandbox`. Only the glossary `Sales` is served.
+
+The profile adds its own rules to the policy, in
+[`catalogs/policy.rego`](catalogs/policy.rego), which OPA loads only when
+`catalogs/compose.atlas.yaml` is in `COMPOSE_FILE`, as in this profile's
+commands. The sandbox's default policy stays the one the other checks were
+measured with. The first rule hides `accounts.opened_on` from analysts. The
+second filters salary payments out of their transactions. The third hides the
+canary `demo.mcp.canary` from everyone, admins included. Before it serves
+context, the server checks that Trino still hides the canary from the caller. If
+the caller can see it, the visibility filter cannot be trusted, and the server
+serves no context.
+
+Here is what Carol gets for the `amount` column of `crm.transactions`, copied
+from a run of `tests/context.sh`. The `Compliance` term attached to the same
+column is absent.
+
+```json
+{
+  "column_context": {
+    "amount": {
+      "description": "Amount of the movement, in the account's currency",
+      "sources": {"description": "atlas"},
+      "terms": [{"name": "Revenue", "ref": "t2"}]
+    }
+  },
+  "terms": {
+    "t1": {"name": "Turnover", "glossary": "Sales", "definition": "Total revenue over a period",
+           "status": "draft", "related": [{"ref": "t2", "name": "Revenue", "relation": "synonym"}],
+           "source": "atlas"},
+    "t2": {"name": "Revenue", "glossary": "Sales", "definition": "Money that comes in from a sale",
+           "status": "approved", "related": [{"ref": "t1", "name": "Turnover", "relation": "synonym"}],
+           "source": "atlas"}
+  },
+  "context_sources": {"atlas": "ok", "file": "ok"}
+}
+```
+
+`tests/context.sh` adds [`tests/compose.v08.yaml`](tests/compose.v08.yaml): a
+second provider, `file`, which declares the grain and the joins of two tables,
+two notions Atlas lacks; the `fingerprint-audit` module; a context deadline of 3
+seconds; an Atlas read timeout of 30 seconds, so that only that deadline can end
+a slow read in time; and no cache, so that each call reads Atlas and Trino
+again. It checks the following:
+
+- Carol gets the descriptions, the terms of `Sales` and their status, in
+  `describe_table` and `describe_schema`;
+- Dave gets nothing about `crm.customers`. The table is absent from his answers,
+  from his audit lines, and from his query history on each cluster, which the
+  check reads as the admin user. Atlas's own log shows no read of the table
+  during his calls. OPA's decision log names the table for Dave in one place
+  only: Trino's own listing filter, which refused it. Trino has to send the table
+  to OPA to filter his listing. Only the visibility filter's queries carry the
+  client tag `mcp-gate`. `system.runtime.queries` has no client tags column, so
+  the check reads the tags from the coordinator's `/v1/query` endpoint;
+- the column the policy hides from Carol, `accounts.opened_on`, is absent from
+  the context, the grain and the joins, and its term is not named. This column
+  was chosen because no earlier check and no question in `agent/` uses it. The
+  term attached only to `crm.customers` never appears in the context of another
+  table. No `Compliance` term appears;
+- the renamed table returns `not_found`, the `tpch` catalog returns
+  `not_mapped`, and the deleted table and column are never served;
+- `profile_table` on the masked `email`, and on `amount` under the row filter,
+  returns the same `rows`, `min` and `max` as `execute_query` for the same user;
+- a policy that makes the canary visible returns `not_checked`, and the server
+  logs one warning per call that names no user and no table;
+- with Atlas stopped, the Atlas source reports `unavailable`, and the call still
+  returns. With Atlas paused past the deadline, the source reports `unavailable`.
+  The call takes no longer than the same call with Atlas healthy, plus the
+  deadline, plus the 0.25 s the server waits past it and the 0.5 s reply margin
+  of the provider contract. akko-mcp-trino closes the pool connection that
+  carried the request, that very one, before Atlas reads it: while Atlas is
+  still frozen, the server's socket is gone, or in FIN_WAIT2 with no process
+  holding it. HTTP cannot withdraw a request already sent: the data catalog may
+  still read and answer it, and that answer reaches no one. Once Atlas is
+  resumed, it no longer holds that connection, and the server has no socket left
+  for it, so Atlas's answer finds no reader. Before the pause, the same probe
+  must find the server's pooled connection from both ends: that positive
+  check shows the probe sees what is there;
+- when Atlas rejects the account, the server tries one login, then none until
+  the secret file changes. It logs `atlas refused the account` once. Atlas
+  itself does not log failed logins. With `ATLAS_LOG_REFUSED_LOGINS=true`, set
+  only by `tests/compose.v08.yaml`,
+  [`catalogs/atlas/start.sh`](catalogs/atlas/start.sh) writes them to
+  `/data/logs/logins.log`, without passwords. That file uses the Log4j 2 core
+  that Atlas 2.4.0 ships, version 2.17.2.
+
+Whatever happens, the end of a run removes the allow-all policy of the canary
+check, resumes or starts Atlas and puts the reader's secret back, with `KEEP=1`
+and after Ctrl-C too, and it names each restore it made.
+[`tests/interrupt.sh`](tests/interrupt.sh) replays that: it interrupts
+`tests/context.sh` as Ctrl-C does, at five points, and reads the state from
+outside.
+
+Tested with Apache Atlas 2.4.0 built by
+[`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
+`trinodb/trino-gateway:22`, `quay.io/keycloak/keycloak:26.7.5`,
+`openpolicyagent/opa:1.21.1-static`, `postgres:17.11-alpine`, and akko-mcp-trino
+built from commit `4bd78f2`. That commit closes the connection of a context read
+that hits its deadline. The build still reports version 0.7.2. Without the
+gateway, all 104 checks passed. Here is the section on a slow Atlas:
+
+```text
+== 8. A slow Atlas: the call answers in time, and Atlas's late answer finds no reader
+  OK    carol, describe_table transactions with Atlas healthy: atlas ok
+  OK    the probe sees the server's pooled connection to Atlas from both ends, held by the server
+  describe_table answered in 3.75 s with Atlas frozen, 1.27 s with Atlas healthy; the context deadline is 3 s
+  OK    carol, describe_table transactions with Atlas frozen: atlas unavailable, file ok
+  OK      the columns and the file's grain still come
+  OK      the call took at least the deadline, 3 s, end to end
+  OK      and no longer: at most the deadline + 0.25 s + 0.5 s more than with Atlas healthy
+  OK    Atlas's side: one connection holds the request unread, and the client closed it (CLOSE_WAIT)
+  OK      it is a connection of the pool, open before the pause
+  OK      the server no longer holds it: its socket is gone, or in FIN_WAIT2 with no process
+  Atlas, resumed, served: GET http://atlas:21000/api/atlas/v2/entity/bulk/uniqueAttribute/type/hive_table?attr_0%3AqualifiedName=crm.transactions%40sandbox, status 200
+  OK    Atlas resumed: it no longer holds the connection of the cut read
+  OK      and the server has no socket for it: Atlas's answer finds no reader
+  OK    Atlas back: the context comes again
+```
+
+Here the client is akko-mcp-trino, seen from Atlas. Built from commit `0e0159c`,
+before that fix, an earlier form of the check on the closed connection failed
+with `got closed by the client 0, open with a request unread 1`. Atlas, resumed, still reads and
+answers the request it had received; that answer reaches no one. Its audit log
+shows that answer, which the script prints.
+
+Behind the gateway (`GATEWAY=1`), all 104 checks passed as well, and
+`describe_table` with Atlas paused answered in 3.92 s. The check
+reads the query history on both clusters.
+
+With akko-mcp-trino 0.7.2, `tests/context.sh` fails at startup, because that
+server does not know the `fingerprint-audit` module.
+
+```text
+mcp-1         | ValueError: unknown extension 'fingerprint-audit'; installed extensions: none
+```
+
+Memory at rest without the gateway, measured with `docker stats` right after
+startup: Atlas 1.934 GiB (limit 3 GiB), Trino 812.4 MiB, Keycloak 547.5 MiB, the
+MCP server 90.68 MiB, the Inspector 113.2 MiB, PostgreSQL 36.27 MiB, OPA 11.98 MiB.
+Plan for about 4 GB of free memory. Startup took 318 s, mostly for Atlas.
+
+Behind the gateway, `docker stats` measured at rest: Atlas 1.922 GiB, the two Trino
+clusters 742.8 MiB and 778.3 MiB, Keycloak 495.9 MiB, the gateway 346.5 MiB, the
+MCP server 81.54 MiB. Plan for about 5 GB of free memory.
+
 ## A real agent: how many calls to the right column
 
 [`agent/`](agent/README.md) asks a real model (Mistral or Anthropic, by their
@@ -259,7 +451,10 @@ from any peer on its network: in production, nothing but the gateway should
 reach a cluster. The gateway is started with `java -jar` and the jar's path
 inside its image, which an image bump may move. Its admin password and session
 key are readable by every service that runs as uid 1000 (Keycloak, Trino, the
-gateway), only not by the MCP server. The akko-mcp-trino image and its configuration are the same as in
+gateway), only not by the MCP server. With the `catalogs` profile, Atlas
+runs without TLS. Its users are defined in a file, and HBase and Solr run inside
+the Atlas container.
+The akko-mcp-trino image and its configuration are the same as in
 production; the rest is not.
 
 ## About AKKO

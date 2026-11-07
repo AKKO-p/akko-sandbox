@@ -1,0 +1,64 @@
+# The checks of the context from a data catalog, akko-mcp-trino 0.8 (tests/context.sh).
+# Added to COMPOSE_FILE by the script, after catalogs/compose.atlas.yaml, and before
+# tests/compose.v08.gateway.yaml when GATEWAY=1.
+#
+#   MCP_IMAGE=<image> tests/context.sh
+#   MCP_IMAGE=<image> GATEWAY=1 tests/context.sh
+
+services:
+  # The catalogs of tests/v07/catalog: demo as it is, and tpch, which no Atlas cluster is
+  # mapped to.
+  trino:
+    volumes:
+      - ./tests/v07/catalog:/etc/trino/catalog:ro
+
+  # OPA's decisions go to its log, for the check that names no hidden object; the profile's
+  # rules stay loaded.
+  opa:
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=error", "--set=decision_logs.console=true", "/policy/policy.rego", "/policy/catalogs.rego"]
+
+  mcp:
+    environment:
+      # Atlas first, then a file that gives two tables their grain and their joins, which
+      # Atlas has no notion of. One join of transactions goes through accounts.opened_on,
+      # the column the policy hides from analysts, so that it is seen dropped.
+      MCP_CONTEXT_PROVIDERS: atlas,file
+      MCP_CONTEXT_FILE: /context/context.json
+      # Each call reads Atlas and Trino again, so that a change of policy or of Atlas is
+      # seen at the next call.
+      MCP_CONTEXT_TTL_SECONDS: "0"
+      MCP_VISIBILITY_TTL_SECONDS: "0"
+      # A short deadline for the check of a slow Atlas, and a short wait after an outage.
+      MCP_CONTEXT_TIMEOUT_SECONDS: "3"
+      MCP_CONTEXT_RETRY_AFTER_SECONDS: "5"
+      # A read of Atlas that only the context deadline can end in time, for that check.
+      ATLAS_TIMEOUT_SECONDS: "30"
+      MCP_EXTENSIONS: fingerprint-audit
+    volumes:
+      - ./tests/v08/context.json:/context/context.json:ro
+
+  # Atlas logs each login it refuses (catalogs/atlas/start.sh), for the check that a refused
+  # account gets one attempt.
+  atlas:
+    environment:
+      ATLAS_LOG_REFUSED_LOGINS: "true"
+
+  # The checks' own clients: OPA's policy API, for the variant that makes the canary
+  # visible; and the clusters themselves, from the back network, as the admin, for their
+  # query history. Started by the script.
+  opa-admin:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    image: curlimages/curl:8.23.0
+    profiles: ["tools"]
+    entrypoint: ["sleep", "infinity"]
+    mem_limit: 32m
+  history:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    profiles: ["tools"]
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - certs:/certs:ro
+    mem_limit: 128m
