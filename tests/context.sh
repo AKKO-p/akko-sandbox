@@ -39,17 +39,19 @@ check() { if [ "$2" = "$3" ]; then printf '  OK    %s\n' "$1"; else printf '  FA
 # the allow-all policy, a paused or stopped Atlas, a replaced reader secret.
 allow_all=0 paused=0 stopped=0 secret_kept=0
 cleanup() {
-  [ $allow_all = 1 ] && echo "== end of run: the allow-all policy removed: $(opa DELETE v08-allow-all)"
-  [ $paused = 1 ] && docker compose unpause atlas >/dev/null 2>&1 && echo "== end of run: Atlas resumed"
-  [ $secret_kept = 1 ] && reader_secret 'cp reader.kept reader.secret && rm reader.kept' && echo "== end of run: the reader's secret put back"
-  [ $stopped = 1 ] && [ "${KEEP:-0}" = "1" ] && docker compose start atlas >/dev/null 2>&1 && echo "== end of run: Atlas started again"
+  restored() { if [ "$1" = 0 ]; then echo "== end of run: $2"; else echo "== end of run: FAILED, $3"; fi; }
+  if [ $allow_all = 1 ]; then [ "$(opa DELETE v08-allow-all)" = 200 ]; restored $? "the allow-all policy removed" "the allow-all policy may still be loaded"; fi
+  if [ $paused = 1 ]; then docker compose unpause atlas >/dev/null 2>&1; restored $? "Atlas resumed" "Atlas may still be paused"; fi
+  if [ $secret_kept = 1 ]; then reader_secret 'cp reader.kept reader.secret && rm reader.kept'; restored $? "the reader's secret put back" "the reader's secret is still the wrong one"; fi
+  if [ $stopped = 1 ] && [ "${KEEP:-0}" = "1" ]; then docker compose start atlas >/dev/null 2>&1; restored $? "Atlas started again" "Atlas is still stopped"; fi
   rm -rf "$scratch"
-  if [ "${KEEP:-0}" = "1" ]; then echo "KEEP=1: project $COMPOSE_PROJECT_NAME left running, its policy, Atlas and the reader secret restored"; return; fi
+  if [ "${KEEP:-0}" = "1" ]; then echo "KEEP=1: project $COMPOSE_PROJECT_NAME left running"; return; fi
   docker compose --profile catalogs --profile tools down -v --remove-orphans >/dev/null 2>&1
   echo "== project $COMPOSE_PROJECT_NAME removed: $(docker ps -aq --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | wc -l) containers, $(docker volume ls -q --filter "label=com.docker.compose.project=$COMPOSE_PROJECT_NAME" | wc -l) volumes left"
 }
 trap cleanup EXIT
-trap 'exit 130' INT TERM
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 # An MCP tool call through the Inspector CLI, as $1, printing the tool's JSON.
 call() { # user, tool, then name=value arguments
@@ -113,18 +115,28 @@ except Exception as e: print('error:', type(e).__name__)" "$1"; }
 refused_logins() { docker compose exec -T atlas cat /data/logs/logins.log 2>/dev/null | grep -c 'Failed to process authentication request'; }
 reader_requests() { docker compose exec -T atlas cat /data/logs/audit.log 2>/dev/null | grep -c '|mcp_reader|'; }
 atlas_customers_reads() { docker compose exec -T atlas cat /data/logs/audit.log 2>/dev/null | grep '|mcp_reader|' | grep -c 'crm\.customers'; }
-# The connections to Atlas's port 21000, read from inside its network namespace, which
-# works while Atlas is paused: one JSON object per connection, with the client's address,
-# the TCP state (01 established, 08 closed by the client) and the bytes Atlas has not read.
-atlas_sockets() { # the container id of Atlas
-  docker run --rm --label "com.docker.compose.project=$COMPOSE_PROJECT_NAME" --label com.docker.compose.service=atlas-sockets \
+# The TCP connections of a container, read from inside its network namespace (which works
+# while the container is paused), one JSON object per connection that is not listening: its
+# local and remote ip:port, IPv4 and IPv4-mapped IPv6 alike, the TCP state (01 established,
+# 05 FIN_WAIT2, 08 CLOSE_WAIT), the bytes not read yet, and the inode (0 once no process
+# holds the socket any more).
+sockets() { # container id
+  docker run --rm --label "com.docker.compose.project=$COMPOSE_PROJECT_NAME" --label com.docker.compose.service=sockets \
     --network "container:$1" --entrypoint python "${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}" -c "
-import json
+import ipaddress, json, socket, struct
+def address(field):
+    raw, port = field.split(':')
+    data = bytes.fromhex(raw)
+    data = b''.join(data[i:i + 4][::-1] for i in range(0, len(data), 4))
+    ip = ipaddress.ip_address(data)
+    if ip.version == 6 and ip.ipv4_mapped: ip = ip.ipv4_mapped
+    return '%s:%d' % (ip, int(port, 16))
 for table in ('/proc/net/tcp', '/proc/net/tcp6'):
     for line in open(table).readlines()[1:]:
         f = line.split()
-        if f[1].endswith(':5208') and f[3] != '0A':
-            print(json.dumps({'peer': f[2], 'state': f[3], 'unread': int(f[4].split(':')[1], 16)}))"
+        if f[3] != '0A':
+            print(json.dumps({'local': address(f[1]), 'remote': address(f[2]), 'state': f[3],
+                              'unread': int(f[4].split(':')[1], 16), 'inode': int(f[9])}))"
 }
 # The reader's password file, which the MCP server reads: kept, replaced, put back.
 reader_secret() { # sh command run in /secrets as root, then a value it reads as $W
@@ -215,7 +227,6 @@ dave_audit=$(grep '"tool":"' "$scratch/mcp.log" | tail -n +$((audit_before + 1))
 dave_n=$(wc -l < "$scratch/dave_calls" | tr -d ' ')
 check "his audit lines, one per call, with fingerprint-audit's fields" "$(grep -c '"sql_sha256"' <<<"$dave_audit") $(grep -c '"metadata_served"' <<<"$dave_audit")" "$dave_n $dave_n"
 check "  they name no hidden object" "$(grep -ci 'customers\|balance\|full_name\|email\|segment' <<<"$dave_audit")" "0"
-check "Atlas was asked nothing about crm.customers during his calls (audit.log)" "$(( $(atlas_customers_reads) - customers_read ))" "0"
 check "  metadata_served names what he was served: accounts and transactions" "$(grep -o '"metadata_served":\[[^]]*\]' <<<"$dave_audit" | grep -o 'demo\.crm\.[a-z_]*' | sort -u | tr '\n' ' ')" "demo.crm.accounts demo.crm.transactions "
 history > "$scratch/history"
 check "every cluster's history was read" "$(rows 'sorted({r["cluster"] for r in rows if "error" not in r}), [r for r in rows if "error" in r]' < "$scratch/history")" "($(python3 -c "import sys; print(sorted(sys.argv[1:]))" $clusters), [])"
@@ -248,6 +259,7 @@ check "  each of them Trino's own listing filter (FilterTables), which refused i
 # of the search carry it: they are not in the history checks above.
 out=$(call dave_viewer search_columns text=email catalog=demo)
 check "dave, search_columns email: no match, complete, and nothing about customers" "$(field '(d["matches"], d["complete"])' <<<"$out") $(grep -ci 'customers' <<<"$out")" "([], True) 0"
+check "Atlas was asked nothing about crm.customers during his calls (audit.log)" "$(( $(atlas_customers_reads) - customers_read ))" "0"
 
 echo "== 5. A renamed table, an unmapped catalog, a deleted entity"
 out=$(call carol_analyst describe_table catalog=demo schema=crm_archive table=transactions_2014)
@@ -291,7 +303,7 @@ check "the variant is removed" "$(opa DELETE v08-allow-all)" "200"
 allow_all=0
 check "carol gets the context again" "$(call carol_analyst describe_table catalog=demo schema=crm table=transactions | field 'd["context_sources"]')" "{'atlas': 'ok', 'file': 'ok'}"
 
-echo "== 8. A slow Atlas: the call answers in time, and Atlas's late answer reaches no one"
+echo "== 8. A slow Atlas: the call answers in time, and Atlas's late answer finds no reader"
 # ATLAS_TIMEOUT_SECONDS is 30 s here (tests/compose.v08.yaml): only the context deadline can
 # end the read in time. The call may take that deadline, plus the 0.25 s the chain waits past
 # it and the 0.5 s reply margin of the provider contract (akko-mcp-trino's catalog-context
@@ -301,8 +313,31 @@ seconds() { python3 -c "import time; print(time.time())"; }
 t0=$(seconds); out=$(call carol_analyst describe_table catalog=demo schema=crm table=transactions); t1=$(seconds)
 baseline=$(python3 -c "import sys; print(round(float(sys.argv[2]) - float(sys.argv[1]), 2))" "$t0" "$t1")
 check "carol, describe_table transactions with Atlas healthy: atlas ok" "$(field 'd["context_sources"]["atlas"]' <<<"$out")" "ok"
-atlas_id=$(docker compose ps -q atlas)
-atlas_sockets "$atlas_id" > "$scratch/sockets.before"
+atlas_id=$(docker compose ps -q atlas) mcp_id=$(docker compose ps -q mcp)
+sockets "$atlas_id" > "$scratch/atlas.before"; sockets "$mcp_id" > "$scratch/mcp.before"
+# The witness that the probe finds what is there: the server's pooled connection to Atlas,
+# seen from both ends, the same four ip:port. V08_WITNESS_PORT_SHIFT (0) moves the port the
+# server's side is looked up under, to see this witness fail, and the checks below that rest
+# on it lose their meaning.
+shift_port=${V08_WITNESS_PORT_SHIFT:-0}
+# What the server holds of a connection Atlas sees: the server's sockets whose local ip:port
+# is Atlas's remote one and whose remote ip:port is Atlas's local one, as (state, inode).
+server_side() { # file of the server's sockets, file of Atlas's sockets, filter on Atlas's side
+  python3 -c "
+import json, sys
+rows = lambda path: [json.loads(l) for l in open(path) if l.strip()]
+shift = int(sys.argv[4])
+def moved(addr):
+    host, port = addr.rsplit(':', 1)
+    return '%s:%d' % (host, int(port) + shift)
+for a in rows(sys.argv[2]):
+    if a['local'].endswith(':21000') and not a['remote'].startswith('127.') and eval(sys.argv[3], {}, {'r': a}):
+        print([(s['state'], s['inode']) for s in rows(sys.argv[1]) if s['local'] == moved(a['remote']) and s['remote'] == a['local']])" "$1" "$2" "$3" "$shift_port"
+}
+check "the probe sees the server's pooled connection to Atlas from both ends, held by the server" "$(server_side "$scratch/mcp.before" "$scratch/atlas.before" 'r["state"] == "01"' | python3 -c "
+import ast, sys
+found = [ast.literal_eval(l) for l in sys.stdin if l.strip()]
+print(bool(found) and all(len(f) == 1 and f[0][0] == '01' and f[0][1] > 0 for f in found))")" "True"
 served_before=$(reader_requests)
 paused=1; docker compose pause atlas >/dev/null 2>&1
 t0=$(seconds); out=$(call carol_analyst describe_table catalog=demo schema=crm table=transactions); t1=$(seconds)
@@ -314,37 +349,45 @@ check "  the columns and the file's grain still come" "$(field '(len(d["rows"]),
 # A call that did not wait for Atlas would take about the healthy time; this one takes the
 # deadline at least. (The frozen call skips the reads and proofs that follow a healthy read,
 # so its time past the healthy one can be a little less than the deadline.)
-check "  it waited for Atlas until the deadline: $deadline s at least" "$(python3 -c "import sys; print(float(sys.argv[1]) >= float(sys.argv[2]))" "$elapsed" "$deadline")" "True"
+check "  the call took at least the deadline, $deadline s, end to end" "$(python3 -c "import sys; print(float(sys.argv[1]) >= float(sys.argv[2]))" "$elapsed" "$deadline")" "True"
 check "  and no longer: at most the deadline + 0.25 s + 0.5 s more than with Atlas healthy" "$(python3 -c "import sys; e, b, d = map(float, sys.argv[1:]); print(e - b <= d + 0.25 + 0.5)" "$elapsed" "$baseline" "$deadline")" "True"
-atlas_sockets "$atlas_id" > "$scratch/sockets.during"
+sockets "$atlas_id" > "$scratch/atlas.during"
 # The connection that holds the request is the one with bytes Atlas has not read.
-check "Atlas's side: one connection holds the request unread, and the client closed it (CLOSE_WAIT)" "$(rows '[r["state"] for r in rows if r["unread"] > 0]' < "$scratch/sockets.during")" "['08']"
+check "Atlas's side: one connection holds the request unread, and the client closed it (CLOSE_WAIT)" "$(rows '[r["state"] for r in rows if r["local"].endswith(":21000") and r["unread"] > 0]' < "$scratch/atlas.during")" "['08']"
 check "  it is a connection of the pool, open before the pause" "$(python3 -c "
 import json, sys
-before = {json.loads(l)['peer'] for l in open(sys.argv[1]) if l.strip()}
-held = [json.loads(l)['peer'] for l in open(sys.argv[2]) if l.strip() and json.loads(l)['unread'] > 0]
-print(len(held) == 1 and held[0] in before)" "$scratch/sockets.before" "$scratch/sockets.during")" "True"
+rows = lambda path: [json.loads(l) for l in open(path) if l.strip()]
+before = {(r['local'], r['remote']) for r in rows(sys.argv[1]) if r['state'] == '01'}
+held = [(r['local'], r['remote']) for r in rows(sys.argv[2]) if r['unread'] > 0]
+print(len(held) == 1 and held[0] in before)" "$scratch/atlas.before" "$scratch/atlas.during")" "True"
+# The same connection, from the server's side, while Atlas is still frozen: the server has
+# let go of it. Its socket is gone, or in FIN_WAIT2 with no process holding it (inode 0), so
+# the kernel answers anything Atlas sends later with a reset.
+sockets "$mcp_id" > "$scratch/mcp.during"
+check "  the server no longer holds it: its socket is gone, or in FIN_WAIT2 with no process" "$(server_side "$scratch/mcp.during" "$scratch/atlas.during" 'r["unread"] > 0' | python3 -c "
+import ast, sys
+found = [ast.literal_eval(l) for l in sys.stdin if l.strip()]
+print('no connection held the request' if len(found) != 1 else all(s == '05' and inode == 0 for s, inode in found[0]))")" "True"
 # HTTP cannot withdraw a request already sent: the data catalog may still read and answer it,
 # and that answer reaches no one. Once Atlas is resumed, what it served is printed, as its
-# audit log says, and the checks are that its answer reaches no one: Atlas no longer holds
-# that connection, the server holds nothing of it open, and no reply reaches a caller.
+# audit log says. Its answer finds no reader: Atlas no longer holds that connection, and the
+# server has no socket left for it.
 held=$(python3 -c "
 import json, sys
-print(''.join(json.loads(l)['peer'] for l in open(sys.argv[1]) if l.strip() and json.loads(l)['unread'] > 0))" "$scratch/sockets.during")
-read_logs; replies_before=$(grep -c '"tool":"' "$scratch/mcp.log")
+held = [r['local'] + '|' + r['remote'] for r in map(json.loads, filter(str.strip, open(sys.argv[1]))) if r['local'].endswith(':21000') and r['unread'] > 0]
+print(held[0] if len(held) == 1 else '')" "$scratch/atlas.during")
 docker compose unpause atlas >/dev/null 2>&1; paused=0
 sleep 5
 docker compose exec -T atlas cat /data/logs/audit.log 2>/dev/null | grep '|mcp_reader|' | tail -n +$((served_before + 1)) \
   | awk -F'|' '{print "  Atlas, resumed, served: " $4 " " $5 ", status " $6}'
-atlas_sockets "$atlas_id" > "$scratch/sockets.after"
-check "Atlas resumed: it no longer holds the connection of the cut read" "$([ -n "$held" ] && HELD="$held" rows '[r["state"] for r in rows if r["peer"] == __import__("os").environ["HELD"]]' < "$scratch/sockets.after" || echo "no connection held the request")" "[]"
-# The same connection, from the server's side: its address and port are the peer Atlas saw.
-check "  the server holds nothing of it open" "$(docker compose exec -T mcp python -c "
-import sys
-n = sum(1 for t in ('/proc/net/tcp', '/proc/net/tcp6') for l in open(t).readlines()[1:] if l.split()[1] == sys.argv[1])
-print(n)" "$held" | tr -d '\r')" "0"
-read_logs
-check "  and no reply reached a caller meanwhile: no tool call answered since the resume" "$(( $(grep -c '"tool":"' "$scratch/mcp.log") - replies_before ))" "0"
+sockets "$atlas_id" > "$scratch/atlas.after"; sockets "$mcp_id" > "$scratch/mcp.after"
+check "Atlas resumed: it no longer holds the connection of the cut read" "$([ -n "$held" ] && HELD="$held" rows '[r["state"] for r in rows if r["local"] + "|" + r["remote"] == __import__("os").environ["HELD"]]' < "$scratch/atlas.after" || echo "no single connection held the request")" "[]"
+check "  and the server has no socket for it: Atlas's answer finds no reader" "$([ -n "$held" ] && python3 -c "
+import json, sys
+local, remote = sys.argv[2].split('|')
+host, port = remote.rsplit(':', 1)
+mine = '%s:%d' % (host, int(port) + int(sys.argv[3]))
+print([r['state'] for r in map(json.loads, filter(str.strip, open(sys.argv[1]))) if r['local'] == mine and r['remote'] == local])" "$scratch/mcp.after" "$held" "$shift_port" || echo "no single connection held the request")" "[]"
 n=0; until [ "$(call carol_analyst describe_table catalog=demo schema=crm table=accounts | field 'd["context_sources"]["atlas"]')" = ok ] || [ $n -ge 12 ]; do n=$((n + 1)); sleep 5; done
 check "Atlas back: the context comes again" "$(call carol_analyst describe_table catalog=demo schema=crm table=accounts | field 'd["context_sources"]')" "{'atlas': 'ok', 'file': 'ok'}"
 
