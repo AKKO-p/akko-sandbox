@@ -337,7 +337,7 @@ seconds; and no cache, so that each call reads Atlas and Trino again. It checks:
 Tested with Apache Atlas 2.4.0 built by
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
 `quay.io/keycloak/keycloak:26.7.5`, `openpolicyagent/opa:1.21.1-static`, and
-akko-mcp-trino built from commit `588e91a`, which closes a context read cut at
+akko-mcp-trino built from commit `4bd78f2`, which closes a context read cut at
 its deadline (it reports the version 0.7.2). The run without the gateway ended
 with all 93 checks passed. Its section on a slow Atlas:
 

@@ -343,7 +343,7 @@ vérifie que :
 Testé avec Apache Atlas 2.4.0 construit par
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
 `quay.io/keycloak/keycloak:26.7.5`, `openpolicyagent/opa:1.21.1-static`, et
-akko-mcp-trino construit depuis le commit `588e91a`, qui ferme une lecture du
+akko-mcp-trino construit depuis le commit `4bd78f2`, qui ferme une lecture du
 contexte coupée à son délai (il annonce la version 0.7.2). Le passage sans gateway
 s'est terminé avec les 93 contrôles réussis. Sa section sur un Atlas lent :
 
