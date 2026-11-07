@@ -39,10 +39,10 @@ check() { if [ "$2" = "$3" ]; then printf '  OK    %s\n' "$1"; else printf '  FA
 # the allow-all policy, a paused or stopped Atlas, a replaced reader secret.
 allow_all=0 paused=0 stopped=0 secret_kept=0
 cleanup() {
-  [ $allow_all = 1 ] && opa DELETE v08-allow-all >/dev/null 2>&1
-  [ $paused = 1 ] && docker compose unpause atlas >/dev/null 2>&1
-  [ $secret_kept = 1 ] && reader_secret 'cp reader.kept reader.secret && rm reader.kept'
-  [ $stopped = 1 ] && [ "${KEEP:-0}" = "1" ] && docker compose start atlas >/dev/null 2>&1
+  [ $allow_all = 1 ] && echo "== end of run: the allow-all policy removed: $(opa DELETE v08-allow-all)"
+  [ $paused = 1 ] && docker compose unpause atlas >/dev/null 2>&1 && echo "== end of run: Atlas resumed"
+  [ $secret_kept = 1 ] && reader_secret 'cp reader.kept reader.secret && rm reader.kept' && echo "== end of run: the reader's secret put back"
+  [ $stopped = 1 ] && [ "${KEEP:-0}" = "1" ] && docker compose start atlas >/dev/null 2>&1 && echo "== end of run: Atlas started again"
   rm -rf "$scratch"
   if [ "${KEEP:-0}" = "1" ]; then echo "KEEP=1: project $COMPOSE_PROJECT_NAME left running, its policy, Atlas and the reader secret restored"; return; fi
   docker compose --profile catalogs --profile tools down -v --remove-orphans >/dev/null 2>&1
