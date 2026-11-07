@@ -331,7 +331,8 @@ vérifie que :
 - une policy qui rend le témoin visible donne `not_checked` et un seul
   avertissement, qui ne nomme personne et rien ;
 - Atlas arrêté donne `unavailable`, et l'appel répond quand même. Atlas figé
-  au-delà du délai donne `unavailable` dans le budget de l'appel ;
+  au-delà du délai donne `unavailable` dans le budget de l'appel, et Atlas voit la
+  connexion de la requête fermée avant d'avoir lu la requête ;
 - un compte refusé coûte une connexion à Atlas, puis aucune tant que son fichier de
   secret ne change pas, et le serveur journalise `atlas refused the account` une
   fois. Atlas ne journalise pas les connexions qu'il refuse : avec
@@ -342,9 +343,9 @@ vérifie que :
 Testé avec Apache Atlas 2.4.0 construit par
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
 `quay.io/keycloak/keycloak:26.7.5`, `openpolicyagent/opa:1.21.1-static`, et
-akko-mcp-trino construit depuis sa branche `main` au commit `0e0159c` (il annonce
-la version 0.7.2). Le passage sans gateway s'est terminé avec 92 contrôles réussis et un
-en échec :
+akko-mcp-trino construit depuis le commit `588e91a`, qui ferme une lecture du
+contexte coupée à son délai (il annonce la version 0.7.2). Le passage sans gateway
+s'est terminé avec les 93 contrôles réussis. Sa section sur un Atlas lent :
 
 ```text
 == 8. A slow Atlas: the call answers in time, the request is cancelled
@@ -352,16 +353,17 @@ en échec :
   OK    carol, describe_table transactions with Atlas frozen: atlas unavailable, file ok
   OK      the columns and the file's grain still come
   OK      within the deadline and the token round trips: under 8 s
-  FAIL  Atlas's side: the request's connection, closed by the client before Atlas read it (got closed by the client 0, open with a request unread 1, expected closed by the client 1, open with a request unread 0)
+  OK    Atlas's side: the request's connection, closed by the client before Atlas read it
   OK    Atlas back: the context comes again
 ```
 
-L'appel répond à temps, mais le serveur laisse ouverte la connexion de la requête :
-Atlas garde la requête qu'il n'a pas lue. Ce contrôle reste rouge tant que le
-serveur ne la ferme pas.
+L'appel répond à temps, et le côté d'Atlas montre la connexion de la requête
+fermée par le serveur avant qu'Atlas ne lise la requête. Construit depuis le commit
+`0e0159c`, avant ce correctif, le même contrôle échouait : `got closed by the
+client 0, open with a request unread 1`.
 
-Derrière le gateway (`GATEWAY=1`), le passage s'est terminé de la même façon : 92
-contrôles réussis, et le même en échec. L'historique des requêtes est lu sur
+Derrière le gateway (`GATEWAY=1`), le passage s'est terminé de la même façon : les
+93 contrôles réussis (describe_table avec Atlas figé a répondu en 4,0 s). L'historique des requêtes est lu sur
 chacun des deux clusters.
 
 Avec akko-mcp-trino 0.7.2, `tests/context.sh` s'arrête au démarrage : ce serveur

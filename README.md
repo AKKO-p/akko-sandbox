@@ -326,7 +326,8 @@ seconds; and no cache, so that each call reads Atlas and Trino again. It checks:
 - a policy that makes the canary visible gives `not_checked` and one warning that
   names no one and nothing;
 - Atlas stopped gives `unavailable`, and the call still answers. Atlas frozen past
-  the deadline gives `unavailable` within the call's budget;
+  the deadline gives `unavailable` within the call's budget, and Atlas sees the
+  request's connection closed before it read the request;
 - a refused account costs one login at Atlas, then none until its secret file
   changes, and the server logs `atlas refused the account` once. Atlas does not log
   the logins it refuses: with `ATLAS_LOG_REFUSED_LOGINS=true`, which only
@@ -336,8 +337,9 @@ seconds; and no cache, so that each call reads Atlas and Trino again. It checks:
 Tested with Apache Atlas 2.4.0 built by
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
 `quay.io/keycloak/keycloak:26.7.5`, `openpolicyagent/opa:1.21.1-static`, and
-akko-mcp-trino built from its `main` branch at commit `0e0159c` (it reports the
-version 0.7.2). The run without the gateway ended with 92 checks passed and one failed:
+akko-mcp-trino built from commit `588e91a`, which closes a context read cut at
+its deadline (it reports the version 0.7.2). The run without the gateway ended
+with all 93 checks passed. Its section on a slow Atlas:
 
 ```text
 == 8. A slow Atlas: the call answers in time, the request is cancelled
@@ -345,16 +347,17 @@ version 0.7.2). The run without the gateway ended with 92 checks passed and one 
   OK    carol, describe_table transactions with Atlas frozen: atlas unavailable, file ok
   OK      the columns and the file's grain still come
   OK      within the deadline and the token round trips: under 8 s
-  FAIL  Atlas's side: the request's connection, closed by the client before Atlas read it (got closed by the client 0, open with a request unread 1, expected closed by the client 1, open with a request unread 0)
+  OK    Atlas's side: the request's connection, closed by the client before Atlas read it
   OK    Atlas back: the context comes again
 ```
 
-The call answers in time, but the server leaves the request's connection open:
-Atlas still holds the request it has not read. This check stays red until the
-server closes it.
+The call answers in time, and Atlas's side shows the request's connection closed
+by the server before Atlas read the request. Built from commit `0e0159c`, before
+that fix, the same check failed: `got closed by the client 0, open with a request
+unread 1`.
 
-Behind the gateway (`GATEWAY=1`), the run ended the same way: 92 checks passed,
-and the same one failed. The query history is read on each of the two clusters.
+Behind the gateway (`GATEWAY=1`), the run ended the same way: all 93 checks
+passed (describe_table with Atlas frozen answered in 4.0 s). The query history is read on each of the two clusters.
 
 With akko-mcp-trino 0.7.2, `tests/context.sh` stops at the start: that server
 does not know the module `fingerprint-audit`.
