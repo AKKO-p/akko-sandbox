@@ -79,28 +79,6 @@ forbidden if {
 	not user in impersonators
 }
 
-# 2d. Analysts may not see when an account was opened: the column is left out of
-#     every listing and refused in a query, as in rule 2a.
-forbidden if {
-	role == "analyst"
-	input.action.operation in {"FilterColumns", "SelectFromColumns"}
-	t := input.action.resource.table
-	t.catalogName == "demo"
-	t.schemaName == "crm"
-	t.tableName == "accounts"
-	"opened_on" in t.columns
-}
-
-# 2e. Nobody may see the canary, admins included: akko-mcp-trino serves a data
-#     catalog's context to a caller only while Trino hides this table from them
-#     (catalogs/canary.sql creates it, with the catalogs profile only).
-forbidden if {
-	t := input.action.resource.table
-	t.catalogName == "demo"
-	t.schemaName == "mcp"
-	t.tableName == "canary"
-}
-
 # 3. Everyone but an admin sees e-mail addresses masked: ***@example.com
 columnMask := {"expression": "'***' || substr(email, strpos(email, '@'))"} if {
 	role != "admin"
@@ -111,15 +89,6 @@ columnMask := {"expression": "'***' || substr(email, strpos(email, '@'))"} if {
 rowFilters contains {"expression": "country IN ('DE', 'ES', 'FR', 'IT', 'NL')"} if {
 	role == "analyst"
 	is_customers(input.action.resource.table)
-}
-
-# 4b. Analysts do not see salary payments among the transactions.
-rowFilters contains {"expression": "category <> 'salary'"} if {
-	role == "analyst"
-	t := input.action.resource.table
-	t.catalogName == "demo"
-	t.schemaName == "crm"
-	t.tableName == "transactions"
 }
 
 # 5. Batch. Trino filters a listing (catalogs, schemas, tables, columns) with

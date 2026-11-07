@@ -10,7 +10,8 @@
 # Atlas runs its own embedded Kafka for its notifications. Everything runs as uid 1000.
 # For a laptop demo only: no TLS, file-based users, state lost with the container.
 
-FROM maven:3.9.9-eclipse-temurin-8 AS build
+# Base images pinned by the digest of their multi-platform index.
+FROM maven:3.9.9-eclipse-temurin-8@sha256:e20e4fc05fb5480c884a1f750c362ed0e91aca15cec5736e12796713710ec9b3 AS build
 ARG ATLAS_VERSION=2.4.0
 ARG ATLAS_SHA512=870bc43d17e7744fb74a71bd3bf0ae4d5243ba741ef26a33c9beb365c46ed95ac366e0f7738368ef0d8cb0f9b5c7a7de3eb2c2666f4c4d0a91c0c0ee58b67c81
 WORKDIR /build
@@ -32,7 +33,7 @@ RUN --mount=type=cache,target=/root/.m2 \
  && tar xzf "distro/target/apache-atlas-${ATLAS_VERSION}-server.tar.gz" -C /dist \
  && mv "/dist/apache-atlas-${ATLAS_VERSION}" /dist/atlas
 
-FROM eclipse-temurin:8u462-b08-jdk-jammy
+FROM eclipse-temurin:8u462-b08-jdk-jammy@sha256:5609f981ccb84b19af42dfc0e68b7adccc07d2854e7c820ec89227f3dc04d4ce
 ARG HBASE_VERSION=2.5.0
 ARG HBASE_SHA512=1e0ebf9a457a8ed59a0e1ea06eaa6019f63575c317588175f18ee2506cf0e527516952cb026db84d4af890be35f74c29f8e87c41e0dcf99393c09bd48668e16f
 ARG SOLR_VERSION=8.11.3

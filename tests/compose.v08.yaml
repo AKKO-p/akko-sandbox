@@ -12,9 +12,10 @@ services:
     volumes:
       - ./tests/v07/catalog:/etc/trino/catalog:ro
 
-  # OPA's decisions go to its log, for the check that names no hidden object.
+  # OPA's decisions go to its log, for the check that names no hidden object; the profile's
+  # rules stay loaded.
   opa:
-    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=error", "--set=decision_logs.console=true", "/policy/policy.rego"]
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=error", "--set=decision_logs.console=true", "/policy/policy.rego", "/policy/catalogs.rego"]
 
   mcp:
     environment:
@@ -30,6 +31,8 @@ services:
       # A short deadline for the check of a slow Atlas, and a short wait after an outage.
       MCP_CONTEXT_TIMEOUT_SECONDS: "3"
       MCP_CONTEXT_RETRY_AFTER_SECONDS: "5"
+      # A read of Atlas that only the context deadline can end in time, for that check.
+      ATLAS_TIMEOUT_SECONDS: "30"
       MCP_EXTENSIONS: fingerprint-audit
     volumes:
       - ./tests/v08/context.json:/context/context.json:ro

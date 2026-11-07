@@ -80,11 +80,18 @@ services:
       atlas: {condition: service_healthy}
     mem_limit: 64m
 
-  # The canary: one table no caller may see (opa/policy.rego, rule 2d). The server serves
+  # The canary: one table no caller may see (catalogs/policy.rego). The server serves
   # context to a caller only while Trino hides it from them.
   postgres:
     volumes:
       - ./catalogs/canary.sql:/docker-entrypoint-initdb.d/zz-canary.sql:ro
+
+  # The profile's own rules (catalogs/policy.rego), next to the sandbox's policy: the canary,
+  # a column hidden from analysts and a row filter on their transactions.
+  opa:
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=error", "/policy/policy.rego", "/policy/catalogs.rego"]
+    volumes:
+      - ./catalogs/policy.rego:/policy/catalogs.rego:ro
 
   # The Atlas provider, read with mcp_reader. Trino's catalog demo is Atlas's cluster sandbox;
   # no other catalog is mapped. Only the glossary Sales is served; any other glossary, every

@@ -18,8 +18,10 @@ maps to in catalogs/compose.atlas.yaml:
   among its columns, with that status;
 - the table tiny.nation under the cluster tpch, which no Trino catalog maps to.
 
-Nothing is written when Atlas already holds the glossary Sales. Only the standard library is
-used, so any Python 3 runs it. The admin password is read from ATLAS_ADMIN_PASSWORD_FILE and
+The last write marks the glossary Sales as complete (its longDescription). Nothing is written
+when Atlas holds a complete catalog; a catalog left half written by a seed that stopped is
+an error, which a new Atlas container clears. Only the standard library is used, so any
+Python 3 runs it. The admin password is read from ATLAS_ADMIN_PASSWORD_FILE and
 never printed.
 """
 
@@ -47,13 +49,13 @@ TABLES = {
         {
             "id": ("integer", "Identifier of the customer"),
             "full_name": ("varchar", "Name of the person or of the company"),
-            "email": ("varchar", "Address the bank writes to"),
+            "email": ("varchar", "Address the company writes to"),
             "country": ("char(2)", "Country of residence, ISO 3166 code"),
             "segment": ("varchar", "Whether the customer is a person or a company"),
         },
     ),
     "crm.accounts": (
-        "Accounts held at the bank: one row per account, in one currency",
+        "Accounts the customers hold: one row per account, in one currency",
         {
             "id": ("integer", "Identifier of the account"),
             "customer_id": ("integer", "The customer who holds the account"),
@@ -87,7 +89,7 @@ TERMS = {
                 "approved", ["crm.accounts"]),
     "Revenue": ("Sales", "Money that comes in from a sale", "approved",
                 ["crm.transactions.amount"]),
-    "Turnover": ("Sales", "The revenue of a period, added up", "draft", ["crm.transactions"]),
+    "Turnover": ("Sales", "Total revenue over a period", "draft", ["crm.transactions"]),
     "Opening date": ("Sales", "The day an account starts", "approved",
                      ["crm.accounts.opened_on"]),
     "Personal data": ("Compliance", "Anything that identifies a person", "approved",
@@ -142,10 +144,17 @@ def entity_type(name):
     return "hive_column" if name.count(".") == 2 else "hive_table"
 
 
+SEEDED = "Written by catalogs/seed.py, complete."
+
+
 def main():
-    if any(g.get("name") == "Sales" for g in call("GET", "/api/atlas/v2/glossary") or []):
+    sales = [g for g in call("GET", "/api/atlas/v2/glossary") or [] if g.get("name") == "Sales"]
+    if sales and sales[0].get("longDescription") == SEEDED:
         print("atlas already holds the demo catalog")
         return
+    if sales:
+        sys.exit("atlas holds a demo catalog a former seed left half written: "
+                 "remove the atlas container and start again")
     create([{"typeName": "hive_db",
              "attributes": {"qualifiedName": qualified(db), "name": db, "clusterName": CLUSTER,
                             "userDescription": text}} for db, text in DATABASES.items()])
@@ -197,6 +206,10 @@ def main():
              "attributes": {"qualifiedName": qualified("tiny.nation", UNMAPPED),
                             "name": "nation", "userDescription": "Nations of the benchmark"},
              "relationshipAttributes": {"db": ref("hive_db", "tiny", UNMAPPED)}}])
+    # Last: the mark of a complete catalog.
+    glossary = call("GET", f"/api/atlas/v2/glossary/{glossaries['Sales']}")
+    glossary["longDescription"] = SEEDED
+    call("PUT", f"/api/atlas/v2/glossary/{glossaries['Sales']}", glossary)
     print(f"atlas seeded: {len(TABLES) + 1} tables, {len(TERMS)} terms in "
           f"{len(GLOSSARIES)} glossaries")
 

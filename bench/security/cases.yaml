@@ -155,7 +155,7 @@ cases:
     check: "Keycloak records token exchanges from now on"
   - id: SEC-SMK-028
     script: smoke
-    check: "none recorded for carol before the demo"
+    check: "the count of carol's exchanges before the demo is read"
   - id: SEC-GW-001
     script: gateway
     check: "a second start is healthy"

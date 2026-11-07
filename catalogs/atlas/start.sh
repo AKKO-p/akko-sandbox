@@ -60,8 +60,9 @@ sed -i -e 's#^atlas.graph.storage.hostname=.*#atlas.graph.storage.hostname=local
 # Atlas writes each request it served to audit.log, after the login. With
 # ATLAS_LOG_REFUSED_LOGINS=true, Spring Security's Basic login filter also writes each login
 # it refused to logins.log, by the exception's message, never a password. Spring logs through
-# the Log4j 2 API, which Atlas ships unconfigured: this configuration names that one logger,
-# and keeps Log4j 2's default for the rest (errors on the console).
+# the Log4j 2 API, which Atlas ships unconfigured (log4j-core 2.17.2 in Atlas 2.4.0's web
+# application): this configuration names that one logger, and keeps Log4j 2's default for the
+# rest (errors on the console). atlas_start.py adds ATLAS_SERVER_OPTS to its own options.
 if [ "${ATLAS_LOG_REFUSED_LOGINS:-false}" = true ]; then
   cat > /data/log4j2-logins.xml <<'XML'
 <Configuration status="warn">
