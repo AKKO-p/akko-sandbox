@@ -55,7 +55,7 @@ TABLES = {
         },
     ),
     "crm.accounts": (
-        "Accounts the customers hold: one row per account, in one currency",
+        "Accounts: one row per account, in one currency, held by one customer",
         {
             "id": ("integer", "Identifier of the account"),
             "customer_id": ("integer", "The customer who holds the account"),

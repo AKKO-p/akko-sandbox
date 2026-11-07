@@ -52,7 +52,7 @@ Demo accounts, with a demo password. Never reuse them anywhere.
 | User | Password | Sees |
 |---|---|---|
 | `alice_admin` | `demo` | every row, every column in clear |
-| `carol_analyst` | `demo` | European customers only, e-mail addresses masked; no salary payments among the transactions, no account opening date |
+| `carol_analyst` | `demo` | European customers only, e-mail addresses masked |
 | `dave_viewer` | `demo` | everything except the customers table and the accounts' `balance` column |
 
 The Keycloak console is at <http://localhost:8080> (`admin` / `admin`).
@@ -109,7 +109,7 @@ flowchart LR
 - It exchanges the token at Keycloak, over https, for a token whose audience is `trino` (OAuth 2.0 Token Exchange, RFC 8693), with its own client `akko-mcp`. The user's token is never passed on.
 - It sends that token to Trino over https only, checking Trino's certificate against the sandbox CA.
 - Trino verifies the token and runs the query as its `preferred_username`.
-- Trino asks OPA before every action. The whole policy is [one short Rego file](opa/policy.rego): who may read what, two hidden columns, a hidden catalog, a canary table hidden from everyone, the e-mail mask, two row filters, and nobody acting under another user's name.
+- Trino asks OPA before every action. The whole policy is [one short Rego file](opa/policy.rego): who may read what, a hidden column, a hidden catalog, the e-mail mask, the row filter, and nobody acting under another user's name.
 
 To change what a user sees, edit `opa/policy.rego` and run
 `docker compose restart opa`. The MCP server needs no change.
@@ -135,8 +135,8 @@ tests/smoke.sh
 
 It starts the sandbox under its own project name, plays the demo, checks the
 two different answers, `current_user`, every refusal (the server's door and
-Trino's own), the token exchange (from Keycloak's own events), the audit line and the Inspector, prints the
-start time and the memory, and removes everything. `KEEP=1` leaves it running.
+Trino's own), the token exchange (in Keycloak's own event log), the audit line
+and the Inspector, prints the start time and the memory, and removes everything. `KEEP=1` leaves it running.
 `MCP_IMAGE` runs another build of the server, such as a release candidate.
 
 ## Behind Trino Gateway
@@ -170,7 +170,7 @@ answers through the gateway, that the server can neither reach a cluster
 directly nor use the gateway's admin API, that the gateway refuses forwarded
 headers sent by a client, that queries spread over both clusters and that each
 cluster runs them as the user who asked, that a capped result goes through the
-gateway, that a query past its time budget is cancelled in Trino through the
+gateway, that a query past its time budget is canceled in Trino through the
 gateway, and that the refusals stay the same. It uses the sandbox's host ports
 (8080, 3000, 6274); to run it next to a running sandbox, set the ports as in the
 script's header. The CI runs it after `tests/smoke.sh`.
@@ -408,8 +408,9 @@ from any peer on its network: in production, nothing but the gateway should
 reach a cluster. The gateway is started with `java -jar` and the jar's path
 inside its image, which an image bump may move. Its admin password and session
 key are readable by every service that runs as uid 1000 (Keycloak, Trino, the
-gateway), only not by the MCP server. With the profile `catalogs`, Atlas
-runs without TLS, with users in a file, and HBase and Solr in its own container.
+gateway), only not by the MCP server. With the `catalogs` profile, Atlas
+runs without TLS. Its users are defined in a file, and HBase and Solr run inside
+the Atlas container.
 The akko-mcp-trino image and its configuration are the same as in
 production; the rest is not.
 

@@ -55,7 +55,7 @@ réutilisez jamais ailleurs.
 | Utilisateur | Mot de passe | Voit |
 |---|---|---|
 | `alice_admin` | `demo` | toutes les lignes, toutes les colonnes en clair |
-| `carol_analyst` | `demo` | les clients européens seulement, adresses e-mail masquées ; aucun versement de salaire parmi les transactions, aucune date d'ouverture de compte |
+| `carol_analyst` | `demo` | les clients européens seulement, adresses e-mail masquées |
 | `dave_viewer` | `demo` | tout sauf la table des clients et la colonne `balance` des comptes |
 
 La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
@@ -112,7 +112,7 @@ flowchart LR
 - Il échange le token auprès de Keycloak, en https, contre un token dont l'audience est `trino` (OAuth 2.0 Token Exchange, RFC 8693), avec son propre client `akko-mcp`. Le token de l'utilisateur n'est jamais transmis.
 - Il envoie ce token à Trino, en https uniquement, en vérifiant le certificat de Trino avec l'autorité du sandbox.
 - Trino vérifie le token et exécute la requête au nom de son `preferred_username`.
-- Trino interroge OPA avant chaque action. Toute la policy tient dans [un court fichier Rego](opa/policy.rego) : qui peut lire quoi, deux colonnes cachées, un catalogue caché, une table témoin cachée à tous, le masque des e-mails, deux row filters, et personne n'agit sous le nom d'un autre utilisateur.
+- Trino interroge OPA avant chaque action. Toute la policy tient dans [un court fichier Rego](opa/policy.rego) : qui peut lire quoi, une colonne cachée, un catalog caché, le masque des e-mails, le row filter, et personne n'agit sous le nom d'un autre utilisateur.
 
 Pour changer ce que voit un utilisateur, modifiez `opa/policy.rego` puis lancez
 `docker compose restart opa`. Le serveur MCP ne change pas.
@@ -138,8 +138,9 @@ tests/smoke.sh
 
 Le test démarre le sandbox sous son propre nom de projet, joue la démo,
 vérifie les deux réponses différentes, `current_user`, chaque refus (à la porte
-du serveur et chez Trino), le token exchange (lu dans les événements de Keycloak), la ligne d'audit et l'Inspector,
-affiche le temps de démarrage et la mémoire, puis supprime tout. `KEEP=1` le
+du serveur et chez Trino), le token exchange (lu dans les propres événements de
+Keycloak), la ligne d'audit et l'Inspector, affiche le temps de démarrage et la
+mémoire, puis supprime tout. `KEEP=1` le
 laisse tourner. `MCP_IMAGE` lance une autre version du serveur, par exemple une
 release candidate.
 
@@ -190,16 +191,16 @@ GATEWAY=1 tests/v07.sh   # les mêmes contrôles derrière Trino Gateway
 `tests/v07.sh` vérifie les outils qu'akko-mcp-trino 0.7 ajoute ou change, sur le
 sandbox complété par [`tests/compose.v07.yaml`](tests/compose.v07.yaml) (des
 pages de cinq noms, des pages de `describe_schema` de quatre tables et dix
-colonnes au plus, et deux catalogues de plus pris dans
+colonnes au plus, et deux catalogs de plus pris dans
 [`tests/v07/catalog`](tests/v07/catalog), `tpch` et `tpcds`, générés par Trino,
 le second caché aux viewers par la policy ; avec `GATEWAY=1`,
 [`tests/compose.v07.gateway.yaml`](tests/compose.v07.gateway.yaml) les donne
 aussi au second cluster) : `search_columns` trouve `transactions.amount` par le mot
 `revenue` de son commentaire ; `dave_viewer` n'obtient rien de `crm.customers`,
-de la colonne `balance` des comptes ni du catalogue `tpcds`, par aucun outil,
+de la colonne `balance` des comptes ni du catalog `tpcds`, par aucun outil,
 messages d'erreur compris, tant qu'il ne les nomme pas lui-même (voir plus bas),
 alors que carol ou alice obtiennent chacun d'eux ; sa recherche dans tous les
-catalogues fouille chaque schéma de `demo` et de `tpch` ; Trino lui-même retire
+catalogs fouille chaque schéma de `demo` et de `tpch` ; Trino lui-même retire
 la colonne de `information_schema.columns`, de `system.jdbc.columns`, de
 `SHOW COLUMNS`, de `DESCRIBE` et de `SELECT *` pour lui ; `list_tables` et
 `describe_schema` parcourent `crm_archive` page par page, chaque table une fois
@@ -225,8 +226,8 @@ cachée. Sans ce réglage, `SELECT *` est refusé, et en Trino 482 ce refus list
 toutes les colonnes de la table, la colonne cachée comprise : c'est le message de
 Trino, que le serveur transmet entier. Une requête qui nomme la colonne reste
 refusée ; les contrôles lisent le code d'erreur, pas le texte. De même, un
-catalogue qu'il nomme reçoit le refus de Trino (`Cannot access catalog tpcds`,
-kind `permission`) là où un catalogue absent reçoit `not found` (kind
+catalog qu'il nomme reçoit le refus de Trino (`Cannot access catalog tpcds`,
+kind `permission`) là où un catalog absent reçoit `not found` (kind
 `catalog`) : Trino distingue les deux.
 
 ## Le contexte d'un catalogue de données : Apache Atlas
@@ -419,8 +420,8 @@ le chemin du jar dans son image, qu'une montée de version peut déplacer. Son m
 de passe d'administration et sa clé de session sont lisibles par tous les
 services qui tournent en uid 1000 (Keycloak, Trino, le gateway), seul le serveur
 MCP ne peut pas les lire. Avec le profil `catalogs`, Atlas
-tourne sans TLS, avec des utilisateurs dans un fichier, et HBase et Solr dans son
-propre conteneur. L'image d'akko-mcp-trino et
+tourne sans TLS. Ses utilisateurs sont définis dans un fichier, et HBase et Solr
+tournent dans le conteneur d'Atlas. L'image d'akko-mcp-trino et
 sa configuration sont celles de la production ; le reste ne l'est pas.
 
 ## À propos d'AKKO

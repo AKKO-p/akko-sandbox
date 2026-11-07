@@ -162,7 +162,7 @@ check "  the row filter's column is described like any other" "$(field 'd["colum
 echo "  her answer, the context of amount:"
 field 'json.dumps({"column_context": {"amount": d["column_context"]["amount"]}, "terms": d["terms"], "context_sources": d["context_sources"]}, indent=2)' <<<"$out" | sed 's/^/    /'
 out=$(call carol_analyst describe_schema catalog=demo schema=crm)
-check "carol, describe_schema crm: Atlas's description of each table" "$(field 'sorted((t["table"], t.get("description", {}).get("text"), t.get("description", {}).get("source")) for t in d["tables"])' <<<"$out")" "[('accounts', 'Accounts the customers hold: one row per account, in one currency', 'atlas'), ('customers', 'Everyone who holds an account: one row per person or company', 'atlas'), ('transactions', 'Money in and out of the accounts: one row per movement', 'atlas')]"
+check "carol, describe_schema crm: Atlas's description of each table" "$(field 'sorted((t["table"], t.get("description", {}).get("text"), t.get("description", {}).get("source")) for t in d["tables"])' <<<"$out")" "[('accounts', 'Accounts: one row per account, in one currency, held by one customer', 'atlas'), ('customers', 'Everyone who holds an account: one row per person or company', 'atlas'), ('transactions', 'Money in and out of the accounts: one row per movement', 'atlas')]"
 check "  both sources ok" "$(field 'd["context_sources"]' <<<"$out")" "{'atlas': 'ok', 'file': 'ok'}"
 out=$(call carol_analyst describe_table catalog=demo schema=crm table=customers)
 check "carol, describe_table customers: the term Customer, attached to it" "$(term_names <<<"$out")" "['Customer']"
@@ -204,7 +204,6 @@ out=$(d describe_schema catalog=demo schema=crm)
 check "dave, describe_schema crm: accounts and transactions, described" "$(field 'sorted((t["table"], "description" in t) for t in d["tables"])' <<<"$out")" "[('accounts', True), ('transactions', True)]"
 d list_tables catalog=demo schema=crm >/dev/null
 d search_columns text=account catalog=demo >/dev/null
-check "dave, search_columns email: no match, complete" "$(d search_columns text=email catalog=demo | field '(d["matches"], d["complete"])')" "([], True)"
 check "dave, profile_table accounts, every column: no balance" "$(d profile_table catalog=demo schema=crm table=accounts mode=full | field '[c["column"] for c in d["columns"]]')" "['id', 'customer_id', 'opened_on', 'currency']"
 for word in customers '"Customer"' full_name email segment balance 'Everyone who holds' 'person or company' 'holds at least one' Compliance 'Personal data' 'identifies a person'; do
   check "nothing dave got names $word, in any case" "$(grep -ci -- "$word" "$scratch/dave")" "0"
@@ -244,6 +243,10 @@ for line in open(sys.argv[1]):
 print(n, other)" "$scratch/opa")
 echo "  OPA's log: ${opa_dave% *} decisions for dave name customers"
 check "  each of them Trino's own listing filter (FilterTables), which refused it" "$([ "${opa_dave% *}" -gt 0 ] 2>/dev/null && echo "${opa_dave#* }")" "0"
+# Last, a search for a word only crm.customers holds. The word is his own, so the statements
+# of the search carry it: they are not in the history checks above.
+out=$(call dave_viewer search_columns text=email catalog=demo)
+check "dave, search_columns email: no match, complete, and nothing about customers" "$(field '(d["matches"], d["complete"])' <<<"$out") $(grep -ci 'customers' <<<"$out")" "([], True) 0"
 
 echo "== 5. A renamed table, an unmapped catalog, a deleted entity"
 out=$(call carol_analyst describe_table catalog=demo schema=crm_archive table=transactions_2014)
@@ -319,7 +322,10 @@ held = [json.loads(l)['peer'] for l in open(sys.argv[2]) if l.strip() and json.l
 print(len(held) == 1 and held[0] in before)" "$scratch/sockets.before" "$scratch/sockets.during")" "True"
 docker compose unpause atlas >/dev/null 2>&1; paused=0
 sleep 5
-check "Atlas resumed: it served no request of the reader since the pause, the stale one included (audit.log)" "$(( $(reader_requests) - served_before ))" "0"
+served_after=$(reader_requests)
+docker compose exec -T atlas cat /data/logs/audit.log 2>/dev/null | grep '|mcp_reader|' | tail -n +$((served_before + 1)) \
+  | awk -F'|' '{print "  Atlas served after the resume: " $4 " " $5 ", status " $6}'
+check "Atlas resumed: it served no request of the reader since the pause, the stale one included (audit.log)" "$(( served_after - served_before ))" "0"
 n=0; until [ "$(call carol_analyst describe_table catalog=demo schema=crm table=accounts | field 'd["context_sources"]["atlas"]')" = ok ] || [ $n -ge 12 ]; do n=$((n + 1)); sleep 5; done
 check "Atlas back: the context comes again" "$(call carol_analyst describe_table catalog=demo schema=crm table=accounts | field 'd["context_sources"]')" "{'atlas': 'ok', 'file': 'ok'}"
 
