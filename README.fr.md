@@ -350,10 +350,12 @@ cache, pour que chaque appel relise Atlas et Trino. Il vérifie ce qui suit :
   quand même. Avec Atlas figé au-delà du délai, la source indique `unavailable`.
   L'appel ne dure pas plus que le même appel avec Atlas sain, plus le délai, plus
   les 0,25 s que le serveur attend au-delà et la marge de réponse de 0,5 s du
-  contrat des fournisseurs. akko-mcp-trino ferme la connexion du pool qui porte
-  la requête HTTP avant qu'Atlas ne la lise. Le contrôle exige aussi qu'Atlas,
-  une fois repris, ne serve rien ; aujourd'hui Atlas sert encore cette requête,
-  et ce contrôle échoue (voir plus bas) ;
+  contrat des fournisseurs. akko-mcp-trino ferme la connexion même du pool qui a
+  porté la requête HTTP, avant qu'Atlas ne la lise. HTTP ne permet pas de retirer
+  une requête déjà envoyée. Le catalogue de données peut encore la lire et y
+  répondre, et cette réponse n'arrive à personne. Une fois Atlas repris, il ne
+  garde plus cette connexion, le serveur n'en garde rien d'ouvert, et aucune
+  réponse n'atteint un appelant ;
 - quand Atlas rejette le compte, le serveur tente un seul login, puis aucun tant
   que le fichier de secret ne change pas. Il journalise `atlas refused the
   account` une fois. Atlas ne journalise pas lui-même les logins refusés. Avec
@@ -372,35 +374,36 @@ Testé avec Apache Atlas 2.4.0 construit par
 `openpolicyagent/opa:1.21.1-static`, `postgres:17.11-alpine`, et akko-mcp-trino
 construit depuis le commit `4bd78f2`. Ce commit ferme la connexion d'une lecture
 du contexte interrompue à son délai. Ce build se déclare encore en version 0.7.2.
-Sans gateway, l'exécution a réussi 100 contrôles et en a échoué un. Voici sa
+Sans gateway, l'exécution a réussi ses 103 contrôles. Voici sa
 section sur un Atlas lent :
 
 ```text
-== 8. A slow Atlas: the call answers in time, the request is canceled
+== 8. A slow Atlas: the call answers in time, and Atlas's late answer reaches no one
   OK    carol, describe_table transactions with Atlas healthy: atlas ok
-  describe_table answered in 4.09 s with Atlas frozen, 1.28 s with Atlas healthy; the context deadline is 3 s
+  describe_table answered in 3.95 s with Atlas frozen, 1.39 s with Atlas healthy; the context deadline is 3 s
   OK    carol, describe_table transactions with Atlas frozen: atlas unavailable, file ok
   OK      the columns and the file's grain still come
   OK      it waited for Atlas until the deadline: 3 s at least
   OK      and no longer: at most the deadline + 0.25 s + 0.5 s more than with Atlas healthy
   OK    Atlas's side: one connection holds the request unread, and the client closed it (CLOSE_WAIT)
   OK      it is a connection of the pool, open before the pause
-  Atlas served after the resume: GET http://atlas:21000/api/atlas/v2/entity/bulk/uniqueAttribute/type/hive_table?attr_0%3AqualifiedName=crm.transactions%40sandbox, status 200
-  FAIL  Atlas resumed: it served no request of the reader since the pause, the stale one included (audit.log) (got 1, expected 0)
+  Atlas, resumed, served: GET http://atlas:21000/api/atlas/v2/entity/bulk/uniqueAttribute/type/hive_table?attr_0%3AqualifiedName=crm.transactions%40sandbox, status 200
+  OK    Atlas resumed: it no longer holds the connection of the cut read
+  OK      the server holds nothing of it open
+  OK      and no reply reached a caller meanwhile: no tool call answered since the resume
   OK    Atlas back: the context comes again
 ```
 
 Ici, le client est akko-mcp-trino, vu depuis Atlas. Avec un serveur construit
 depuis le commit `0e0159c`, avant ce correctif, le contrôle de la connexion fermée
-échouait avec `got closed by the client 0, open with a request unread 1`. Avec
-`4bd78f2`, la connexion est fermée, mais la fermer ne retire pas la requête :
-Atlas l'a déjà reçue et, une fois repris, il la lit et y répond, comme le montre
-son journal d'audit. Le contrôle en échec reste dans le script tant qu'une
-lecture fermée laisse quelque chose à servir à Atlas.
+échouait avec `got closed by the client 0, open with a request unread 1`. Atlas,
+une fois repris, lit encore la requête qu'il avait reçue et y répond ; cette
+réponse n'arrive à personne. Son journal d'audit montre cette réponse, que le
+script affiche.
 
-Derrière le gateway (`GATEWAY=1`), l'exécution s'est terminée de la même façon,
-avec le même contrôle en échec, et `describe_table` avec Atlas figé a répondu en
-4,02 s. Le contrôle lit l'historique des requêtes sur les deux clusters.
+Derrière le gateway (`GATEWAY=1`), l'exécution a réussi ses 103 contrôles elle
+aussi, et `describe_table` avec Atlas figé a répondu en 4,31 s. Le contrôle lit
+l'historique des requêtes sur les deux clusters.
 
 Avec akko-mcp-trino 0.7.2, `tests/context.sh` échoue au démarrage, parce que ce
 serveur ne connaît pas le module `fingerprint-audit`.
@@ -410,14 +413,14 @@ mcp-1         | ValueError: unknown extension 'fingerprint-audit'; installed ext
 ```
 
 Au repos, sans gateway et juste après le démarrage, `docker stats` mesure ces
-mémoires : Atlas 1,99 Gio (limite 3 Gio), Trino 790,8 Mio, Keycloak 485,6 Mio, le
-serveur MCP 83,21 Mio, l'Inspector 47,11 Mio, PostgreSQL 24,19 Mio, OPA 18,04 Mio.
-Comptez environ 4 Go de mémoire libre. Le démarrage a pris 334 s, dont l'essentiel
+mémoires : Atlas 1,995 Gio (limite 3 Gio), Trino 799,2 Mio, Keycloak 481,4 Mio, le
+serveur MCP 72,64 Mio, l'Inspector 50,89 Mio, PostgreSQL 26,32 Mio, OPA 15,93 Mio.
+Comptez environ 4 Go de mémoire libre. Le démarrage a pris 335 s, dont l'essentiel
 pour Atlas.
 
-Derrière le gateway, au repos, `docker stats` mesure : Atlas 2,09 Gio, les deux
-clusters Trino 769,5 Mio et 757,6 Mio, Keycloak 522,9 Mio, le gateway 359,7 Mio,
-le serveur MCP 72,75 Mio. Comptez environ 5 Go de mémoire libre.
+Derrière le gateway, au repos, `docker stats` mesure : Atlas 2,002 Gio, les deux
+clusters Trino 743,2 Mio et 769,9 Mio, Keycloak 498,1 Mio, le gateway 308,3 Mio,
+le serveur MCP 81,73 Mio. Comptez environ 5 Go de mémoire libre.
 
 ## Un agent réel : combien d'appels jusqu'à la bonne colonne
 
