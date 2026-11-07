@@ -1,0 +1,11 @@
+# The checks of the context behind Trino Gateway (GATEWAY=1 tests/context.sh): the second
+# cluster gets the same catalogs as the first, and Atlas joins the front network, the only
+# one the MCP server is on.
+
+services:
+  trino-2:
+    volumes:
+      - ./tests/v07/catalog:/etc/trino/catalog:ro
+
+  atlas:
+    networks: [default, front]

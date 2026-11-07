@@ -1,0 +1,109 @@
+# The sandbox with a data catalog: Apache Atlas 2.4.0 describes the demo tables, and
+# akko-mcp-trino serves that context in describe_table and describe_schema, only for what
+# Trino lists to the caller. Needs akko-mcp-trino 0.8 or later, which carries the Atlas
+# provider.
+#
+#   COMPOSE_FILE=compose.yaml:catalogs/compose.atlas.yaml COMPOSE_PROFILES=catalogs \
+#     MCP_IMAGE=<an image of akko-mcp-trino 0.8> docker compose up -d --wait
+#
+# The first start builds Atlas from its official source release (catalogs/atlas/Dockerfile),
+# which takes a while. Atlas keeps its state inside its container: a new container is seeded
+# again. For a laptop demo only: no TLS, file-based users, passwords drawn at random.
+
+services:
+  # One-shot: the passwords of Atlas's two accounts, drawn at random, written to a volume.
+  # admin seeds Atlas; mcp_reader may only read, and is the account the MCP server reads with.
+  atlas-secrets:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    profiles: ["catalogs"]
+    image: alpine/openssl:3.5.9
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - >-
+        cd /secrets;
+        [ -s admin.secret ] || openssl rand -hex 24 > admin.secret;
+        [ -s reader.secret ] || openssl rand -hex 24 > reader.secret;
+        chown 1000:1000 admin.secret reader.secret;
+        chmod 0400 admin.secret; chmod 0444 reader.secret;
+        echo "atlas passwords ready"
+    volumes:
+      - atlas-secrets:/secrets
+    mem_limit: 32m
+
+  # Apache Atlas 2.4.0, with HBase and Solr in the same container (catalogs/atlas).
+  # Its web interface and REST API: http://localhost:21000, as admin, with the password in
+  #   docker compose exec atlas cat /secrets/admin.secret
+  atlas:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    profiles: ["catalogs"]
+    build: ./catalogs/atlas
+    image: akko-sandbox-atlas:2.4.0
+    environment:
+      ATLAS_ADMIN_PASSWORD_FILE: /secrets/admin.secret
+      ATLAS_READER_USER: mcp_reader
+      ATLAS_READER_PASSWORD_FILE: /secrets/reader.secret
+    volumes:
+      - atlas-secrets:/secrets:ro
+    ports:
+      - "127.0.0.1:${ATLAS_PORT:-21000}:21000"
+    depends_on:
+      atlas-secrets: {condition: service_completed_successfully}
+    healthcheck:
+      # The status page needs no login; ACTIVE once Atlas serves its API.
+      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:21000/api/atlas/admin/status | grep -q ACTIVE"]
+      interval: 10s
+      timeout: 5s
+      retries: 60
+      start_period: 120s
+    mem_limit: 3072m
+
+  # One-shot: writes the demo catalog into Atlas as admin, through its REST API v2
+  # (catalogs/seed.py). Does nothing when Atlas already holds it. Any Python 3 runs it:
+  # this is the MCP server's image, already pulled.
+  atlas-seed:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    profiles: ["catalogs"]
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    user: "1000:1000"
+    entrypoint: ["python", "/seed/seed.py"]
+    environment:
+      ATLAS_URL: http://atlas:21000
+      ATLAS_ADMIN_PASSWORD_FILE: /secrets/admin.secret
+      ATLAS_CLUSTER: sandbox
+    volumes:
+      - ./catalogs/seed.py:/seed/seed.py:ro
+      - atlas-secrets:/secrets:ro
+    depends_on:
+      atlas: {condition: service_healthy}
+    mem_limit: 64m
+
+  # The canary: one table no caller may see (opa/policy.rego, rule 2d). The server serves
+  # context to a caller only while Trino hides it from them.
+  postgres:
+    volumes:
+      - ./catalogs/canary.sql:/docker-entrypoint-initdb.d/zz-canary.sql:ro
+
+  # The Atlas provider, read with mcp_reader. Trino's catalog demo is Atlas's cluster sandbox;
+  # no other catalog is mapped. Only the glossary Sales is served; any other glossary, every
+  # classification and every business metadata set stay out (the allow lists are closed by
+  # default). A term's status is its additional attribute status.
+  mcp:
+    environment:
+      MCP_CONTEXT_PROVIDERS: atlas
+      MCP_CONTEXT_CANARY: demo.mcp.canary
+      ATLAS_URL: http://atlas:21000
+      ATLAS_USER: mcp_reader
+      ATLAS_PASSWORD_FILE: /atlas-secrets/reader.secret
+      ATLAS_CLUSTERS: '{"demo": "sandbox"}'
+      ATLAS_GLOSSARIES: Sales
+      ATLAS_TERM_STATUS_ATTRIBUTE: status
+    volumes:
+      - atlas-secrets:/atlas-secrets:ro
+    depends_on:
+      atlas-seed: {condition: service_completed_successfully}
+
+volumes:
+  atlas-secrets:

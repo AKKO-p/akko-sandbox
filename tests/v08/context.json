@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "catalogs": ["demo"],
+  "tables": [
+    {
+      "catalog": "demo", "schema": "crm", "table": "accounts",
+      "grain": ["customer_id", "opened_on"],
+      "joins": [
+        {"columns": ["customer_id"],
+         "target": {"catalog": "demo", "schema": "crm", "table": "customers"},
+         "target_columns": ["id"]}
+      ]
+    },
+    {
+      "catalog": "demo", "schema": "crm", "table": "transactions",
+      "grain": ["id"],
+      "joins": [
+        {"columns": ["account_id"],
+         "target": {"catalog": "demo", "schema": "crm", "table": "accounts"},
+         "target_columns": ["id"]},
+        {"columns": ["account_id", "booked_at"],
+         "target": {"catalog": "demo", "schema": "crm", "table": "accounts"},
+         "target_columns": ["id", "opened_on"]}
+      ]
+    }
+  ],
+  "terms": {}
+}
