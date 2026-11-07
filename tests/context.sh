@@ -310,7 +310,10 @@ echo "  describe_table answered in $elapsed s with Atlas frozen, $baseline s wit
 check "carol, describe_table transactions with Atlas frozen: atlas unavailable, file ok" "$(field 'd["context_sources"]' <<<"$out")" "{'atlas': 'unavailable', 'file': 'ok'}"
 # The joins need statements the spent deadline no longer allows: none is served.
 check "  the columns and the file's grain still come" "$(field '(len(d["rows"]), d["table"].get("grain"))' <<<"$out")" "(5, ['id'])"
-check "  it waited for Atlas, up to the deadline: at least $deadline - 0.5 s more than with Atlas healthy" "$(python3 -c "import sys; e, b, d = map(float, sys.argv[1:]); print(e - b >= d - 0.5)" "$elapsed" "$baseline" "$deadline")" "True"
+# A call that did not wait for Atlas would take about the healthy time; this one takes the
+# deadline at least. (The frozen call skips the reads and proofs that follow a healthy read,
+# so its time past the healthy one can be a little less than the deadline.)
+check "  it waited for Atlas until the deadline: $deadline s at least" "$(python3 -c "import sys; print(float(sys.argv[1]) >= float(sys.argv[2]))" "$elapsed" "$deadline")" "True"
 check "  and no longer: at most the deadline + 0.25 s + 0.5 s more than with Atlas healthy" "$(python3 -c "import sys; e, b, d = map(float, sys.argv[1:]); print(e - b <= d + 0.25 + 0.5)" "$elapsed" "$baseline" "$deadline")" "True"
 atlas_sockets "$atlas_id" > "$scratch/sockets.during"
 # The connection that holds the request is the one with bytes Atlas has not read.
