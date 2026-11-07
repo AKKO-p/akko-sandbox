@@ -52,7 +52,7 @@ Demo accounts, with a demo password. Never reuse them anywhere.
 | User | Password | Sees |
 |---|---|---|
 | `alice_admin` | `demo` | every row, every column in clear |
-| `carol_analyst` | `demo` | European customers only, e-mail addresses masked |
+| `carol_analyst` | `demo` | European customers only, e-mail addresses masked; no salary payments among the transactions, no account opening date |
 | `dave_viewer` | `demo` | everything except the customers table and the accounts' `balance` column |
 
 The Keycloak console is at <http://localhost:8080> (`admin` / `admin`).
@@ -109,7 +109,7 @@ flowchart LR
 - It exchanges the token at Keycloak, over https, for a token whose audience is `trino` (OAuth 2.0 Token Exchange, RFC 8693), with its own client `akko-mcp`. The user's token is never passed on.
 - It sends that token to Trino over https only, checking Trino's certificate against the sandbox CA.
 - Trino verifies the token and runs the query as its `preferred_username`.
-- Trino asks OPA before every action. The whole policy is [one short Rego file](opa/policy.rego): who may read what, a hidden column, a hidden catalog, the e-mail mask, the row filter, and nobody acting under another user's name.
+- Trino asks OPA before every action. The whole policy is [one short Rego file](opa/policy.rego): who may read what, two hidden columns, a hidden catalog, a canary table hidden from everyone, the e-mail mask, two row filters, and nobody acting under another user's name.
 
 To change what a user sees, edit `opa/policy.rego` and run
 `docker compose restart opa`. The MCP server needs no change.
@@ -227,6 +227,148 @@ read the error code, not the text. In the same way, a catalog he names gets
 Trino's refusal (`Cannot access catalog tpcds`, kind `permission`) where a
 missing one gets `not found` (kind `catalog`): Trino tells the two apart.
 
+## Context from a data catalog: Apache Atlas
+
+```bash
+COMPOSE_FILE=compose.yaml:catalogs/compose.atlas.yaml COMPOSE_PROFILES=catalogs \
+  MCP_IMAGE=<an image of akko-mcp-trino 0.8> docker compose up -d --wait
+MCP_IMAGE=<an image of akko-mcp-trino 0.8> tests/context.sh
+MCP_IMAGE=<an image of akko-mcp-trino 0.8> GATEWAY=1 tests/context.sh   # behind Trino Gateway
+```
+
+akko-mcp-trino 0.8 reads a data catalog and adds its context to `describe_table`
+and `describe_schema`. It serves that context only for the tables and columns
+Trino lists to the caller. The profile `catalogs`
+([`catalogs/compose.atlas.yaml`](catalogs/compose.atlas.yaml)) adds Apache Atlas
+2.4.0 and turns on the server's Atlas provider.
+
+0.8 is not on Docker Hub yet. Until it is, build the image from the `main` branch
+of akko-mcp-trino and pass it in `MCP_IMAGE`. The Atlas provider comes with the
+image, inactive until `MCP_CONTEXT_PROVIDERS` names it.
+
+Apache Atlas publishes its sources only.
+[`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile) builds the server from
+the official source release, checked against the SHA-512 that the Apache Software
+Foundation publishes next to it. HBase 2.5.0 and Solr 8.11.3, the versions the
+release names, come from the ASF archive, each checked against its SHA-512. The
+first start builds the image: the Maven build took 7 min 18 s on a 16-core
+machine, and the image takes 2.98 GB. Atlas keeps its state inside its
+container.
+
+[`catalogs/seed.py`](catalogs/seed.py) writes the demo catalog through Atlas's
+REST API v2, as admin:
+
+- a steward's description for each crm table and column;
+- the glossary `Sales`, with five terms, each with a status: `Customer`, attached
+  to `crm.customers` only, `Account`, `Revenue`, its synonym `Turnover`, and
+  `Opening date`;
+- the glossary `Compliance`, with the term `Personal data`, attached to columns
+  every user sees;
+- a renamed table, a deleted table and a deleted column;
+- a table under the Atlas cluster `tpch`, which no Trino catalog maps to.
+
+The server reads Atlas with `mcp_reader`, an account of Atlas's own role
+`DATA_SCIENTIST`, which may only read. Its password is drawn at random in the
+`atlas-secrets` volume. Trino's catalog `demo` is Atlas's cluster `sandbox`. Only
+the glossary `Sales` is served. The canary `demo.mcp.canary` is a table the
+policy hides from everyone, admins included: the server serves context to a
+caller only while Trino hides it from them.
+
+Here is what `carol_analyst` gets for the column `amount` of
+`crm.transactions`, copied from a run of `tests/context.sh`. The term of
+`Compliance`, attached to the same column, is not there:
+
+```json
+{
+  "column_context": {
+    "amount": {
+      "description": "Amount of the movement, in the account's currency",
+      "sources": {"description": "atlas"},
+      "terms": [{"name": "Revenue", "ref": "t2"}]
+    }
+  },
+  "terms": {
+    "t1": {"name": "Turnover", "glossary": "Sales", "definition": "The revenue of a period, added up",
+           "status": "draft", "related": [{"ref": "t2", "name": "Revenue", "relation": "synonym"}],
+           "source": "atlas"},
+    "t2": {"name": "Revenue", "glossary": "Sales", "definition": "Money that comes in from a sale",
+           "status": "approved", "related": [{"ref": "t1", "name": "Turnover", "relation": "synonym"}],
+           "source": "atlas"}
+  },
+  "context_sources": {"atlas": "ok", "file": "ok"}
+}
+```
+
+`tests/context.sh` adds [`tests/compose.v08.yaml`](tests/compose.v08.yaml): a
+second provider, `file`, which gives two tables a grain and joins, since Atlas has
+no notion of either; the module `fingerprint-audit`; a context deadline of 3
+seconds; and no cache, so that each call reads Atlas and Trino again. It checks:
+
+- `carol_analyst` gets the descriptions, the terms of `Sales` and their status,
+  in `describe_table` and `describe_schema`;
+- `dave_viewer` gets nothing about `crm.customers`: not in his answers, not in his
+  audit lines, not in his query history on each cluster, read by the admin. OPA's
+  decision log names the table for him only in Trino's own listing filter, which
+  refused it. The statements of the visibility filter carry the client tag
+  `mcp-gate`, and only they do;
+- the column the policy hides from carol, `accounts.opened_on`, leaves the
+  context, the grain and the joins, and its term is not named. The term attached
+  only to `crm.customers` is never named next to another table. Nothing of
+  `Compliance` comes out;
+- the renamed table is `not_found`, the catalog `tpch` is `not_mapped`, and the
+  deleted table and column are never served;
+- `profile_table` on the masked `email`, and on `amount` under the row filter,
+  gives the `rows`, `min` and `max` that `execute_query` computes for the same
+  user;
+- a policy that makes the canary visible gives `not_checked` and one warning that
+  names no one and nothing;
+- Atlas stopped gives `unavailable`, and the call still answers. Atlas frozen past
+  the deadline gives `unavailable` within the call's budget;
+- a refused account costs one login at Atlas, then none until its secret file
+  changes, and the server logs `atlas refused the account` once. Atlas writes each
+  login it refuses to a log of its own for this check
+  ([`catalogs/atlas/start.sh`](catalogs/atlas/start.sh)).
+
+Tested with Apache Atlas 2.4.0 built by
+[`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
+`quay.io/keycloak/keycloak:26.7.5`, `openpolicyagent/opa:1.21.1-static`, and
+akko-mcp-trino built from its `main` branch at commit `0e0159c` (it reports the
+version 0.7.2). The run without the gateway ended with 92 checks passed and one failed:
+
+```text
+== 8. A slow Atlas: the call answers in time, the request is cancelled
+  describe_table answered in 3.7 s, the context deadline being 3 s
+  OK    carol, describe_table transactions with Atlas frozen: atlas unavailable, file ok
+  OK      the columns and the file's grain still come
+  OK      within the deadline and the token round trips: under 8 s
+  FAIL  Atlas's side: the request's connection, closed by the client before Atlas read it (got closed by the client 0, open with a request unread 1, expected closed by the client 1, open with a request unread 0)
+  OK    Atlas back: the context comes again
+```
+
+The call answers in time, but the server leaves the request's connection open:
+Atlas still holds the request it has not read. This check stays red until the
+server closes it.
+
+Behind the gateway (`GATEWAY=1`), the run ended the same way: 92 checks passed,
+and the same one failed. The query history is read on each of the two clusters.
+
+With akko-mcp-trino 0.7.2, `tests/context.sh` stops at the start: that server
+does not know the module `fingerprint-audit`.
+
+```text
+mcp-1         | ValueError: unknown extension 'fingerprint-audit'; installed extensions: none
+```
+
+Memory at rest, measured with `docker stats` right after the start, without the gateway: Atlas
+2 GiB (limit 3 GiB), Trino 801.6 MiB, Keycloak 522.9 MiB, the MCP server
+72.6 MiB, the Inspector 50.36 MiB, PostgreSQL 26.88 MiB, OPA 18.58 MiB. Plan for
+about 4 GB of free memory, and the start takes about five and a half minutes
+(322 s), most of it Atlas's.
+
+Behind the gateway, at rest: Atlas 1.957 GiB, the two Trino 769.1 and
+767.4 MiB, Keycloak 556.2 MiB, the gateway 333.8 MiB, the MCP server 72.61 MiB.
+Plan for about 5 GB of free memory.
+
 ## A real agent: how many calls to the right column
 
 [`agent/`](agent/README.md) asks a real model (Mistral or Anthropic, by their
@@ -259,7 +401,9 @@ from any peer on its network: in production, nothing but the gateway should
 reach a cluster. The gateway is started with `java -jar` and the jar's path
 inside its image, which an image bump may move. Its admin password and session
 key are readable by every service that runs as uid 1000 (Keycloak, Trino, the
-gateway), only not by the MCP server. The akko-mcp-trino image and its configuration are the same as in
+gateway), only not by the MCP server. With the profile `catalogs`, Atlas
+runs without TLS, with users in a file, and HBase and Solr in its own container.
+The akko-mcp-trino image and its configuration are the same as in
 production; the rest is not.
 
 ## About AKKO
