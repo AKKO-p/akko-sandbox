@@ -430,6 +430,109 @@ Derrière le gateway, au repos, `docker stats` mesure : Atlas 1,922 Gio, les 
 clusters Trino 742,8 Mio et 778,3 Mio, Keycloak 495,9 Mio, le gateway 346,5 Mio,
 le serveur MCP 81,54 Mio. Comptez environ 5 Go de mémoire libre.
 
+## Le contexte à l'échelle : 2 000 colonnes, 50 000 termes
+
+```bash
+MCP_IMAGE=<une image d'akko-mcp-trino 0.8> tests/load.sh
+```
+
+`tests/load.sh` vérifie que le contexte tient sur un grand catalogue, et le
+mesure. Il ajoute [`tests/compose.load.yaml`](tests/compose.load.yaml) au profil
+`catalogs`. PostgreSQL accepte 1 600 colonnes au plus, donc la table large vit
+dans un second catalogue Trino, `wide`, sur le connecteur mémoire de Trino. Le
+serveur le relie au même cluster Atlas, `sandbox`, et sert le glossaire
+`Generated` à côté de `Sales`.
+
+[`tests/load/seed.py`](tests/load/seed.py) écrit dans Atlas :
+
+- la table `load.wide_2000`, avec 2 000 colonnes, chacune avec une description ;
+- le glossaire `Generated`, avec 50 000 termes, par requêtes de 500 ;
+- 2 000 de ces termes, rattachés aux colonnes, un terme par colonne.
+
+Atlas a un appel en lot pour les termes de glossaire,
+`POST /api/atlas/v2/glossary/terms`. Il compare chaque nouveau nom à tous les
+termes du glossaire, donc chaque requête dure plus longtemps à mesure que le
+glossaire grandit. Mesuré avec Atlas 2.4.0 : 15,1 s pour les 500 premiers
+termes, 211,6 s pour les 500 après 25 000. Le seed écrit les termes par
+l'appel en lot des entités, `POST /api/atlas/v2/entity/bulk`, comme entités
+`AtlasGlossaryTerm` ancrées au glossaire. Atlas les sert ensuite comme tout
+autre terme.
+
+L'exécution fixe la durée de vie des caches à 60 s, le cache des tables à
+64 Mio (`MCP_CONTEXT_CACHE_BYTES=67108864`) et le cache des termes à 16 Mio
+(`MCP_CONTEXT_TERMS_CACHE_BYTES=16777216`). Elle les relit dans le `--check` du
+serveur. Le conteneur du serveur peut utiliser 1 Gio, au-dessus de la borne
+vérifiée plus bas, pour qu'un serveur qui la dépasse soit mesuré, pas tué.
+Ensuite Carol appelle une fois `describe_table` sur la table large,
+pour remplir les caches. Le script attend leur expiration et envoie 50 appels à
+la fois, chacun depuis sa propre session MCP. Il vérifie ce qui suit :
+
+- la mémoire du serveur reste sous les deux limites de cache plus 256 Mo,
+  échantillonnée par `docker stats` pendant la rafale, et par le pic de son
+  cgroup depuis son démarrage ;
+- Atlas lit la table une fois et chacun des 2 000 termes une fois pour toute la
+  rafale. Le script compte les lectures dans le journal d'audit d'Atlas lui-même ;
+- chaque réponse garde son contexte sous `MCP_CONTEXT_RESPONSE_CHARS` (60 000),
+  indique `"context_truncated": true`, liste les colonnes laissées de côté dans
+  `undescribed_columns` et donne la source comme `partial`.
+
+Chaque contrôle peut être vu en échec. Sans cache (`LOAD_CACHE_BYTES=1
+LOAD_TERMS_CACHE_BYTES=1`) et avec 5 appels à 15 s d'écart, Atlas lit la table
+une fois par appel. `LOAD_MEMORY_MARGIN_MB=0` et `LOAD_RESPONSE_LIMIT=50000`
+placent les bornes sous ce qui a été mesuré.
+
+L'exécution relève trois limites du sandbox. OPA reçoit 512 Mo. Avec ses 64 Mo,
+le noyau l'a tué pendant les 50 instructions `DESCRIBE`, qui lui demandaient
+chacune de filtrer 2 000 colonnes. Le délai du contexte et le délai de lecture
+d'Atlas sont de 20 s. Avec les valeurs par défaut, 5 s, Atlas a mis 5,9 s à
+lire la table : sur quatre appels à la suite, les deux premiers n'ont servi
+aucun contexte. `MCP_CONTEXT_MAX_CONCURRENCY` vaut 64. Un appel qui attend une
+lecture déjà lancée par un autre appel compte dans cette limite. Avec la valeur
+par défaut, 32, les 18 appels au-delà ont répondu `unavailable` aussitôt,
+pendant qu'Atlas lisait la table une fois pour les 32 autres.
+
+Mesuré sur une machine de 16 processeurs et 62,8 Gio de mémoire, avec
+`trinodb/trino:482`, Apache Atlas 2.4.0 construit par
+[`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), et akko-mcp-trino
+construit depuis le commit `a18eac7` (il annonce encore la version 0.7.2). Les
+27 contrôles ont réussi.
+
+```text
+  seed: terms: 50000 in 734.8 s, 500 a request (68 a second)
+  seed: columns: 2000 in 57.1 s, 500 a request
+  seed: attached: 2000 terms, one a column, in 56.9 s
+== 3. One call, which fills the caches
+  describe_table answered in 12.35 s, caches empty
+  176 columns described, 1824 undescribed, 176 terms, context of 59724 characters
+== 4. 50 calls of describe_table at once, at the caches' expiry
+  the burst took 23.61 s; each call 21.10 s to 23.61 s
+  the server's memory: at most 235.8 MiB in 15 samples of docker stats; cgroup peak since start 255.3 MiB; bound 336.0 MiB (the two caches + 256 MB)
+  OK    Atlas read the table once for the whole burst (its audit log)
+  OK      and each of the 2000 terms once: reads, distinct terms
+  the context of each answer: 59724 to 59724 characters, limit 60000
+  OK    every context under the limit
+  OK      and every answer says it was cut, its source partial
+```
+
+Enfin, le script compte les instructions que chaque outil exécute dans Trino,
+au nom de Carol, sur la table large. Il les lit dans l'historique de Trino
+lui-même, `system.runtime.queries`, et les tags clients dans `/v1/query`.
+Chaque outil est appelé une fois avec les caches expirés, puis une fois encore
+juste après. Les instructions du filtre de visibilité portent le tag
+`mcp-gate`.
+
+| Outil | Caches expirés | Juste après |
+|---|---|---|
+| `describe_table` | 3 (2 `mcp-gate`) | 1 (0 `mcp-gate`) |
+| `describe_schema` | 8 (2 `mcp-gate`) | 6 (0 `mcp-gate`) |
+| `search_columns` | 5 (0 `mcp-gate`) | 5 (0 `mcp-gate`) |
+| `profile_table` | 2 (0 `mcp-gate`) | 2 (0 `mcp-gate`) |
+
+Le seed a pris 850 s, après un démarrage de 313 s. L'hôte avait 6,8 Gio de
+mémoire disponible avant le seed et 6,2 Gio avant la rafale. Dans cette
+exécution, le conteneur d'Atlas peut utiliser jusqu'à 4 Gio, avec un tas de
+1536 Mo.
+
 ## Un agent réel : combien d'appels jusqu'à la bonne colonne
 
 [`agent/`](agent/README.md) pose à un vrai modèle (Mistral ou Anthropic, par leurs
