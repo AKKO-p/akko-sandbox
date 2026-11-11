@@ -468,37 +468,46 @@ LOAD_TERMS_CACHE_BYTES=1`) and 5 calls 15 s apart, Atlas reads the table once
 per call. `LOAD_MEMORY_MARGIN_MB=0` and `LOAD_RESPONSE_LIMIT=50000` move the
 bounds below what was measured.
 
-The run raises three limits of the sandbox. OPA gets 512 MB. With its 64 MB,
-the kernel killed it during the 50 `DESCRIBE` statements, each asking it to
-filter 2,000 columns. The context deadline and Atlas's read timeout are 20 s.
-With the defaults, 5 s, Atlas took 5.9 s to read the table: of four calls in a
-row, the first two served no context. `MCP_CONTEXT_MAX_CONCURRENCY` is 64. A
-call that waits for a read another call already started counts against this
-limit. With the default, 32, the 18 calls past it reported `unavailable` at
-once, while Atlas read the table once for the other 32.
+The run raises three settings, each for a reason it measured, as the server's
+docs advise for large catalogs:
+
+- OPA gets 512 MB. With the sandbox's 64 MB, the kernel killed it during the 50
+  `DESCRIBE` statements, each asking it to filter 2,000 columns, and Trino then
+  failed every statement.
+- `MCP_CONTEXT_TIMEOUT_SECONDS` and `ATLAS_TIMEOUT_SECONDS` are both 20 s. With
+  the defaults, 5 s, Atlas took 5.9 s to read the table with nothing cached: of
+  four calls in a row, the first two served no context.
+
+`MCP_CONTEXT_MAX_CONCURRENCY` keeps its default, 32. The 50 calls of the burst
+wait on the one read of the table already in flight, and a call that waits takes
+no slot.
 
 Measured on a machine with 16 processors and 62.8 GiB of memory, with
 `trinodb/trino:482`, Apache Atlas 2.4.0 built by
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), and akko-mcp-trino
-built from commit `a18eac7` (it still reports version 0.7.2). All 27 checks
+built from commit `d61d669` (it still reports version 0.7.2). All 27 checks
 passed.
 
 ```text
-  seed: terms: 50000 in 734.8 s, 500 a request (68 a second)
-  seed: columns: 2000 in 57.1 s, 500 a request
-  seed: attached: 2000 terms, one a column, in 56.9 s
+  seed: terms: 50000 in 749.9 s, 500 a request (67 a second)
+  seed: columns: 2000 in 60.4 s, 500 a request
+  seed: attached: 2000 terms, one a column, in 61.4 s
 == 3. One call, which fills the caches
-  describe_table answered in 12.35 s, caches empty
+  describe_table answered in 14.34 s, caches empty
   176 columns described, 1824 undescribed, 176 terms, context of 59724 characters
 == 4. 50 calls of describe_table at once, at the caches' expiry
-  the burst took 23.61 s; each call 21.10 s to 23.61 s
-  the server's memory: at most 235.8 MiB in 15 samples of docker stats; cgroup peak since start 255.3 MiB; bound 336.0 MiB (the two caches + 256 MB)
+  the burst took 25.83 s; each call 22.64 s to 25.82 s
+  the source of the context, answers by status: {'partial': 50}
+  the server's memory: at most 237.9 MiB in 16 samples of docker stats; cgroup peak since start 259.8 MiB; bound 336.0 MiB (the two caches + 256 MB)
   OK    Atlas read the table once for the whole burst (its audit log)
   OK      and each of the 2000 terms once: reads, distinct terms
   the context of each answer: 59724 to 59724 characters, limit 60000
   OK    every context under the limit
   OK      and every answer says it was cut, its source partial
 ```
+
+All 50 answers carry the context, `partial` because each is cut to
+`MCP_CONTEXT_RESPONSE_CHARS`: none reports Atlas `unavailable`.
 
 Last, the script counts the statements each tool runs in Trino, as Carol, on
 the wide table. It reads them from Trino's own history,
@@ -513,9 +522,9 @@ visibility filter's statements carry the tag `mcp-gate`.
 | `search_columns` | 5 (0 `mcp-gate`) | 5 (0 `mcp-gate`) |
 | `profile_table` | 2 (0 `mcp-gate`) | 2 (0 `mcp-gate`) |
 
-The seed took 850 s, after a start of 313 s. The host had 6.8 GiB of memory
-available before the seed and 6.2 GiB before the burst. In this run, Atlas's
-container may use up to 4 GiB, with a heap of 1536 MB.
+The seed took 873 s, after a start of 324 s. The host had 7.1 GiB of memory
+available before the seed and 6.2 GiB before the burst. Atlas keeps the
+sandbox's sizing, a heap of 768 MB in a container of 3 GiB.
 
 ## A real agent: how many calls to the right column
 

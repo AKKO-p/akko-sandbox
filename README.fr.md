@@ -481,38 +481,47 @@ LOAD_TERMS_CACHE_BYTES=1`) et avec 5 appels à 15 s d'écart, Atlas lit la tab
 une fois par appel. `LOAD_MEMORY_MARGIN_MB=0` et `LOAD_RESPONSE_LIMIT=50000`
 placent les bornes sous ce qui a été mesuré.
 
-L'exécution relève trois limites du sandbox. OPA reçoit 512 Mo. Avec ses 64 Mo,
-le noyau l'a tué pendant les 50 instructions `DESCRIBE`, qui lui demandaient
-chacune de filtrer 2 000 colonnes. Le délai du contexte et le délai de lecture
-d'Atlas sont de 20 s. Avec les valeurs par défaut, 5 s, Atlas a mis 5,9 s à
-lire la table : sur quatre appels à la suite, les deux premiers n'ont servi
-aucun contexte. `MCP_CONTEXT_MAX_CONCURRENCY` vaut 64. Un appel qui attend une
-lecture déjà lancée par un autre appel compte dans cette limite. Avec la valeur
-par défaut, 32, les 18 appels au-delà ont répondu `unavailable` aussitôt,
-pendant qu'Atlas lisait la table une fois pour les 32 autres.
+L'exécution relève trois réglages, chacun pour une raison qu'elle a mesurée,
+comme le conseille la documentation du serveur pour les grands catalogues :
+
+- OPA reçoit 512 Mo. Avec les 64 Mo du sandbox, le noyau l'a tué pendant les 50
+  instructions `DESCRIBE`, qui lui demandaient chacune de filtrer 2 000
+  colonnes, et Trino a ensuite fait échouer chaque instruction.
+- `MCP_CONTEXT_TIMEOUT_SECONDS` et `ATLAS_TIMEOUT_SECONDS` valent tous deux
+  20 s. Avec les valeurs par défaut, 5 s, Atlas a mis 5,9 s à lire la table sans
+  rien en cache : sur quatre appels à la suite, les deux premiers n'ont servi
+  aucun contexte.
+
+`MCP_CONTEXT_MAX_CONCURRENCY` garde sa valeur par défaut, 32. Les 50 appels de la
+rafale attendent la seule lecture de la table déjà lancée, et un appel qui attend
+ne prend pas de place.
 
 Mesuré sur une machine de 16 processeurs et 62,8 Gio de mémoire, avec
 `trinodb/trino:482`, Apache Atlas 2.4.0 construit par
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), et akko-mcp-trino
-construit depuis le commit `a18eac7` (il annonce encore la version 0.7.2). Les
+construit depuis le commit `d61d669` (il annonce encore la version 0.7.2). Les
 27 contrôles ont réussi.
 
 ```text
-  seed: terms: 50000 in 734.8 s, 500 a request (68 a second)
-  seed: columns: 2000 in 57.1 s, 500 a request
-  seed: attached: 2000 terms, one a column, in 56.9 s
+  seed: terms: 50000 in 749.9 s, 500 a request (67 a second)
+  seed: columns: 2000 in 60.4 s, 500 a request
+  seed: attached: 2000 terms, one a column, in 61.4 s
 == 3. One call, which fills the caches
-  describe_table answered in 12.35 s, caches empty
+  describe_table answered in 14.34 s, caches empty
   176 columns described, 1824 undescribed, 176 terms, context of 59724 characters
 == 4. 50 calls of describe_table at once, at the caches' expiry
-  the burst took 23.61 s; each call 21.10 s to 23.61 s
-  the server's memory: at most 235.8 MiB in 15 samples of docker stats; cgroup peak since start 255.3 MiB; bound 336.0 MiB (the two caches + 256 MB)
+  the burst took 25.83 s; each call 22.64 s to 25.82 s
+  the source of the context, answers by status: {'partial': 50}
+  the server's memory: at most 237.9 MiB in 16 samples of docker stats; cgroup peak since start 259.8 MiB; bound 336.0 MiB (the two caches + 256 MB)
   OK    Atlas read the table once for the whole burst (its audit log)
   OK      and each of the 2000 terms once: reads, distinct terms
   the context of each answer: 59724 to 59724 characters, limit 60000
   OK    every context under the limit
   OK      and every answer says it was cut, its source partial
 ```
+
+Les 50 réponses portent le contexte, `partial` parce que chacune est coupée à
+`MCP_CONTEXT_RESPONSE_CHARS` : aucune ne donne Atlas `unavailable`.
 
 Enfin, le script compte les instructions que chaque outil exécute dans Trino,
 au nom de Carol, sur la table large. Il les lit dans l'historique de Trino
@@ -528,10 +537,9 @@ juste après. Les instructions du filtre de visibilité portent le tag
 | `search_columns` | 5 (0 `mcp-gate`) | 5 (0 `mcp-gate`) |
 | `profile_table` | 2 (0 `mcp-gate`) | 2 (0 `mcp-gate`) |
 
-Le seed a pris 850 s, après un démarrage de 313 s. L'hôte avait 6,8 Gio de
-mémoire disponible avant le seed et 6,2 Gio avant la rafale. Dans cette
-exécution, le conteneur d'Atlas peut utiliser jusqu'à 4 Gio, avec un tas de
-1536 Mo.
+Le seed a pris 873 s, après un démarrage de 324 s. L'hôte avait 7,1 Gio de
+mémoire disponible avant le seed et 6,2 Gio avant la rafale. Atlas garde le
+dimensionnement du sandbox, un tas de 768 Mo dans un conteneur de 3 Gio.
 
 ## Un agent réel : combien d'appels jusqu'à la bonne colonne
 

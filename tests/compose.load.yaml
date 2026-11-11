@@ -10,12 +10,6 @@ services:
     volumes:
       - ./tests/load/catalog:/etc/trino/catalog:ro
 
-  # Room for 50,000 glossary terms: a larger heap, and a container limit raised to match.
-  atlas:
-    environment:
-      ATLAS_HEAP: 1536m
-    mem_limit: 4096m
-
   # Trino asks OPA to filter the 2,000 columns of each DESCRIBE in one request. With the
   # sandbox's 64 MB, the kernel killed OPA for lack of memory during 50 DESCRIBE at once, and
   # every statement after failed.
@@ -39,14 +33,11 @@ services:
       # Room to read the table and its 2,000 terms with nothing cached. With the defaults (5 s
       # each), Atlas took 5.9 s to answer the read of the table: of four calls in a row, the
       # first two served no context (atlas unavailable), the third part of the terms, the
-      # fourth all that fits in the answer.
+      # fourth all that fits in the answer. The two are raised together, as the server's docs
+      # advise for tables that wide (Large catalogs). MCP_CONTEXT_MAX_CONCURRENCY keeps its
+      # default, 32: the 50 calls of the burst wait on one read.
       MCP_CONTEXT_TIMEOUT_SECONDS: "20"
       ATLAS_TIMEOUT_SECONDS: "20"
-      # Above the 50 calls of the burst. A call that waits for the read another call has in
-      # flight counts against this limit: with the default, 32, the 18 calls past it answered
-      # atlas unavailable at once, while Atlas read the table once for the 32 others.
-      # LOAD_MAX_CONCURRENCY=32 shows it.
-      MCP_CONTEXT_MAX_CONCURRENCY: ${LOAD_MAX_CONCURRENCY:-64}
     # Above the bound the script checks (the two caches + 256 MB), so that a server past it
     # is measured, not killed.
     mem_limit: 1024m

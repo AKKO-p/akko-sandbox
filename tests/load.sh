@@ -20,7 +20,6 @@
 # with LOAD_CACHE_BYTES=1 LOAD_TERMS_CACHE_BYTES=1, nothing is cached, and a burst spread out
 # makes Atlas read the table once per call. LOAD_MEMORY_MARGIN_MB (256) and
 # LOAD_RESPONSE_LIMIT (the server's) change the bounds the answers are checked against.
-# LOAD_MAX_CONCURRENCY=32, the server's default, leaves the calls past 32 without context.
 set -uo pipefail
 cd "$(dirname "$0")/.."
 export COMPOSE_PROFILES=catalogs
@@ -185,6 +184,7 @@ peak=$(docker compose exec -T mcp cat /sys/fs/cgroup/memory.peak 2>/dev/null | t
 audit | tail -n +$((audit_before + 1)) | grep '|mcp_reader|' > "$scratch/audit"
 echo "  the burst took $(rows 'round(max(r["end"] for r in rows) - min(r["start"] for r in rows), 2)' < "$scratch/burst") s; each call $(rows '"%.2f s to %.2f s" % (min(r["end"] - r["start"] for r in rows), max(r["end"] - r["start"] for r in rows))' < "$scratch/burst")"
 check "$calls answers, none an error" "$(rows '(len(rows), [r["i"] for r in rows if r["error"] or "error" in json.loads(r["text"])])' < "$scratch/burst")" "($calls, [])"
+echo "  the source of the context, answers by status: $(rows 'dict(sorted(__import__("collections").Counter(json.loads(r["text"])["context_sources"].get("atlas", "-") for r in rows).items()))' < "$scratch/burst")"
 # The bytes docker stats prints, in MiB.
 mib() { python3 -c "
 import re, sys
