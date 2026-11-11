@@ -5,16 +5,16 @@
 
 services:
   # The catalogs of tests/load/catalog: demo as it is, and wide, Trino's memory connector,
-  # which holds the table of 2,000 columns.
+  # which holds the tables of 2,000 columns.
   trino:
     volumes:
       - ./tests/load/catalog:/etc/trino/catalog:ro
 
   # Trino asks OPA to filter the 2,000 columns of each DESCRIBE in one request. With the
-  # sandbox's 64 MB, the kernel killed OPA for lack of memory during 50 DESCRIBE at once, and
-  # every statement after failed.
+  # sandbox's 64 MiB, the kernel killed OPA for lack of memory during 50 DESCRIBE at once,
+  # and every statement after failed. LOAD_OPA_MEMORY=64m shows it.
   opa:
-    mem_limit: 512m
+    mem_limit: ${LOAD_OPA_MEMORY:-512m}
 
   mcp:
     environment:
@@ -22,24 +22,29 @@ services:
       # served next to Sales.
       ATLAS_CLUSTERS: '{"demo": "sandbox", "wide": "sandbox"}'
       ATLAS_GLOSSARIES: Sales,Generated
-      # One page of describe_table holds every column of the wide table.
+      # One page of describe_table holds every column of a wide table, so that its context is
+      # read, and cut, for all 2,000 columns. With the default, 100, the answer lists 100
+      # columns and their context fits whole.
       TRINO_MAX_ROWS: "2000"
       # Short lifetimes, so that the run sees the caches expire; the two cache limits, set
-      # here and printed by the script. LOAD_* change them for a witness run.
+      # here and printed by the script. LOAD_* change them for a witness run, and section 7
+      # of the script for its own small limits.
       MCP_CONTEXT_TTL_SECONDS: ${LOAD_TTL_SECONDS:-60}
       MCP_VISIBILITY_TTL_SECONDS: ${LOAD_TTL_SECONDS:-60}
       MCP_CONTEXT_CACHE_BYTES: ${LOAD_CACHE_BYTES:-67108864}
       MCP_CONTEXT_TERMS_CACHE_BYTES: ${LOAD_TERMS_CACHE_BYTES:-16777216}
-      # Room to read the table and its 2,000 terms with nothing cached. With the defaults (5 s
-      # each), Atlas took 5.9 s to answer the read of the table: of four calls in a row, the
-      # first two served no context (atlas unavailable), the third part of the terms, the
-      # fourth all that fits in the answer. The two are raised together, as the server's docs
-      # advise for tables that wide (Large catalogs). MCP_CONTEXT_MAX_CONCURRENCY keeps its
-      # default, 32: the 50 calls of the burst wait on one read.
-      MCP_CONTEXT_TIMEOUT_SECONDS: "20"
-      ATLAS_TIMEOUT_SECONDS: "20"
-    # Above the bound the script checks (the two caches + 256 MB), so that a server past it
-    # is measured, not killed.
+      # Room to read a wide table and its 2,000 terms with nothing cached. Section 3 of the
+      # script measures the defaults, 5 s each, and the README gives the numbers. The two are
+      # raised together, as the server's docs advise for tables that wide (Large catalogs).
+      # MCP_CONTEXT_MAX_CONCURRENCY keeps its default, 32: the 50 calls of the burst wait on
+      # one read, and a call that waits takes no read slot.
+      MCP_CONTEXT_TIMEOUT_SECONDS: ${LOAD_CONTEXT_TIMEOUT_SECONDS:-20}
+      ATLAS_TIMEOUT_SECONDS: ${LOAD_ATLAS_TIMEOUT_SECONDS:-20}
+      # The server's own response limit (its default, 60,000), for a witness run below it.
+      MCP_CONTEXT_RESPONSE_CHARS: ${LOAD_RESPONSE_CHARS:-60000}
+    # Above the bound the script checks (the three caches + 256 MiB), so that a server past
+    # it is measured, not killed. The sandbox's own 256 MiB is below the peak measured
+    # during the burst.
     mem_limit: 1024m
 
   # The checks' own clients: the seed of the load catalog, run once by the script; and the
@@ -59,6 +64,7 @@ services:
       LOAD_TERMS: ${LOAD_TERMS:-50000}
       LOAD_COLUMNS: ${LOAD_COLUMNS:-2000}
       LOAD_ATTACHED_TERMS: ${LOAD_ATTACHED_TERMS:-2000}
+      LOAD_TABLES: "3"
       LOAD_BATCH: ${LOAD_BATCH:-500}
     volumes:
       - ./tests/load/seed.py:/seed/seed.py:ro
