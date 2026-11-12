@@ -69,7 +69,7 @@ La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | l'identity provider (IdP), realm `sandbox`, avec le token exchange standard | 768 Mo |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | la policy d'accès, [`opa/policy.rego`](opa/policy.rego) | 64 Mo |
 | `trino` | `trinodb/trino:482` | le moteur, en https, authentification JWT, contrôle d'accès OPA | 2048 Mo |
-| `mcp` | `akkoai/akko-mcp-trino:0.7.2` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 384 Mo |
+| `mcp` | `akkoai/akko-mcp-trino:0.8.0` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 384 Mo |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | l'Inspector MCP officiel | 384 Mo |
 
 Mesuré sur une machine Linux avec `docker stats` : environ 1,4 Go utilisés au repos
@@ -180,6 +180,22 @@ restent les mêmes. Il utilise les ports du sandbox (8080, 3000, 6274) ;
 pour le lancer à côté d'un sandbox démarré, fixez les ports comme dans
 l'en-tête du script. La CI le lance après `tests/smoke.sh`.
 
+## Les neuf outils d'akko-mcp-trino 0.8
+
+| Outil | Ce qu'il fait |
+|---|---|
+| `list_catalogs` | liste les catalogues que l'appelant voit |
+| `list_schemas` | liste les schémas d'un catalogue, par pages |
+| `list_tables` | liste les tables d'un schéma, par pages |
+| `describe_schema` | décrit un schéma : ses tables et leurs colonnes, avec le contexte d'un catalogue de données s'il est configuré |
+| `describe_table` | décrit une table : colonnes, types, commentaires, avec le même contexte |
+| `search_columns` | trouve des colonnes et des tables par les mots de leurs noms et commentaires |
+| `profile_table` | résume les colonnes d'une table |
+| `execute_query` | exécute une requête de lecture au nom de l'appelant |
+| `explain_query` | vérifie une requête sans l'exécuter |
+
+`demo.sh --check` exige exactement ces neuf outils, pour chaque utilisateur.
+
 ## Les outils d'akko-mcp-trino 0.7
 
 ```bash
@@ -233,9 +249,9 @@ kind `permission`) là où un catalog absent reçoit `not found` (kind
 
 ```bash
 COMPOSE_FILE=compose.yaml:catalogs/compose.atlas.yaml COMPOSE_PROFILES=catalogs \
-  MCP_IMAGE=<une image d'akko-mcp-trino 0.8> docker compose up -d --wait
-MCP_IMAGE=<une image d'akko-mcp-trino 0.8> tests/context.sh
-MCP_IMAGE=<une image d'akko-mcp-trino 0.8> GATEWAY=1 tests/context.sh   # derrière Trino Gateway
+  docker compose up -d --wait
+tests/context.sh
+GATEWAY=1 tests/context.sh   # derrière Trino Gateway
 ```
 
 akko-mcp-trino 0.8 lit un catalogue de données et ajoute son contexte à
@@ -244,10 +260,10 @@ et les colonnes que Trino montre à l'appelant. Le profil `catalogs`
 ([`catalogs/compose.atlas.yaml`](catalogs/compose.atlas.yaml)) ajoute Apache Atlas
 2.4.0 et active le fournisseur Atlas du serveur.
 
-La version 0.8 n'est pas encore sur Docker Hub. D'ici là, construisez l'image
-depuis la branche `main` d'akko-mcp-trino et passez son nom dans `MCP_IMAGE`.
-L'image contient le fournisseur Atlas. Il reste inactif tant que
-`MCP_CONTEXT_PROVIDERS` ne le nomme pas.
+Atlas est optionnel : le `docker compose up` par défaut ne le démarre pas.
+L'image par défaut, `akkoai/akko-mcp-trino:0.8.0`, contient le fournisseur Atlas. Il
+reste inactif tant que `MCP_CONTEXT_PROVIDERS` ne le nomme pas, ce que fait le
+profil `catalogs`.
 
 Apache Atlas ne publie que des archives de sources.
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile) construit le serveur
@@ -380,7 +396,7 @@ Testé avec Apache Atlas 2.4.0 construit par
 `trinodb/trino-gateway:22`, `quay.io/keycloak/keycloak:26.7.5`,
 `openpolicyagent/opa:1.21.1-static`, `postgres:17.11-alpine`, et akko-mcp-trino
 construit depuis le commit `4bd78f2`. Ce commit ferme la connexion d'une lecture
-du contexte interrompue à son délai. Ce build se déclare encore en version 0.7.2.
+du contexte interrompue à son délai.
 Sans gateway, l'exécution a réussi ses 104 contrôles. Voici sa
 section sur un Atlas lent :
 
@@ -413,13 +429,6 @@ Derrière le gateway (`GATEWAY=1`), l'exécution a réussi ses 104 contrôles e
 aussi, et `describe_table` avec Atlas figé a répondu en 3,92 s. Le contrôle lit
 l'historique des requêtes sur les deux clusters.
 
-Avec akko-mcp-trino 0.7.2, `tests/context.sh` échoue au démarrage, parce que ce
-serveur ne connaît pas le module `fingerprint-audit`.
-
-```text
-mcp-1         | ValueError: unknown extension 'fingerprint-audit'; installed extensions: none
-```
-
 Au repos, sans gateway et juste après le démarrage, `docker stats` mesure ces
 mémoires : Atlas 1,934 Gio (limite 3 Gio), Trino 812,4 Mio, Keycloak 547,5 Mio, le
 serveur MCP 90,68 Mio, l'Inspector 113,2 Mio, PostgreSQL 36,27 Mio, OPA 11,98 Mio.
@@ -433,7 +442,7 @@ le serveur MCP 81,54 Mio. Comptez environ 5 Go de mémoire libre.
 ## Le contexte à l'échelle : 2 000 colonnes, 50 000 termes
 
 ```bash
-MCP_IMAGE=<une image d'akko-mcp-trino 0.8> tests/load.sh
+tests/load.sh
 ```
 
 `tests/load.sh` vérifie que le contexte tient sur un grand catalogue de

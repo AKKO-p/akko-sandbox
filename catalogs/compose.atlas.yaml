@@ -1,10 +1,10 @@
 # The sandbox with a data catalog: Apache Atlas 2.4.0 describes the demo tables, and
 # akko-mcp-trino serves that context in describe_table and describe_schema, only for what
-# Trino lists to the caller. Needs akko-mcp-trino 0.8 or later, which carries the Atlas
+# Trino lists to the caller. Needs akko-mcp-trino 0.8 or later (the default image), which carries the Atlas
 # provider.
 #
 #   COMPOSE_FILE=compose.yaml:catalogs/compose.atlas.yaml COMPOSE_PROFILES=catalogs \
-#     MCP_IMAGE=<an image of akko-mcp-trino 0.8> docker compose up -d --wait
+#     docker compose up -d --wait
 #
 # The first start builds Atlas from its official source release (catalogs/atlas/Dockerfile),
 # which takes a while. Atlas keeps its state inside its container: a new container is seeded
@@ -66,7 +66,7 @@ services:
     restart: "no"
     security_opt: ["no-new-privileges:true"]
     profiles: ["catalogs"]
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
     user: "1000:1000"
     entrypoint: ["python", "/seed/seed.py"]
     environment:

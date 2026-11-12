@@ -66,7 +66,7 @@ The Keycloak console is at <http://localhost:8080> (`admin` / `admin`).
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | the identity provider, realm `sandbox`, with standard token exchange | 768 MB |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | the access policy, [`opa/policy.rego`](opa/policy.rego) | 64 MB |
 | `trino` | `trinodb/trino:482` | the engine, https, JWT authentication, OPA access control | 2048 MB |
-| `mcp` | `akkoai/akko-mcp-trino:0.7.2` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 384 MB |
+| `mcp` | `akkoai/akko-mcp-trino:0.8.0` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 384 MB |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | the official MCP Inspector | 384 MB |
 
 Measured on a Linux host with `docker stats`: about 1.4 GB in use at rest
@@ -176,6 +176,22 @@ gateway, and that the refusals stay the same. It uses the sandbox's host ports
 (8080, 3000, 6274); to run it next to a running sandbox, set the ports as in the
 script's header. The CI runs it after `tests/smoke.sh`.
 
+## The nine tools of akko-mcp-trino 0.8
+
+| Tool | What it does |
+|---|---|
+| `list_catalogs` | lists the catalogs the caller sees |
+| `list_schemas` | lists the schemas of a catalog, in pages |
+| `list_tables` | lists the tables of a schema, in pages |
+| `describe_schema` | describes a schema: its tables and their columns, with the context from a data catalog when one is configured |
+| `describe_table` | describes a table: columns, types, comments, with the same context |
+| `search_columns` | finds columns and tables by the words of their names and comments |
+| `profile_table` | summarizes a table's columns |
+| `execute_query` | runs a read query as the caller |
+| `explain_query` | checks a query without running it |
+
+`demo.sh --check` requires exactly these nine tools, for every user.
+
 ## The tools of akko-mcp-trino 0.7
 
 ```bash
@@ -232,9 +248,9 @@ missing one gets `not found` (kind `catalog`): Trino tells the two apart.
 
 ```bash
 COMPOSE_FILE=compose.yaml:catalogs/compose.atlas.yaml COMPOSE_PROFILES=catalogs \
-  MCP_IMAGE=<an image of akko-mcp-trino 0.8> docker compose up -d --wait
-MCP_IMAGE=<an image of akko-mcp-trino 0.8> tests/context.sh
-MCP_IMAGE=<an image of akko-mcp-trino 0.8> GATEWAY=1 tests/context.sh   # behind Trino Gateway
+  docker compose up -d --wait
+tests/context.sh
+GATEWAY=1 tests/context.sh   # behind Trino Gateway
 ```
 
 akko-mcp-trino 0.8 reads a data catalog and adds its context to `describe_table`
@@ -243,10 +259,10 @@ that Trino shows the caller. The `catalogs` profile
 ([`catalogs/compose.atlas.yaml`](catalogs/compose.atlas.yaml)) adds Apache Atlas
 2.4.0 and turns on the server's Atlas provider.
 
-Version 0.8 is not on Docker Hub yet. Until it is, build the image from the
-`main` branch of akko-mcp-trino and pass its name in `MCP_IMAGE`. The image
-includes the Atlas provider. It stays inactive until `MCP_CONTEXT_PROVIDERS`
-lists it.
+Atlas is opt-in: the default `docker compose up` does not start it. The default
+image, `akkoai/akko-mcp-trino:0.8.0`, includes the Atlas provider. It stays
+inactive until `MCP_CONTEXT_PROVIDERS` lists it, which the `catalogs` profile
+does.
 
 Apache Atlas publishes source releases only.
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile) builds the server from
@@ -372,7 +388,7 @@ Tested with Apache Atlas 2.4.0 built by
 `trinodb/trino-gateway:22`, `quay.io/keycloak/keycloak:26.7.5`,
 `openpolicyagent/opa:1.21.1-static`, `postgres:17.11-alpine`, and akko-mcp-trino
 built from commit `4bd78f2`. That commit closes the connection of a context read
-that hits its deadline. The build still reports version 0.7.2. Without the
+that hits its deadline. Without the
 gateway, all 104 checks passed. Here is the section on a slow Atlas:
 
 ```text
@@ -403,13 +419,6 @@ Behind the gateway (`GATEWAY=1`), all 104 checks passed as well, and
 `describe_table` with Atlas paused answered in 3.92 s. The check
 reads the query history on both clusters.
 
-With akko-mcp-trino 0.7.2, `tests/context.sh` fails at startup, because that
-server does not know the `fingerprint-audit` module.
-
-```text
-mcp-1         | ValueError: unknown extension 'fingerprint-audit'; installed extensions: none
-```
-
 Memory at rest without the gateway, measured with `docker stats` right after
 startup: Atlas 1.934 GiB (limit 3 GiB), Trino 812.4 MiB, Keycloak 547.5 MiB, the
 MCP server 90.68 MiB, the Inspector 113.2 MiB, PostgreSQL 36.27 MiB, OPA 11.98 MiB.
@@ -422,7 +431,7 @@ MCP server 81.54 MiB. Plan for about 5 GB of free memory.
 ## Context at scale: 2,000 columns, 50,000 terms
 
 ```bash
-MCP_IMAGE=<an image of akko-mcp-trino 0.8> tests/load.sh
+tests/load.sh
 ```
 
 `tests/load.sh` checks that the context holds on a large data catalog. It also

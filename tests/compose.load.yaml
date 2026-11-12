@@ -56,7 +56,7 @@ services:
     restart: "no"
     security_opt: ["no-new-privileges:true"]
     profiles: ["tools"]
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
     user: "1000:1000"
     entrypoint: ["python", "/seed/seed.py"]
     environment:
@@ -75,7 +75,7 @@ services:
   history:
     restart: "no"
     security_opt: ["no-new-privileges:true"]
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
     profiles: ["tools"]
     entrypoint: ["sleep", "infinity"]
     volumes:

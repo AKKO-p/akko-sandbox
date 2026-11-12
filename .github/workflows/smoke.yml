@@ -74,15 +74,6 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - name: Build akko-mcp-trino from source, until 0.7.0 is published
-        if: env.MCP_CORE_REF != ''
-        run: |
-          git clone --quiet https://github.com/AKKO-p/akko-mcp-trino.git core
-          git -C core checkout --quiet "$MCP_CORE_REF"
-          git -C core log --oneline -1
-          docker build --quiet --tag "$MCP_IMAGE" core
-          docker run --rm "$MCP_IMAGE" akko-mcp-trino --version
-
       - name: Pull the images
         run: docker compose --profile tools pull --quiet --ignore-pull-failures
 
