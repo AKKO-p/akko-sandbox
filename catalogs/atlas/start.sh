@@ -3,6 +3,8 @@
 # on that ZooKeeper, Atlas's three indexes (the Solr configuration Atlas ships), then Atlas
 # with its embedded Kafka. State lives under /data, inside the container.
 #
+# TLS: ATLAS_TLS_KEYSTORE (PKCS12), ATLAS_TLS_PASSWORD_FILE, ATLAS_TLS_CA_FILE.
+#
 # Users come from files, never from the environment:
 #   ATLAS_ADMIN_PASSWORD_FILE    the password of admin (role ROLE_ADMIN), who seeds Atlas
 #   ATLAS_READER_USER            a read-only account, of the shipped role DATA_SCIENTIST,
@@ -57,6 +59,40 @@ sed -i -e 's#^atlas.graph.storage.hostname=.*#atlas.graph.storage.hostname=local
        -e 's#^atlas.graph.index.search.solr.zookeeper-url=.*#atlas.graph.index.search.solr.zookeeper-url=localhost:2181/solr#' \
        -e 's#^atlas.audit.hbase.zookeeper.quorum=.*#atlas.audit.hbase.zookeeper.quorum=localhost:2181#' \
        -e 's#^atlas.kafka.data=.*#atlas.kafka.data=/data/kafka#' "$P"
+# Atlas serves https only. The key and certificate come in a PKCS12 file under a password in a
+# file, and the CA that signed them goes into a trust store of its own: both are made here, from
+# the files the sandbox's certificate authority wrote, and kept under /data (mode 600).
+: "${ATLAS_TLS_KEYSTORE:?}" "${ATLAS_TLS_PASSWORD_FILE:?}" "${ATLAS_TLS_CA_FILE:?}"
+mkdir -p /data/tls
+rm -f /data/tls/keystore.jks /data/tls/truststore.jks /data/tls/credstore.jceks
+tls_password=$(cat "$ATLAS_TLS_PASSWORD_FILE")
+keytool -importkeystore -noprompt -srckeystore "$ATLAS_TLS_KEYSTORE" -srcstoretype PKCS12 \
+  -srcstorepass "$tls_password" -destkeystore /data/tls/keystore.jks -deststoretype JKS \
+  -deststorepass "$tls_password" -destkeypass "$tls_password" >/dev/null
+keytool -importcert -noprompt -alias ca -file "$ATLAS_TLS_CA_FILE" -keystore /data/tls/truststore.jks \
+  -storetype JKS -storepass "$tls_password" >/dev/null
+# Atlas reads the passwords of its stores from a Hadoop credential store, not from its
+# properties. The war is expanded by cputil.py (which then fails, with no console to ask on);
+# the credential shell of the Hadoop jars inside it writes the store.
+python3 "$ATLAS_HOME/bin/cputil.py" >/dev/null 2>&1 </dev/null || true
+for alias in keystore.password truststore.password password; do
+  java -cp "$ATLAS_HOME/server/webapp/atlas/WEB-INF/lib/*" org.apache.hadoop.security.alias.CredentialShell \
+    create "$alias" -value "$tls_password" -provider jceks://file/data/tls/credstore.jceks >/dev/null 2>&1 \
+    || { echo "could not write $alias to the credential store" >&2; exit 1; }
+done
+chmod 600 /data/tls/*
+sed -i -e '/^atlas\.enableTLS=/d' -e '/^atlas\.server\.https\.port=/d' -e '/^atlas\.rest\.address=/d' \
+       -e '/^keystore\.file=/d' -e '/^truststore\.file=/d' -e '/^cert\.stores\.credential\.provider\.path=/d' "$P"
+{
+  echo
+  echo "atlas.enableTLS=true"
+  echo "atlas.server.https.port=21000"
+  echo "atlas.rest.address=https://localhost:21000"
+  echo "keystore.file=/data/tls/keystore.jks"
+  echo "truststore.file=/data/tls/truststore.jks"
+  echo "cert.stores.credential.provider.path=jceks://file/data/tls/credstore.jceks"
+} >> "$P"
+
 # Atlas writes each request it served to audit.log, after the login. With
 # ATLAS_LOG_REFUSED_LOGINS=true, Spring Security's Basic login filter also writes each login
 # it refused to logins.log, by the exception's message, never a password. Spring logs through

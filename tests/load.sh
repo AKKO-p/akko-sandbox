@@ -131,7 +131,7 @@ if 'error' in r: print(json.dumps({'error': r['error']['errorName']}))
 }
 # What Atlas holds, read as admin inside its container (the password never leaves it).
 atlas_get() { # path, then a Python expression on the JSON answer, as d
-  docker compose exec -T atlas sh -c 'curl -fsS -u "admin:$(cat /secrets/admin.secret)" "http://127.0.0.1:21000$0"' "$1" | field "$2"
+  docker compose exec -T atlas sh -c 'curl -fsS --cacert /certs/ca.crt -u "admin:$(cat /secrets/admin.secret)" "https://127.0.0.1:21000$0"' "$1" | field "$2"
 }
 # Atlas's audit log writes one line for each request it served, after the login:
 #   <log time> [...] INFO [AuditFilter.java:140] <start, UTC>|<user>|<address>|<method>|<URL>|<status>|<ms>
@@ -139,7 +139,7 @@ atlas_get() { # path, then a Python expression on the JSON answer, as d
 # the server's requests between two markers, once the second one is written.
 run_id="$$-$(date +%s)"
 mark() {
-  docker compose exec -T atlas sh -c 'curl -fsS -o /dev/null -u "admin:$(cat /secrets/admin.secret)" "http://127.0.0.1:21000/api/atlas/admin/version?load_marker=$0"' "$1-$run_id" \
+  docker compose exec -T atlas sh -c 'curl -fsS -o /dev/null --cacert /certs/ca.crt -u "admin:$(cat /secrets/admin.secret)" "https://127.0.0.1:21000/api/atlas/admin/version?load_marker=$0"' "$1-$run_id" \
     || { echo "  Atlas did not answer the marker $1" >&2; exit 1; }
 }
 audit_between() { # first marker, second marker

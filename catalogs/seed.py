@@ -28,14 +28,17 @@ never printed.
 import base64
 import json
 import os
+import ssl
 import sys
 import urllib.error
 import urllib.parse
 import urllib.request
 
-URL = os.environ.get("ATLAS_URL", "http://atlas:21000").rstrip("/")
+URL = os.environ.get("ATLAS_URL", "https://atlas:21000").rstrip("/")
 CLUSTER = os.environ.get("ATLAS_CLUSTER", "sandbox")
 UNMAPPED = os.environ.get("ATLAS_UNMAPPED_CLUSTER", "tpch")
+# Atlas is served over https: the CA that signed its certificate comes in ATLAS_CA_BUNDLE.
+_CTX = ssl.create_default_context(cafile=os.environ.get("ATLAS_CA_BUNDLE") or None)
 with open(os.environ["ATLAS_ADMIN_PASSWORD_FILE"]) as f:
     _AUTH = "Basic " + base64.b64encode(f"admin:{f.read().strip()}".encode()).decode()
 
@@ -112,7 +115,7 @@ def call(method, path, body=None, params=None, ok=(200,)):
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=60) as res:
+        with urllib.request.urlopen(req, timeout=60, context=_CTX) as res:
             text = res.read().decode()
             status = res.status
     except urllib.error.HTTPError as e:

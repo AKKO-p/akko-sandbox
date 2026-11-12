@@ -265,6 +265,8 @@ L'image par défaut, `akkoai/akko-mcp-trino:0.8.0`, contient le fournisseur Atla
 reste inactif tant que `MCP_CONTEXT_PROVIDERS` ne le nomme pas, ce que fait le
 profil `catalogs`.
 
+Atlas est servi en https ici, avec un certificat signé par l'autorité de certification du sandbox, parce que le serveur refuse un mot de passe Atlas en http clair (`ATLAS_URL` vaut `https://atlas:21000`, `ATLAS_CA_BUNDLE` vaut `/certs/ca.crt`).
+
 Apache Atlas ne publie que des archives de sources.
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile) construit le serveur
 depuis l'archive officielle des sources. Le build la vérifie avec le SHA-512 que
@@ -394,17 +396,14 @@ l'extérieur.
 Testé avec Apache Atlas 2.4.0 construit par
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
 `trinodb/trino-gateway:22`, `quay.io/keycloak/keycloak:26.7.5`,
-`openpolicyagent/opa:1.21.1-static`, `postgres:17.11-alpine`, et akko-mcp-trino
-construit depuis le commit `4bd78f2`. Ce commit ferme la connexion d'une lecture
-du contexte interrompue à son délai.
-Sans gateway, l'exécution a réussi ses 104 contrôles. Voici sa
+`openpolicyagent/opa:1.21.1-static`, `postgres:17.11-alpine`, et `akkoai/akko-mcp-trino:0.8.0` publié, avec Atlas servi en https. Sans gateway, l'exécution a réussi ses 104 contrôles. Voici sa
 section sur un Atlas lent :
 
 ```text
 == 8. A slow Atlas: the call answers in time, and Atlas's late answer finds no reader
   OK    carol, describe_table transactions with Atlas healthy: atlas ok
   OK    the probe sees the server's pooled connection to Atlas from both ends, held by the server
-  describe_table answered in 3.75 s with Atlas frozen, 1.27 s with Atlas healthy; the context deadline is 3 s
+  describe_table answered in 3.93 s with Atlas frozen, 1.26 s with Atlas healthy; the context deadline is 3 s
   OK    carol, describe_table transactions with Atlas frozen: atlas unavailable, file ok
   OK      the columns and the file's grain still come
   OK      the call took at least the deadline, 3 s, end to end
@@ -412,25 +411,24 @@ section sur un Atlas lent :
   OK    Atlas's side: one connection holds the request unread, and the client closed it (CLOSE_WAIT)
   OK      it is a connection of the pool, open before the pause
   OK      the server no longer holds it: its socket is gone, or in FIN_WAIT2 with no process
-  Atlas, resumed, served: GET http://atlas:21000/api/atlas/v2/entity/bulk/uniqueAttribute/type/hive_table?attr_0%3AqualifiedName=crm.transactions%40sandbox, status 200
+  Atlas, resumed, served: GET https://atlas:21000/api/atlas/v2/entity/bulk/uniqueAttribute/type/hive_table?attr_0%3AqualifiedName=crm.transactions%40sandbox, status 200
   OK    Atlas resumed: it no longer holds the connection of the cut read
   OK      and the server has no socket for it: Atlas's answer finds no reader
   OK    Atlas back: the context comes again
 ```
 
 Ici, le client est akko-mcp-trino, vu depuis Atlas. Avec un serveur construit
-depuis le commit `0e0159c`, avant ce correctif, une forme plus ancienne du
+depuis le commit `0e0159c`, un build d'avant la publication qui ne fermait pas encore cette connexion, une forme plus ancienne du
 contrôle de la connexion fermée échouait avec `got closed by the client 0, open with a request unread 1`. Atlas,
 une fois repris, lit encore la requête qu'il avait reçue et y répond ; cette
 réponse n'arrive à personne. Son journal d'audit montre cette réponse, que le
 script affiche.
 
 Derrière le gateway (`GATEWAY=1`), l'exécution a réussi ses 104 contrôles elle
-aussi, et `describe_table` avec Atlas figé a répondu en 3,92 s. Le contrôle lit
+aussi, et `describe_table` avec Atlas figé a répondu en 4,0 s. Le contrôle lit
 l'historique des requêtes sur les deux clusters.
 
-Au repos, sans gateway et juste après le démarrage, `docker stats` mesure ces
-mémoires : Atlas 1,934 Gio (limite 3 Gio), Trino 812,4 Mio, Keycloak 547,5 Mio, le
+Au repos, sans gateway et juste après le démarrage, sur un build antérieur (non mesuré de nouveau sur la 0.8.0), `docker stats` mesure ces mémoires : Atlas 1,934 Gio (limite 3 Gio), Trino 812,4 Mio, Keycloak 547,5 Mio, le
 serveur MCP 90,68 Mio, l'Inspector 113,2 Mio, PostgreSQL 36,27 Mio, OPA 11,98 Mio.
 Comptez environ 4 Go de mémoire libre. Le démarrage a pris 318 s, dont l'essentiel
 pour Atlas.
@@ -538,8 +536,7 @@ la nouvelle borne.
 
 On peut faire échouer chaque contrôle. Ces exécutions témoins reprennent le
 projet d'une exécution conservée avec `KEEP=1`, et s'arrêtent après la rafale
-(`LOAD_BURST_ONLY=1`). Les cinq premières ont tourné sur `d61d669`, le build
-d'avant `e60f915`, avec les mêmes réglages ; la dernière sur `e60f915` :
+(`LOAD_BURST_ONLY=1`). Les cinq premières ont tourné sur `d61d669`, un build d'avant la publication, avec les mêmes réglages ; la dernière sur `e60f915`, d'avant la publication aussi. Leurs chiffres n'ont pas été mesurés de nouveau sur la 0.8.0 :
 
 | Variables | Ce qu'elle montre |
 |---|---|
@@ -580,28 +577,27 @@ rafale, 40 appels ont envoyé l'unique lecture de la table ou l'ont attendue, et
 places : aucune des 50 réponses n'a indiqué `unavailable`.
 
 L'exécution a tourné sur une machine de 16 processeurs et 62,8 Gio de mémoire,
-avec ces images : akko-mcp-trino construit depuis le commit `e60f915` (version
-0.8.0), Apache Atlas 2.4.0 construit par
+avec ces images : `akkoai/akko-mcp-trino:0.8.0` publié, Apache Atlas 2.4.0 construit par
 [`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
 `openpolicyagent/opa:1.21.1-static`, `quay.io/keycloak/keycloak:26.7.5` et
-`postgres:17.11-alpine`. Les 43 contrôles ont réussi. Voici un extrait de sa
+`postgres:17.11-alpine`, avec Atlas en https. Les 43 contrôles ont réussi. Voici un extrait de sa
 sortie :
 
 ```text
-  seed: terms: 50000 in 743.2 s, 500 a request (67 a second)
-  seed: columns: wide_2000, 2000 in 56.7 s, 500 a request
-  seed: attached: wide_2000, 2000 terms, one a column, in 59.0 s
+  seed: terms: 50000 in 769.4 s, 500 a request (65 a second)
+  seed: columns: wide_2000, 2000 in 56.5 s, 500 a request
+  seed: attached: wide_2000, 2000 terms, one a column, in 75.9 s
   ...
 == 3. The server's default time budgets, with its caches empty
   context: atlas (timeout 5 s; atlas: timeouts: connect 1 s, read 5 s
-  call 1: 6.38 s, atlas unavailable
-  call 2: 5.53 s, atlas partial
-  call 3: 5.43 s, atlas partial
-  call 4: 3.83 s, atlas partial
-  Atlas's reads of wide_2000, by its audit log: 8.53 s, 3.95 s
+  call 1: 6.25 s, atlas unavailable
+  call 2: 5.40 s, atlas partial
+  call 3: 5.37 s, atlas partial
+  call 4: 4.20 s, atlas partial
+  Atlas's reads of wide_2000, by its audit log: 6.90 s, 3.72 s
   ...
 == 4. One call, which fills the caches
-  describe_table answered in 15.02 s, caches empty; Atlas read the table in 7.10 s
+  describe_table answered in 15.4 s, caches empty; Atlas read the table in 7.28 s
   OK    carol, describe_table wide_2000: 2000 columns, the context of Atlas, cut
   OK      each column described or listed as undescribed, once
   OK      each column described carries its description and its own term of Generated
@@ -609,13 +605,13 @@ sortie :
   the server's caches hold 735938 bytes (mcp_trino_context_cache_bytes)
 == 5. 50 calls of describe_table at once, after the caches expired
   ...
-  the burst took 27.28 s; each call 22.11 s to 27.27 s; the calls started within 0.01 s
+  the burst took 27.22 s; each call 21.92 s to 27.21 s; the calls started within 0.02 s
   the server's cache lookups during the burst: 80040 misses, 20010 hits, 2001 a call
   40 calls waited on the read in flight or sent it, 10 served from the cache
   OK      more calls met the read in flight than there are read slots: 40 > 32
   OK    50 answers, none an error
   the source of the context, answers by status: {'partial': 50}
-  the server's memory: at most 226.8 MiB in 17 samples of docker stats; cgroup peak since start 254.8 MiB; bound 368.0 MiB (the three caches + 256 MiB)
+  the server's memory: at most 209.6 MiB in 17 samples of docker stats; cgroup peak since start 221.9 MiB; bound 368.0 MiB (the three caches + 256 MiB)
   OK      docker stats sampled it, at least 5 times
   OK    the server's memory stayed under the bound, by docker stats
   OK      and by its cgroup's peak since it started

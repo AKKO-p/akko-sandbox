@@ -31,13 +31,14 @@ printed.
 import base64
 import json
 import os
+import ssl
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
 
-URL = os.environ.get("ATLAS_URL", "http://atlas:21000").rstrip("/")
+URL = os.environ.get("ATLAS_URL", "https://atlas:21000").rstrip("/")
 CLUSTER = os.environ.get("ATLAS_CLUSTER", "sandbox")
 TERMS = int(os.environ.get("LOAD_TERMS", "50000"))
 COLUMNS = int(os.environ.get("LOAD_COLUMNS", "2000"))
@@ -48,6 +49,8 @@ GLOSSARY = "Generated"
 SCHEMA = "load"
 NAMES = ["wide_2000"] + [f"wide_2000_{n}" for n in range(2, TABLES + 1)]
 SEEDED = "Written by tests/load/seed.py, complete."
+# Atlas is served over https: the CA that signed its certificate comes in ATLAS_CA_BUNDLE.
+_CTX = ssl.create_default_context(cafile=os.environ.get("ATLAS_CA_BUNDLE") or None)
 with open(os.environ["ATLAS_ADMIN_PASSWORD_FILE"]) as f:
     _AUTH = "Basic " + base64.b64encode(f"admin:{f.read().strip()}".encode()).decode()
 
@@ -61,7 +64,7 @@ def call(method, path, body=None, params=None, ok=(200,)):
     if data is not None:
         req.add_header("Content-Type", "application/json")
     try:
-        with urllib.request.urlopen(req, timeout=600) as res:
+        with urllib.request.urlopen(req, timeout=600, context=_CTX) as res:
             text = res.read().decode()
             status = res.status
     except urllib.error.HTTPError as e:

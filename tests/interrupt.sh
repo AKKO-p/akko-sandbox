@@ -52,7 +52,7 @@ state() {
     "['policy/catalogs.rego', 'policy/policy.rego']"
   check "  Atlas runs, not paused, healthy" "$(docker inspect -f '{{.State.Status}} {{.State.Paused}} {{.State.Health.Status}}' "$(docker compose ps -aq atlas)")" "running false healthy"
   check "  no kept secret left in the volume" "$(docker compose run --rm --no-deps -T -u 0 --entrypoint /bin/sh atlas-secrets -c 'ls /secrets/reader.kept 2>/dev/null | wc -l' 2>/dev/null | tr -d ' ')" "0"
-  check "  Atlas accepts the reader's secret that the server reads" "$(docker compose exec -T atlas sh -c 'curl -s -o /dev/null -w %{http_code} -u mcp_reader:$(cat /secrets/reader.secret) http://localhost:21000/api/atlas/admin/version')" "200"
+  check "  Atlas accepts the reader's secret that the server reads" "$(docker compose exec -T atlas sh -c 'curl -s -o /dev/null -w %{http_code} --cacert /certs/ca.crt -u mcp_reader:$(cat /secrets/reader.secret) https://localhost:21000/api/atlas/admin/version')" "200"
 }
 
 echo "== 1. Without KEEP, while Atlas is paused for the slow call"
