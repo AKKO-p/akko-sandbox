@@ -1,0 +1,69 @@
+[
+  {
+    "id": "CTX-01",
+    "question": "Which column holds the address the company writes to, for each customer?",
+    "expected": [
+      "demo.crm.customers.email"
+    ],
+    "forbidden": [
+      "demo.crm.customers.country",
+      "demo.crm.customers.full_name"
+    ],
+    "why": "The data catalog describes customers.email as the address the company writes to. Trino has no comment on email.",
+    "why_forbidden": "A country of residence is where a customer lives, not where the company writes; a name is not an address."
+  },
+  {
+    "id": "CTX-02",
+    "question": "What is the Turnover of each month?",
+    "expected": [
+      "demo.crm.transactions.amount",
+      "demo.crm.transactions.booked_at"
+    ],
+    "forbidden": [
+      "demo.crm.accounts.balance",
+      "demo.crm.accounts.opened_on"
+    ],
+    "why": "In the data catalog's glossary Sales, Turnover is the total revenue over a period, attached to crm.transactions, and a synonym of Revenue, attached to transactions.amount; booked_at is described there as the day the movement was booked. Trino never names Turnover and has no comment on booked_at.",
+    "why_forbidden": "A balance is what an account holds, not revenue; the day an account was opened is not when money came in."
+  },
+  {
+    "id": "CTX-03",
+    "question": "How many accounts are held by customers of each country of residence?",
+    "expected": [
+      "demo.crm.customers.country",
+      "demo.crm.accounts.customer_id"
+    ],
+    "forbidden": [
+      "demo.crm.accounts.currency"
+    ],
+    "why": "The data catalog describes customers.country as the country of residence, and accounts.customer_id as the customer who holds the account. Trino has no comment on either.",
+    "why_forbidden": "An account's currency is not where its holder lives."
+  },
+  {
+    "id": "CTX-04",
+    "question": "For each account, give the name of its holder and the ISO 4217 code of the account.",
+    "expected": [
+      "demo.crm.customers.full_name",
+      "demo.crm.accounts.currency",
+      "demo.crm.accounts.customer_id"
+    ],
+    "forbidden": [
+      "demo.crm.customers.country"
+    ],
+    "why": "The data catalog describes accounts.currency as an ISO 4217 code, customers.full_name as the name of the person or of the company, and accounts.customer_id as the account's holder. Trino has no comment on these three columns.",
+    "why_forbidden": "customers.country is the other ISO code of the sandbox, ISO 3166, a customer's country, not an account's code."
+  },
+  {
+    "id": "CTX-05",
+    "question": "How many movements were booked on the accounts of each holder?",
+    "expected": [
+      "demo.crm.transactions.account_id",
+      "demo.crm.accounts.customer_id"
+    ],
+    "forbidden": [
+      "demo.crm.accounts.balance"
+    ],
+    "why": "The data catalog describes transactions.account_id as the account the movement is booked on, and accounts.customer_id as the customer who holds the account. Trino has no comment on either.",
+    "why_forbidden": "A balance is an amount an account holds, not a count of movements."
+  }
+]
