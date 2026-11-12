@@ -7,7 +7,7 @@
 # Removes everything at the end unless KEEP=1. GATEWAY=1 runs the same checks behind
 # Trino Gateway, two clusters.
 #
-#   tests/v071.sh                the sandbox's image, 0.7.2
+#   tests/v071.sh                the sandbox's image, 0.8.0
 #   GATEWAY=1 tests/v071.sh
 set -uo pipefail
 cd "$(dirname "$0")/.."

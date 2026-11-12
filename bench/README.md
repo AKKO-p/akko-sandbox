@@ -17,7 +17,7 @@ On a Linux host with Docker, from the repository root, one run at a time:
 ```bash
 bench/run.sh security                         # every suite of bench/security/cases.yaml
 bench/run.sh security --suite smoke,v071      # some of them
-bench/run.sh security --image akkoai/akko-mcp-trino:0.7.2 --seed 1311
+bench/run.sh security --image akkoai/akko-mcp-trino:0.8.0 --seed 1311
 bench/run.sh perf                             # the k6 script against the Inspector
 bench/run.sh correctness --rescore agent/reports/2026-11-01-final-mistral-0.7.0-4105967.json
 AGENT_ENV_FILE=/root/secrets/agent.env \

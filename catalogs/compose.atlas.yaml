@@ -1,14 +1,15 @@
 # The sandbox with a data catalog: Apache Atlas 2.4.0 describes the demo tables, and
 # akko-mcp-trino serves that context in describe_table and describe_schema, only for what
-# Trino lists to the caller. Needs akko-mcp-trino 0.8 or later, which carries the Atlas
-# provider.
+# Trino lists to the caller. Needs akko-mcp-trino 0.8 or later (the default image), which carries
+# the Atlas provider and refuses an Atlas password over plain http: Atlas is served over https,
+# with a certificate the sandbox's own certificate authority signed (certs/generate.sh).
 #
 #   COMPOSE_FILE=compose.yaml:catalogs/compose.atlas.yaml COMPOSE_PROFILES=catalogs \
-#     MCP_IMAGE=<an image of akko-mcp-trino 0.8> docker compose up -d --wait
+#     docker compose up -d --wait
 #
 # The first start builds Atlas from its official source release (catalogs/atlas/Dockerfile),
 # which takes a while. Atlas keeps its state inside its container: a new container is seeded
-# again. For a laptop demo only: no TLS, file-based users, passwords drawn at random.
+# again. For a laptop demo only: file-based users, passwords drawn at random.
 
 services:
   # One-shot: the passwords of Atlas's two accounts, drawn at random, written to a volume.
@@ -32,7 +33,8 @@ services:
     mem_limit: 32m
 
   # Apache Atlas 2.4.0, with HBase and Solr in the same container (catalogs/atlas).
-  # Its web interface and REST API: http://localhost:21000, as admin, with the password in
+  # Its web interface and REST API: https://localhost:21000 (the certificate is signed by the
+  # sandbox's CA, certs/ca.crt in the certs volume), as admin, with the password in
   #   docker compose exec atlas cat /secrets/admin.secret
   atlas:
     restart: "no"
@@ -44,15 +46,20 @@ services:
       ATLAS_ADMIN_PASSWORD_FILE: /secrets/admin.secret
       ATLAS_READER_USER: mcp_reader
       ATLAS_READER_PASSWORD_FILE: /secrets/reader.secret
+      ATLAS_TLS_KEYSTORE: /certs/atlas.p12
+      ATLAS_TLS_PASSWORD_FILE: /certs/atlas-keystore.secret
+      ATLAS_TLS_CA_FILE: /certs/ca.crt
     volumes:
       - atlas-secrets:/secrets:ro
+      - certs:/certs:ro
     ports:
       - "127.0.0.1:${ATLAS_PORT:-21000}:21000"
     depends_on:
       atlas-secrets: {condition: service_completed_successfully}
+      certs: {condition: service_completed_successfully}
     healthcheck:
       # The status page needs no login; ACTIVE once Atlas serves its API.
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:21000/api/atlas/admin/status | grep -q ACTIVE"]
+      test: ["CMD-SHELL", "curl -fsS --cacert /certs/ca.crt https://localhost:21000/api/atlas/admin/status | grep -q ACTIVE"]
       interval: 10s
       timeout: 5s
       retries: 60
@@ -66,16 +73,18 @@ services:
     restart: "no"
     security_opt: ["no-new-privileges:true"]
     profiles: ["catalogs"]
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
     user: "1000:1000"
     entrypoint: ["python", "/seed/seed.py"]
     environment:
-      ATLAS_URL: http://atlas:21000
+      ATLAS_URL: https://atlas:21000
+      ATLAS_CA_BUNDLE: /certs/ca.crt
       ATLAS_ADMIN_PASSWORD_FILE: /secrets/admin.secret
       ATLAS_CLUSTER: sandbox
     volumes:
       - ./catalogs/seed.py:/seed/seed.py:ro
       - atlas-secrets:/secrets:ro
+      - certs:/certs:ro
     depends_on:
       atlas: {condition: service_healthy}
     mem_limit: 64m
@@ -101,7 +110,8 @@ services:
     environment:
       MCP_CONTEXT_PROVIDERS: atlas
       MCP_CONTEXT_CANARY: demo.mcp.canary
-      ATLAS_URL: http://atlas:21000
+      ATLAS_URL: https://atlas:21000
+      ATLAS_CA_BUNDLE: /certs/ca.crt
       ATLAS_USER: mcp_reader
       ATLAS_PASSWORD_FILE: /atlas-secrets/reader.secret
       ATLAS_CLUSTERS: '{"demo": "sandbox"}'

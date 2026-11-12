@@ -56,11 +56,12 @@ services:
     restart: "no"
     security_opt: ["no-new-privileges:true"]
     profiles: ["tools"]
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
     user: "1000:1000"
     entrypoint: ["python", "/seed/seed.py"]
     environment:
-      ATLAS_URL: http://atlas:21000
+      ATLAS_URL: https://atlas:21000
+      ATLAS_CA_BUNDLE: /certs/ca.crt
       ATLAS_ADMIN_PASSWORD_FILE: /secrets/admin.secret
       ATLAS_CLUSTER: sandbox
       LOAD_TERMS: ${LOAD_TERMS:-50000}
@@ -71,11 +72,12 @@ services:
     volumes:
       - ./tests/load/seed.py:/seed/seed.py:ro
       - atlas-secrets:/secrets:ro
+      - certs:/certs:ro
     mem_limit: 256m
   history:
     restart: "no"
     security_opt: ["no-new-privileges:true"]
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
     profiles: ["tools"]
     entrypoint: ["sleep", "infinity"]
     volumes:

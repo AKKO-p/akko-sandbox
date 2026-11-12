@@ -25,7 +25,7 @@ services:
       MCP_URL: http://mcp:3000/mcp
       # The image the mcp service runs, with compose.yaml's default: written in
       # the report, since the server announces no version of its own.
-      MCP_IMAGE: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+      MCP_IMAGE: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
     working_dir: /agent
     volumes:
       # The reports, written by the container's user.

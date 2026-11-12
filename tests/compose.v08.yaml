@@ -2,8 +2,8 @@
 # Added to COMPOSE_FILE by the script, after catalogs/compose.atlas.yaml, and before
 # tests/compose.v08.gateway.yaml when GATEWAY=1.
 #
-#   MCP_IMAGE=<image> tests/context.sh
-#   MCP_IMAGE=<image> GATEWAY=1 tests/context.sh
+#   tests/context.sh
+#   GATEWAY=1 tests/context.sh
 
 services:
   # The catalogs of tests/v07/catalog: demo as it is, and tpch, which no Atlas cluster is
@@ -56,7 +56,7 @@ services:
   history:
     restart: "no"
     security_opt: ["no-new-privileges:true"]
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
     profiles: ["tools"]
     entrypoint: ["sleep", "infinity"]
     volumes:

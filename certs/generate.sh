@@ -9,7 +9,8 @@
 set -eu
 cd /certs
 if [ -s trino.pem ] && [ -s keycloak.crt ] && [ -s mcp-client.secret ] \
-  && [ -s gateway.pem ] && [ -s gateway-admin.secret ] && [ -s gateway-session.pub ]; then
+  && [ -s gateway.pem ] && [ -s gateway-admin.secret ] && [ -s gateway-session.pub ] \
+  && [ -s atlas.p12 ] && [ -s atlas-keystore.secret ]; then
   echo "certificates already present"
   exit 0
 fi
@@ -37,6 +38,8 @@ sign trino "DNS:trino,DNS:localhost,IP:127.0.0.1"
 sign keycloak "DNS:keycloak,DNS:localhost,IP:127.0.0.1"
 # Used only by the Trino Gateway variant (gateway/compose.gateway.yaml).
 sign gateway "DNS:gateway,DNS:localhost,IP:127.0.0.1"
+# Used only by the catalogs profile (catalogs/compose.atlas.yaml): Apache Atlas serves https.
+sign atlas "DNS:atlas,DNS:localhost,IP:127.0.0.1"
 
 # The MCP server's client secret at Keycloak, read by both at start.
 openssl rand -hex 24 > mcp-client.secret
@@ -46,16 +49,21 @@ openssl rand -hex 24 > gateway-admin.secret
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out gateway-session.key
 openssl pkey -in gateway-session.key -pubout -out gateway-session.pub
 
+# Atlas reads its key and certificate, with the CA, from one PKCS12 file, under a drawn password.
+openssl rand -hex 24 > atlas-keystore.secret
+openssl pkcs12 -export -name atlas -inkey atlas.key -in atlas.crt -certfile ca.crt \
+  -out atlas.p12 -passout file:atlas-keystore.secret
+
 # Trino reads its key and certificate from one PEM file.
 cat trino.key trino.crt > trino.pem
 cat gateway.key gateway.crt > gateway.pem
-rm -f ca.key ca.srl trino.key gateway.key gateway.crt
+rm -f ca.key ca.srl trino.key gateway.key gateway.crt atlas.key atlas.crt
 
 # Trino and Keycloak run as uid 1000, the MCP server as uid 10001: the secret is
 # readable by both, which a real deployment would keep in a secret store instead.
 # The gateway's admin password is not readable by the MCP server.
-chown 1000:1000 trino.pem gateway.pem keycloak.key keycloak.crt \
+chown 1000:1000 trino.pem gateway.pem keycloak.key keycloak.crt atlas.p12 atlas-keystore.secret \
   gateway-admin.secret gateway-session.key gateway-session.pub
-chmod 0400 trino.pem gateway.pem keycloak.key gateway-admin.secret gateway-session.key
+chmod 0400 trino.pem gateway.pem keycloak.key gateway-admin.secret atlas.p12 atlas-keystore.secret gateway-session.key
 chmod 0444 ca.crt trino.crt keycloak.crt mcp-client.secret gateway-session.pub
-echo "certificate authority, Trino, Keycloak and gateway certificates, secrets created"
+echo "certificate authority, Trino, Keycloak, gateway and Atlas certificates, secrets created"
