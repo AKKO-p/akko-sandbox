@@ -32,9 +32,10 @@
 # Each check can be made to fail. LOAD_CALLS (50) and LOAD_SPREAD_SECONDS (0) change the burst;
 # LOAD_BURST_ONLY=1 stops after it, for a witness run. LOAD_OPA_MEMORY=64m gives OPA the
 # sandbox's own limit.
-# With LOAD_CACHE_BYTES=1 LOAD_TERMS_CACHE_BYTES=1, nothing is cached: a burst at once still
-# makes Atlas read the table once, since the calls wait on the read in flight, and a burst
-# spread out makes it read the table once per call. LOAD_MEMORY_MARGIN_MB (256, in MiB) and
+# With LOAD_CACHE_BYTES=1 LOAD_TERMS_CACHE_BYTES=1, nothing is cached: in a burst at once,
+# the calls that reach the context while the table is read wait on that read, and those
+# that reach it after the read ended read it again (twice for 50 calls, measured); a burst
+# spread out makes Atlas read the table once per call. LOAD_MEMORY_MARGIN_MB (256, in MiB) and
 # LOAD_RESPONSE_LIMIT (the server's) change the bounds the answers are checked against;
 # LOAD_RESPONSE_CHARS changes the server's own limit.
 set -uo pipefail
@@ -195,7 +196,7 @@ check_memory() {
   read -r samples top <<<"$(mib < "$scratch/memory")"
   bound=$(python3 -c "import sys; print('%.1f' % (sum(map(int, sys.argv[1:4])) / 1048576 + int(sys.argv[4])))" "$cache_bytes" "$terms_cache_bytes" "$visibility_bytes" "$margin_mb")
   echo "  the server's memory: at most $top MiB in $samples samples of docker stats; cgroup peak since start $(python3 -c "import sys; print('%.1f MiB' % (int(sys.argv[1]) / 1048576))" "${peak:-0}"); bound $bound MiB (the three caches + $margin_mb MiB)"
-  check "  docker stats sampled it, at least 5 times" "$([ "$samples" -ge 5 ] && echo yes)" "yes"
+  check "  docker stats sampled it, at least 5 times" "$([ "$samples" -ge 5 ] && echo yes || echo no)" "yes"
   check "the server's memory stayed under the bound, by docker stats" "$(python3 -c "import sys; print(float(sys.argv[1]) < float(sys.argv[2]))" "$top" "$bound")" "True"
   check "  and by its cgroup's peak since it started" "$(python3 -c "import sys; print(0 < int(sys.argv[1]) / 1048576 < float(sys.argv[2]))" "${peak:-0}" "$bound")" "True"
   check "  the server was neither restarted nor killed" "$(docker inspect -f '{{.RestartCount}} {{.State.OOMKilled}} {{.State.Running}}' "$mcp_id")" "0 false true"
@@ -219,12 +220,12 @@ echo "  server: $(docker compose exec -T mcp akko-mcp-trino --version 2>&1 | tai
 read_settings
 mcp_id=$(docker compose ps -q mcp)
 grep '^context:\|^visibility:\|^atlas: catalogs\|^atlas: glossaries\|^atlas: timeouts\|^atlas: term reads' <<<"$checked" | sed 's/^/  /'
-check "the server read its settings: lifetime, the three cache limits, the response limit, the reads in flight" "$([ -n "$ttl" ] && [ -n "$cache_bytes" ] && [ -n "$terms_cache_bytes" ] && [ -n "$visibility_bytes" ] && [ -n "$response_chars" ] && [ -n "$in_flight" ] && echo yes)" "yes"
+check "the server read its settings: lifetime, the three cache limits, the response limit, the reads in flight" "$([ -n "$ttl" ] && [ -n "$cache_bytes" ] && [ -n "$terms_cache_bytes" ] && [ -n "$visibility_bytes" ] && [ -n "$response_chars" ] && [ -n "$in_flight" ] && echo yes || echo no)" "yes"
 echo "  MCP_CONTEXT_CACHE_BYTES=$cache_bytes MCP_CONTEXT_TERMS_CACHE_BYTES=$terms_cache_bytes MCP_VISIBILITY_CACHE_BYTES=$visibility_bytes MCP_CONTEXT_TTL_SECONDS=$ttl MCP_CONTEXT_RESPONSE_CHARS=$response_chars MCP_CONTEXT_MAX_CONCURRENCY=$in_flight"
 # The burst tests that calls waiting on a read in flight take no read slot: it must be
 # larger than the slots, unless LOAD_CALLS makes it smaller on purpose.
 if [ -z "${LOAD_CALLS:-}" ]; then
-  check "the burst is larger than the reads in flight: $calls calls, $in_flight reads" "$([ "$calls" -gt "${in_flight:-0}" ] && echo yes)" "yes"
+  check "the burst is larger than the reads in flight: $calls calls, $in_flight reads" "$([ "$calls" -gt "${in_flight:-0}" ] && echo yes || echo no)" "yes"
 fi
 
 echo "== 2. The wide tables, in Trino and in Atlas"
@@ -323,7 +324,7 @@ n = sum(1 for c in calls if c['start'] < end and c['end'] > start)
 print(n, 'from %.2f s to %.2f s after the first call started' % (start - first, end - first))" "$scratch/audit" "$scratch/burst")
 need=$(( (calls * 9 + 9) / 10 ))
 echo "  Atlas's read of the table: ${overlap#* }; $calls calls, ${overlap%% *} of them in flight during it"
-check "  at least $need of the $calls calls overlap that read (90 %)" "$([ "${overlap%% *}" -ge "$need" ] && echo yes)" "yes"
+check "  at least $need of the $calls calls overlap that read (90 %)" "$([ "${overlap%% *}" -ge "$need" ] && echo yes || echo no)" "yes"
 limit=${LOAD_RESPONSE_LIMIT:-$response_chars}
 size='len(json.dumps({k: json.loads(r["text"])[k] for k in ("table", "column_context", "terms")}))'
 echo "  the context of each answer: $(rows "'%d to %d characters' % (min($size for r in rows), max($size for r in rows))" < "$scratch/burst"), limit $limit"
@@ -363,7 +364,7 @@ new = [r for r in map(json.loads, open(sys.argv[2])) if r.get('user') == 'carol_
 print(len(new), sum(1 for r in new if 'mcp-gate' in (r['tags'] or [])), ','.join(sorted({r['source'] or '-' for r in new})))" "$scratch/before" "$scratch/after")
     read -r n gate source <<<"$new"
     measured[$tool.$when]="$n ($gate mcp-gate)"
-    check "$tool, $when: answered; its statements are in Trino's history, all from source trino-mcp" "$error $([ "${n:-0}" -gt 0 ] && echo yes) $source" "None yes trino-mcp"
+    check "$tool, $when: answered; its statements are in Trino's history, all from source trino-mcp" "$error $([ "${n:-0}" -gt 0 ] && echo yes || echo no) $source" "None yes trino-mcp"
     echo "  $tool, $when: $n statements, $gate of them tagged mcp-gate"
   done
 done
