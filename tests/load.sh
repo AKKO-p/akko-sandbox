@@ -12,8 +12,9 @@
 # 4. With the run's time budgets, one call that fills the caches.
 # 5. 50 calls of describe_table at once, as carol_analyst, after the caches expired: the
 #    server's memory stays under its three cache limits plus 256 MiB; Atlas reads the table
-#    once and each term once, as its own audit log counts, and at least 90 % of the calls
-#    overlap that one read; every answer keeps its context under MCP_CONTEXT_RESPONSE_CHARS
+#    once and each term once, as its own audit log counts; more calls than the read slots
+#    waited on that read or sent it, by the server's cache lookups; the windows of at least
+#    90 % of the calls overlap it; every answer keeps its context under MCP_CONTEXT_RESPONSE_CHARS
 #    and says it was cut.
 # 6. The statements each tool runs in Trino, read from Trino's own query history.
 # 7. Small cache limits (512 KiB for tables, 256 KiB for terms), and the three tables read in
@@ -40,7 +41,7 @@
 # LOAD_RESPONSE_CHARS changes the server's own limit.
 set -uo pipefail
 export LC_ALL=C
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/.." || exit 1
 export COMPOSE_PROFILES=catalogs
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-akko-sandbox-load}"
 export COMPOSE_FILE=compose.yaml:catalogs/compose.atlas.yaml:tests/compose.load.yaml
@@ -137,12 +138,19 @@ atlas_get() { # path, then a Python expression on the JSON answer, as d
 # mark writes a marker into it, a request as admin, named for this run; audit_between prints
 # the server's requests between two markers, once the second one is written.
 run_id="$$-$(date +%s)"
-mark() { docker compose exec -T atlas sh -c 'curl -s -o /dev/null -u "admin:$(cat /secrets/admin.secret)" "http://127.0.0.1:21000/api/atlas/admin/version?load_marker=$0"' "$1-$run_id"; }
+mark() {
+  docker compose exec -T atlas sh -c 'curl -fsS -o /dev/null -u "admin:$(cat /secrets/admin.secret)" "http://127.0.0.1:21000/api/atlas/admin/version?load_marker=$0"' "$1-$run_id" \
+    || { echo "  Atlas did not answer the marker $1" >&2; exit 1; }
+}
 audit_between() { # first marker, second marker
   for _ in $(seq 1 30); do
     docker compose exec -T atlas cat /data/logs/audit.log 2>/dev/null > "$scratch/audit.log"
     grep -q "load_marker=$2-$run_id|" "$scratch/audit.log" && break
     sleep 1
+  done
+  # A slice without both markers would be empty, and a check of no read would pass on it.
+  for m in "$1" "$2"; do
+    grep -q "load_marker=$m-$run_id|" "$scratch/audit.log" || { echo "  the marker $m is missing from Atlas's audit log" >&2; exit 1; }
   done
   awk -v a="load_marker=$1-$run_id|" -v b="load_marker=$2-$run_id|" 'index($0, a) {on = 1; next} index($0, b) {on = 0} on' "$scratch/audit.log" | grep '|mcp_reader|'
 }
@@ -262,6 +270,7 @@ audit_between probe-start probe-end > "$scratch/audit"
 echo "  Atlas's reads of wide_2000, by its audit log: $(read_times wide_2000 < "$scratch/audit")"
 restart_mcp
 
+echo "== 2 (continued). The catalog in Atlas"
 glossary=$(atlas_get /api/atlas/v2/glossary '[g["guid"] for g in d if g["name"] == "Generated"][0]')
 check "Atlas: the glossary Generated holds 50000 terms" "$(atlas_get "/api/atlas/v2/glossary/$glossary" 'len(d.get("terms", []))')" "50000"
 for t in $tables; do
@@ -300,17 +309,31 @@ sleep 2
 stop_sampler
 audit_between burst-start burst-end > "$scratch/audit"
 echo "  the burst took $(rows 'round(max(r["end"] for r in rows) - min(r["start"] for r in rows), 2)' < "$scratch/burst") s; each call $(rows '"%.2f s to %.2f s" % (min(r["end"] - r["start"] for r in rows), max(r["end"] - r["start"] for r in rows))' < "$scratch/burst"); the calls started within $(rows '"%.2f s" % (max(r["start"] for r in rows) - min(r["start"] for r in rows))' < "$scratch/burst")"
-echo "  the server's cache lookups during the burst: $(( $(metric 'mcp_trino_context_cache_lookups_total{provider="atlas",result="miss"}') - misses )) misses, $(( $(metric 'mcp_trino_context_cache_lookups_total{provider="atlas",result="hit"}') - hits )) hits"
+misses=$(( $(metric 'mcp_trino_context_cache_lookups_total{provider="atlas",result="miss"}') - misses ))
+hits=$(( $(metric 'mcp_trino_context_cache_lookups_total{provider="atlas",result="hit"}') - hits ))
+# Each call looks up the table and its 2,000 terms once, at its entry into the context: a call
+# that finds the table missing either sends the read or waits on the one in flight; a call that
+# finds it cached is a hit for all of them.
+per_call=$((1 + 2000))
+echo "  the server's cache lookups during the burst: $misses misses, $hits hits, $per_call a call"
+echo "  $((misses / per_call)) calls waited on the read in flight or sent it, $((hits / per_call)) served from the cache"
+# Calls that waited on the read take no read slot: the burst tests it only if more calls than
+# the slots met the read in flight.
+if [ -z "${LOAD_CALLS:-}" ]; then
+  check "  more calls met the read in flight than there are read slots: $((misses / per_call)) > $in_flight" "$([ $((misses / per_call)) -gt "${in_flight:-0}" ] && echo yes || echo no)" "yes"
+fi
 check "$calls answers, none an error" "$(rows '(len(rows), [r["i"] for r in rows if r["error"] or "error" in json.loads(r["text"])])' < "$scratch/burst")" "($calls, [])"
 echo "  the source of the context, answers by status: $(rows 'dict(sorted(collections.Counter(json.loads(r["text"])["context_sources"].get("atlas", "-") for r in rows).items()))' < "$scratch/burst")"
 check_memory
-check "no service was killed for lack of memory" "$(docker inspect -f '{{.Name}} {{.State.OOMKilled}}' $(docker compose ps -aq) | grep -c ' true$')" "0"
+mapfile -t containers < <(docker compose ps -aq)
+check "no service was killed for lack of memory" "$(docker inspect -f '{{.Name}} {{.State.OOMKilled}}' "${containers[@]}" | grep -c ' true$')" "0"
 check "Atlas read the table once for the whole burst (its audit log)" "$(table_reads wide_2000 < "$scratch/audit")" "1"
 check "  and each of the 2000 terms once: reads, distinct terms" "$(term_reads < "$scratch/audit")" "2000 2000"
 check "  and nothing else" "$(grep -vE "qualifiedName=load\\.wide_2000%40sandbox(&|\\||$)|glossary/term/" "$scratch/audit" | grep -c .)" "0"
 # Atlas's first read of the table, from its start (UTC, in the audit line) to its end (start
-# plus its time); a call overlaps it when it started before the read ended and ended after
-# the read started.
+# plus its time). A call's window, from its request to its answer, overlaps it when the call
+# started before the read ended and ended after the read started. A window counts the call's
+# whole time, Trino's DESCRIBE included, so a call served from the cache can overlap too.
 overlap=$(python3 -c "
 import datetime, json, re, sys
 lines = [l for l in open(sys.argv[1]) if re.search(r'qualifiedName=load\.wide_2000%40sandbox(&|\||$)', l)]
@@ -323,8 +346,8 @@ first = min(c['start'] for c in calls)
 n = sum(1 for c in calls if c['start'] < end and c['end'] > start)
 print(n, 'from %.2f s to %.2f s after the first call started' % (start - first, end - first))" "$scratch/audit" "$scratch/burst")
 need=$(( (calls * 9 + 9) / 10 ))
-echo "  Atlas's read of the table: ${overlap#* }; $calls calls, ${overlap%% *} of them in flight during it"
-check "  at least $need of the $calls calls overlap that read (90 %)" "$([ "${overlap%% *}" -ge "$need" ] && echo yes || echo no)" "yes"
+echo "  Atlas's read of the table: ${overlap#* }; the windows of ${overlap%% *} of the $calls calls overlap it"
+check "  the windows of at least $need of the $calls calls overlap that read (90 %)" "$([ "${overlap%% *}" -ge "$need" ] && echo yes || echo no)" "yes"
 limit=${LOAD_RESPONSE_LIMIT:-$response_chars}
 size='len(json.dumps({k: json.loads(r["text"])[k] for k in ("table", "column_context", "terms")}))'
 echo "  the context of each answer: $(rows "'%d to %d characters' % (min($size for r in rows), max($size for r in rows))" < "$scratch/burst"), limit $limit"

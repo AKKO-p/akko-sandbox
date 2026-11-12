@@ -26,7 +26,7 @@ services:
       # One page of describe_table holds every column of a wide table, so that its context is
       # read, and cut, for all 2,000 columns. With the default, 100, the answer lists 100
       # columns and their context fits whole.
-      TRINO_MAX_ROWS: "2000"
+      TRINO_MAX_ROWS: ${LOAD_MAX_ROWS:-2000}
       # Short lifetimes, so that the run sees the caches expire; the two cache limits, set
       # here and printed by the script. LOAD_* change them for a witness run, and section 7
       # of the script for its own small limits.
