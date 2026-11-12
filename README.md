@@ -425,95 +425,170 @@ MCP server 81.54 MiB. Plan for about 5 GB of free memory.
 MCP_IMAGE=<an image of akko-mcp-trino 0.8> tests/load.sh
 ```
 
-`tests/load.sh` checks that the context holds on a large catalog, and measures
-it. It adds [`tests/compose.load.yaml`](tests/compose.load.yaml) to the
-`catalogs` profile. PostgreSQL allows 1,600 columns at most, so the wide table
-lives in a second Trino catalog, `wide`, on Trino's memory connector. The
+`tests/load.sh` checks that the context holds on a large data catalog. It also
+measures its cost. It adds [`tests/compose.load.yaml`](tests/compose.load.yaml)
+to the `catalogs` profile. PostgreSQL allows 1,600 columns at most, so the wide
+tables are in a second Trino catalog, `wide`, on Trino's memory connector. The
 server maps it to the same Atlas cluster, `sandbox`, and serves the glossary
 `Generated` next to `Sales`.
 
-[`tests/load/seed.py`](tests/load/seed.py) writes into Atlas:
+[`tests/load/seed.py`](tests/load/seed.py) writes three things into Atlas:
 
-- the table `load.wide_2000`, with 2,000 columns, each with a description;
+- three tables, `load.wide_2000`, `load.wide_2000_2` and `load.wide_2000_3`,
+  each with 2,000 columns, each column with a description;
 - the glossary `Generated`, with 50,000 terms, in requests of 500;
-- 2,000 of these terms, attached to the columns, one term per column.
+- 2,000 of these terms for each table, attached to its columns, one term per
+  column.
 
 Atlas has a bulk call for glossary terms, `POST /api/atlas/v2/glossary/terms`.
 It checks each new name against every term of the glossary, so each request
-takes longer as the glossary grows. Measured with Atlas 2.4.0: 15.1 s for the
-first 500 terms, 211.6 s for the 500 after 25,000. The seed writes the terms
-through the entity bulk call, `POST /api/atlas/v2/entity/bulk`, as
-`AtlasGlossaryTerm` entities anchored to the glossary. Atlas then serves them
-as any other term.
+takes longer as the glossary grows. In an earlier run with Atlas 2.4.0, the
+first 500 terms took 15.1 s, and the 500 after the first 25,000 took 211.6 s.
+The seed writes the terms through the entity bulk call,
+`POST /api/atlas/v2/entity/bulk`, as `AtlasGlossaryTerm` entities anchored to
+the glossary. Atlas then serves them like any other term.
 
 The run sets the caches' lifetime to 60 s, the table cache to 64 MiB
 (`MCP_CONTEXT_CACHE_BYTES=67108864`) and the terms cache to 16 MiB
-(`MCP_CONTEXT_TERMS_CACHE_BYTES=16777216`). It reads them back from the
-server's `--check`. The server's container may use 1 GiB, above the bound checked
-below, so that a server past it is measured, not killed. Then Carol calls `describe_table` on the wide table once, to
-fill the caches. The script waits until they expire and sends 50 calls at once,
-each from its own MCP session. It checks the following:
+(`MCP_CONTEXT_TERMS_CACHE_BYTES=16777216`). The visibility cache keeps its
+default, 32 MiB. The script reads the three limits back from the server's
+`--check`. The server's container may use 1 GiB, above the bound checked below,
+so that a server past it is measured, not killed. The sandbox's own limit for
+it, 256 MiB, is below the peak measured during the burst.
 
-- the server's memory stays under the two cache limits plus 256 MB, sampled by
-  `docker stats` during the burst, and by the peak of its cgroup since it
-  started;
+The run has four steps:
+
+1. The server starts with its default time budgets, 5 s, and its caches empty.
+   Carol calls `describe_table` on `wide_2000` four times in a row. The script
+   prints what each call served, and how long Atlas took for each read of the
+   table.
+2. The server starts again with the run's settings. Carol calls
+   `describe_table` once, to fill the caches.
+3. After the caches expired, the script sends 50 calls at once, each from its
+   own MCP session.
+4. The server starts again with small cache limits: 512 KiB for tables,
+   256 KiB for terms, and a lifetime of 600 s, so that nothing expires. Carol
+   calls `describe_table` on the three tables in turn. A table and its terms
+   take more than these limits hold.
+
+After the 50 calls, the script checks the following:
+
+- the server's memory stays under its three cache limits plus 256 MiB,
+  measured by `docker stats` during the burst and by its cgroup's peak since
+  it started;
 - Atlas reads the table once and each of the 2,000 terms once for the whole
-  burst. The script counts the reads in Atlas's own audit log;
+  burst. The script counts the reads in Atlas's own audit log, between two
+  markers it writes there;
+- at least 45 of the 50 calls are in flight during that one read. The script
+  compares the start and end of each call with the start and duration that
+  Atlas logs for the read;
 - every answer keeps its context under `MCP_CONTEXT_RESPONSE_CHARS` (60,000),
   says `"context_truncated": true`, lists the columns left out in
-  `undescribed_columns`, and reports the source as `partial`.
+  `undescribed_columns`, and gives the source as `partial`.
 
-Each check can be seen to fail. With no cache (`LOAD_CACHE_BYTES=1
-LOAD_TERMS_CACHE_BYTES=1`) and 5 calls 15 s apart, Atlas reads the table once
-per call. `LOAD_MEMORY_MARGIN_MB=0` and `LOAD_RESPONSE_LIMIT=50000` move the
-bounds below what was measured.
+With the small limits, the script checks that the caches stay under them after
+each call. `wide_2000_3`, read last, is still cached: Atlas does not read it
+again. `wide_2000`, read first, was evicted: Atlas reads it again, with its
+2,000 terms. The server's memory stays under the new bound.
 
-The run raises three settings, each for a reason it measured, as the server's
-docs advise for large catalogs:
+Each check can be made to fail. These witness runs use the project of a run
+kept with `KEEP=1`, and stop after the burst (`LOAD_BURST_ONLY=1`):
 
-- OPA gets 512 MB. With the sandbox's 64 MB, the kernel killed it during the 50
-  `DESCRIBE` statements, each asking it to filter 2,000 columns, and Trino then
-  failed every statement.
-- `MCP_CONTEXT_TIMEOUT_SECONDS` and `ATLAS_TIMEOUT_SECONDS` are both 20 s. With
-  the defaults, 5 s, Atlas took 5.9 s to read the table with nothing cached: of
-  four calls in a row, the first two served no context.
+| Variables | What it shows |
+|---|---|
+| `LOAD_CACHE_BYTES=1 LOAD_TERMS_CACHE_BYTES=1` | No cache, 50 calls at once. Atlas read the table twice, not 50 times: 40 calls waited on the first read, and the 10 calls that reached the context after it ended read it again. The check of one read fails. |
+| the same, with `LOAD_CALLS=5 LOAD_SPREAD_SECONDS=15` | No cache, 5 calls 15 s apart. Atlas read the table once per call, and 1 of the 5 calls overlapped the first read. Both checks fail. |
+| `LOAD_MEMORY_MARGIN_MB=0 LOAD_RESPONSE_LIMIT=50000` | The script's bounds are below what was measured: the memory checks and the check of the response limit fail. |
+| `LOAD_RESPONSE_CHARS=30000` | The server's own limit is lower. Every context is 29,760 characters and still cut. Every check passes. |
+| `LOAD_OPA_MEMORY=64m` | OPA has the sandbox's 64 MiB. On this build, the burst passed, and the kernel did not kill OPA. |
 
-`MCP_CONTEXT_MAX_CONCURRENCY` keeps its default, 32. The 50 calls of the burst
-wait on the one read of the table already in flight, and a call that waits takes
-no slot.
+The run raises four settings, as the server's docs advise for large data
+catalogs. The first three have a reason measured on this build:
 
-Measured on a machine with 16 processors and 62.8 GiB of memory, with
-`trinodb/trino:482`, Apache Atlas 2.4.0 built by
-[`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), and akko-mcp-trino
-built from commit `d61d669` (it still reports version 0.7.2). All 27 checks
-passed.
+- `TRINO_MAX_ROWS` is 2000, so one page of `describe_table` lists every column
+  of a wide table, and the context is read and cut for all 2,000 columns. With
+  the default, 100, the answer lists 100 columns, and their context fits
+  whole.
+- `ATLAS_TIMEOUT_SECONDS` is 20 s. It bounds one request, and Atlas's read of
+  the table took 6.29 s with its caches empty. With the default, 5 s, the first
+  of four calls in a row served no context (`unavailable`), and the next three a
+  part of it (`partial`).
+- `MCP_CONTEXT_TIMEOUT_SECONDS` is 40 s. It bounds the read of the table and
+  then of its 2,000 terms. At 20 s, in one burst, Atlas took 11.2 s for the
+  table and 15 s for its terms: 39 of the 50 answers came back without terms.
+- OPA gets 512 MiB. An earlier build saw the kernel kill OPA at the sandbox's 64
+  MiB during the burst, and Trino then failed every statement. On `d61d669`, the
+  burst passed with 64 MiB (the last witness run above). The run keeps 512 MiB
+  as a margin: this reason was not measured on this build.
+
+`MCP_CONTEXT_MAX_CONCURRENCY` keeps its default, 32. In the burst, all 50 calls
+were in flight during the one read of the table. Without a cache, 40 of the 50
+calls still shared one read, which only waiting on a read in flight explains. A
+call that waits takes none of the 32 slots: none of the 50 answers reported
+`unavailable`.
+
+The run used a machine with 16 processors and 62.8 GiB of memory, and these
+images: akko-mcp-trino built from commit `d61d669` (it still reports version
+0.7.2), Apache Atlas 2.4.0 built by
+[`catalogs/atlas/Dockerfile`](catalogs/atlas/Dockerfile), `trinodb/trino:482`,
+`openpolicyagent/opa:1.21.1-static`, `quay.io/keycloak/keycloak:26.7.5` and
+`postgres:17.11-alpine`. All 42 checks passed. Here is an excerpt of its
+output:
 
 ```text
-  seed: terms: 50000 in 749.9 s, 500 a request (67 a second)
-  seed: columns: 2000 in 60.4 s, 500 a request
-  seed: attached: 2000 terms, one a column, in 61.4 s
-== 3. One call, which fills the caches
-  describe_table answered in 14.34 s, caches empty
+  seed: terms: 50000 in 710.0 s, 500 a request (70 a second)
+  seed: columns: wide_2000, 2000 in 54.3 s, 500 a request
+  seed: attached: wide_2000, 2000 terms, one a column, in 55.2 s
+  ...
+== 3. The server's default time budgets, with its caches empty
+  context: atlas (timeout 5 s; atlas: timeouts: connect 1 s, read 5 s
+  call 1: 6.25 s, atlas unavailable
+  call 2: 5.39 s, atlas partial
+  call 3: 5.33 s, atlas partial
+  call 4: 1.34 s, atlas partial
+  Atlas's reads of wide_2000, by its audit log: 6.29 s, 2.94 s
+  ...
+== 4. One call, which fills the caches
+  describe_table answered in 12.64 s, caches empty; Atlas read the table in 5.89 s
+  ...
   176 columns described, 1824 undescribed, 176 terms, context of 59724 characters
-== 4. 50 calls of describe_table at once, at the caches' expiry
-  the burst took 25.83 s; each call 22.64 s to 25.82 s
+  the server's caches hold 735938 bytes (mcp_trino_context_cache_bytes)
+== 5. 50 calls of describe_table at once, after the caches expired
+  ...
+  the burst took 26.03 s; each call 22.29 s to 26.03 s; the calls started within 0.01 s
+  the server's cache lookups during the burst: 80040 misses, 20010 hits
+  OK    50 answers, none an error
   the source of the context, answers by status: {'partial': 50}
-  the server's memory: at most 237.9 MiB in 16 samples of docker stats; cgroup peak since start 259.8 MiB; bound 336.0 MiB (the two caches + 256 MB)
+  the server's memory: at most 225.9 MiB in 16 samples of docker stats; cgroup peak since start 229.7 MiB; bound 368.0 MiB (the three caches + 256 MiB)
+  ...
   OK    Atlas read the table once for the whole burst (its audit log)
   OK      and each of the 2000 terms once: reads, distinct terms
+  OK      and nothing else
+  Atlas's read of the table: from 3.77 s to 11.72 s after the first call started; 50 calls, 50 of them in flight during it
+  OK      at least 45 of the 50 calls overlap that read (90 %)
   the context of each answer: 59724 to 59724 characters, limit 60000
   OK    every context under the limit
   OK      and every answer says it was cut, its source partial
+  OK      and the same context in each
+  ...
+== 7. Small cache limits, overflowed by the three tables
+  ...
+  wide_2000: 13.15 s, atlas partial; the caches hold 579154 bytes
+  wide_2000_2: 11.82 s, atlas partial; the caches hold 579125 bytes
+  wide_2000_3: 12.36 s, atlas partial; the caches hold 579125 bytes
+  OK    the caches held at most their two limits, 786432 bytes, after each call
+  OK    wide_2000_3, read last, is still cached: Atlas does not read it again
+  OK    wide_2000, read first, was evicted: Atlas reads it again
+  and its terms: 2000 reads, 2000 distinct terms
+  the server's memory: at most 101.3 MiB in 30 samples of docker stats; cgroup peak since start 154.3 MiB; bound 288.8 MiB (the three caches + 256 MiB)
 ```
 
-All 50 answers carry the context, `partial` because each is cut to
-`MCP_CONTEXT_RESPONSE_CHARS`: none reports Atlas `unavailable`.
-
-Last, the script counts the statements each tool runs in Trino, as Carol, on
-the wide table. It reads them from Trino's own history,
-`system.runtime.queries`, and the client tags from `/v1/query`. Each tool is
-called once with the caches expired, then once more right after. The
-visibility filter's statements carry the tag `mcp-gate`.
+The script also counts the statements each tool runs in Trino, as Carol, on the
+wide table. It reads them from Trino's own history, `system.runtime.queries`,
+and the client tags from `/v1/query`, 1 s after the answer. Each tool is called
+once with the caches expired, then once more right after. The visibility
+filter's statements carry the tag `mcp-gate`, and all come from the source
+`trino-mcp`.
 
 | Tool | Caches expired | Right after |
 |---|---|---|
@@ -522,9 +597,10 @@ visibility filter's statements carry the tag `mcp-gate`.
 | `search_columns` | 5 (0 `mcp-gate`) | 5 (0 `mcp-gate`) |
 | `profile_table` | 2 (0 `mcp-gate`) | 2 (0 `mcp-gate`) |
 
-The seed took 873 s, after a start of 324 s. The host had 7.1 GiB of memory
-available before the seed and 6.2 GiB before the burst. Atlas keeps the
-sandbox's sizing, a heap of 768 MB in a container of 3 GiB.
+The seed took 1,034 s, after a startup of 312 s. The host had
+6.7 GiB of memory available before the seed and 6.1 GiB
+before the burst. Atlas keeps the sandbox's sizing, a heap of 768 MiB in a
+container of 3 GiB.
 
 ## A real agent: how many calls to the right column
 
