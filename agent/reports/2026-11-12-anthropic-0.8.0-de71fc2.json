@@ -1,0 +1,2469 @@
+{
+  "meta": {
+    "date": "2026-11-12 17:19 UTC",
+    "provider": "anthropic",
+    "model_requested": "claude-sonnet-5-5",
+    "model_returned": "claude-sonnet-5-5",
+    "server": "trino-mcp 0.8.0, 9 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, profile_table, search_columns",
+    "server_image": "akko-mcp-trino:0.8.0-de71fc2-measure",
+    "mcp_url": "http://mcp:3000/mcp",
+    "persona": "carol_analyst",
+    "questions": "questions.json, questions-context.json",
+    "repeat": 3,
+    "max_steps": 12,
+    "max_tokens": 16000,
+    "sampling": "API defaults (the Messages API takes no temperature); output tokens include thinking, so tokens compare server against server for one model, never across providers",
+    "pause": 0.0,
+    "rate_limited": 0,
+    "pair": {
+      "server": "0.8",
+      "model": "claude-sonnet-5-5"
+    }
+  },
+  "summary": {
+    "questions": [
+      {
+        "id": "COR-CRM-01",
+        "question": "What is the revenue per customer?",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "COR-CRM-02",
+        "question": "Which customer segment holds the largest total account balance?",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "COR-CRM-03",
+        "question": "How much was spent in each spending category in March 2026?",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "COR-CRM-04",
+        "question": "How many accounts are held in each currency?",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "COR-CRM-05",
+        "question": "What was the total amount of the archived transactions booked in 2019?",
+        "right": 2,
+        "trials": 3
+      },
+      {
+        "id": "CTX-01",
+        "question": "Which column holds the address the company writes to, for each customer?",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "CTX-02",
+        "question": "What is the Turnover of each month?",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "CTX-03",
+        "question": "How many accounts are held by customers of each country of residence?",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "CTX-04",
+        "question": "For each account, give the name of its holder and the ISO 4217 code of the account.",
+        "right": 3,
+        "trials": 3
+      },
+      {
+        "id": "CTX-05",
+        "question": "How many movements were booked on the accounts of each holder?",
+        "right": 3,
+        "trials": 3
+      }
+    ],
+    "right": 29,
+    "trials": 30,
+    "wilson95": [
+      0.8333,
+      0.9941
+    ],
+    "unstable": [
+      "COR-CRM-05"
+    ]
+  },
+  "trials": [
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "describe_table",
+        "execute_query",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "revenue"
+        },
+        {
+          "text": "customer"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 5
+        },
+        {
+          "sql": "select category, count(*), sum(amount), min(amount), max(amount) from demo.crm.transactions group by 1"
+        },
+        {
+          "sql": "select c.id, c.full_name, a.currency, sum(case when t.amount>0 then t.amount end) revenue, sum(t.amount) net from demo.crm.customers c join demo.crm.accounts a on a.customer_id=c.id join demo.crm.transactions t on t.account_id=a.id group by 1,2,3 order by 1,3"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.amount": 1,
+        "demo.crm.accounts.customer_id": 2
+      },
+      "input_tokens": 41681,
+      "output_tokens": 1461,
+      "answer": "Revenue per customer, counting only money coming in (positive amounts), is below. All of these accounts are in EUR.\n\n| Customer id | Customer | Revenue (EUR) |\n|---|---|---|\n| 1 | Lena Vogel | 821.00 |\n| 2 | Hugo Martin | 778.25 |\n| 3 | Sofia Ruiz | 864.50 |\n| 5 | Giulia Conti | 652.75 |\n| 7 | Emma de Vries | 897.75 |\n\n- **Definition of revenue:** The data catalogue defines revenue as \"money that comes in from a sale\", and `demo.crm.transactions.amount` is the column it is attached to. I counted only positive amounts. The categories (travel, rent, utilities, groceries, restaurants) don't separate sales from other movements. Each category holds both positive and negative amounts, so the positive-only rule is my assumption.\n- **Net alternative:** If you want the net of all movements instead, the figures are 527.50, 458.00, 587.75, 366.75 and 708.25, in the same customer order.\n- **Currency:** Accounts can be in different currencies, such as USD. Only EUR accounts have transactions, so no conversion was needed.\n- **Coverage:** Only customers with at least one transaction appear.\n\nThe query joins `demo.crm.customers.id` to `demo.crm.accounts.customer_id`, then `demo.crm.accounts.id` to `demo.crm.transactions.account_id`.\n\nColumns relied on:\n- demo.crm.transactions.amount\n- demo.crm.transactions.account_id\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.currency\n- demo.crm.customers.id\n- demo.crm.customers.full_name",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.account_id": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.accounts.id",
+        "demo.crm.accounts.currency",
+        "demo.crm.customers.full_name"
+      ],
+      "seconds": 15.827973291277885,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 7,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.account_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "describe_table",
+        "execute_query",
+        "execute_query",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "revenue"
+        },
+        {
+          "text": "customer"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 3
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 3
+        },
+        {
+          "sql": "select category, a.currency, count(*), sum(amount), min(amount), max(amount) from demo.crm.transactions t join demo.crm.accounts a on a.id=t.account_id group by 1,2 order by 1,2"
+        },
+        {
+          "sql": "select c.id, c.full_name, a.currency, sum(t.amount) as revenue, sum(case when t.amount>0 then t.amount end) as inflows from demo.crm.customers c join demo.crm.accounts a on a.customer_id=c.id join demo.crm.transactions t on t.account_id=a.id group by 1,2,3 order by 1,3"
+        },
+        {
+          "sql": "select a.customer_id, a.currency, sum(t.amount) revenue, count(*) n from demo.crm.accounts a join demo.crm.transactions t on t.account_id=a.id group by 1,2 order by 1,2"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.amount": 1,
+        "demo.crm.accounts.customer_id": 2
+      },
+      "input_tokens": 52399,
+      "output_tokens": 1937,
+      "answer": "Revenue per customer is the sum of `amount` over all transactions on the customer's accounts. Amounts are in each account's own currency, and I did not convert between currencies. Customer 6 has accounts in two currencies, so I list them separately.\n\n| customer_id | name | currency | revenue |\n|---|---|---|---|\n| 1 | Lena Vogel | EUR | 527.50 |\n| 2 | Hugo Martin | EUR | 458.00 |\n| 3 | Sofia Ruiz | EUR | 587.75 |\n| 4 | not visible to me | USD | 397.75 |\n| 5 | Giulia Conti | EUR | 366.75 |\n| 6 | not visible to me | JPY | 337.50 |\n| 6 | not visible to me | USD | 156.75 |\n| 7 | Emma de Vries | EUR | 708.25 |\n| 8 | not visible to me | BRL | 677.25 |\n| 10 | not visible to me | CAD | 617.00 |\n\n- **Missing names:** Customers 4, 6, 8 and 10 have accounts and transactions, but I get no rows for them from `customers`. This may be an access rule or missing data, so I show them by `customer_id` only.\n- **Net versus inflows:** `amount` includes negative movements (spending). The sums above are net, which is how the column comment defines revenue (\"the revenue of a sale\"). The glossary instead says revenue is \"money that comes in from a sale\". If you want only positive amounts, the figures for customers 1, 2, 3, 5 and 7 are 821.00, 778.25, 864.50, 652.75 and 897.75. I did not compute positive-only figures for the other customers.\n\nColumns relied on:\n- demo.crm.transactions.amount\n- demo.crm.transactions.account_id\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.currency\n- demo.crm.customers.id\n- demo.crm.customers.full_name",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.account_id": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.accounts.id",
+        "demo.crm.accounts.currency",
+        "demo.crm.customers.id",
+        "demo.crm.customers.full_name"
+      ],
+      "seconds": 19.469453634228557,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 8,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.account_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "What is the revenue per customer?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "describe_table",
+        "execute_query",
+        "execute_query",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "revenue"
+        },
+        {
+          "text": "customer"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 3
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 3
+        },
+        {
+          "sql": "select a.currency, t.category, count(*), sum(t.amount), min(t.amount), max(t.amount) from demo.crm.transactions t join demo.crm.accounts a on a.id=t.account_id group by 1,2 order by 1,2"
+        },
+        {
+          "sql": "select c.id, c.full_name, a.currency, sum(t.amount) revenue, count(*) n from demo.crm.customers c join demo.crm.accounts a on a.customer_id=c.id join demo.crm.transactions t on t.account_id=a.id group by 1,2,3 order by 1,3"
+        },
+        {
+          "sql": "select a.customer_id, a.currency, sum(t.amount) revenue, count(*) n, count(c.id) matched from demo.crm.accounts a join demo.crm.transactions t on t.account_id=a.id left join demo.crm.customers c on c.id=a.customer_id group by 1,2 order by 1,2"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.amount": 1,
+        "demo.crm.accounts.customer_id": 2
+      },
+      "input_tokens": 52170,
+      "output_tokens": 1614,
+      "answer": "Revenue per customer is the sum of `amount` over all transactions on that customer's accounts. I grouped it by currency because accounts are held in different currencies, and I did not convert between them.\n\n| customer_id | currency | revenue |\n|---|---|---|\n| 1 (Lena Vogel) | EUR | 527.50 |\n| 2 (Hugo Martin) | EUR | 458.00 |\n| 3 (Sofia Ruiz) | EUR | 587.75 |\n| 4 | USD | 397.75 |\n| 5 (Giulia Conti) | EUR | 366.75 |\n| 6 | JPY | 337.50 |\n| 6 | USD | 156.75 |\n| 7 (Emma de Vries) | EUR | 708.25 |\n| 8 | BRL | 677.25 |\n| 10 | CAD | 617.00 |\n\n- **Customers without a record:** customers 4, 6, 8 and 10 have accounts and transactions but no matching row in the customers table, so I have no names for them.\n- **Negative amounts:** the sum includes negative amounts, which look like spending. The data has no field that separates sales from other movements, so I followed the column comment (\"the revenue of a sale\") and summed everything. If revenue should count only incoming money, filter to `amount > 0`.\n\nColumns relied on:\n- demo.crm.transactions.amount\n- demo.crm.transactions.account_id\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.currency\n- demo.crm.customers.id\n- demo.crm.customers.full_name",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.account_id": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.accounts.id",
+        "demo.crm.accounts.currency",
+        "demo.crm.customers.id",
+        "demo.crm.customers.full_name"
+      ],
+      "seconds": 16.476413431111723,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 8,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.account_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "Which customer segment holds the largest total account balance?",
+      "expected": [
+        "demo.crm.customers.segment",
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "list_tables",
+        "execute_query",
+        "search_columns",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "customer segment"
+        },
+        {
+          "text": "account balance"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm"
+        },
+        {
+          "sql": "select c.segment, a.currency, sum(a.balance) s, count(*) n from demo.crm.accounts a left join demo.crm.customers c on c.id=a.customer_id group by 1,2 order by 1,2"
+        },
+        {
+          "text": "exchange rate"
+        },
+        {
+          "sql": "select a.id, a.customer_id, a.currency, a.balance, c.id cid, c.segment from demo.crm.accounts a left join demo.crm.customers c on c.id=a.customer_id order by a.id"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.segment": 1,
+        "demo.crm.accounts.balance": 2,
+        "demo.crm.accounts.customer_id": 8
+      },
+      "input_tokens": 39196,
+      "output_tokens": 1225,
+      "answer": "**Business** has the largest total balance among the accounts I could match to a segment. Its total is 17,620.75 EUR, across 2 accounts. Retail has 8,935.80 EUR across 4 accounts.\n\nTwo caveats:\n- **Unmatched accounts:** 6 of the 12 accounts belong to customers 4, 6, 8, 9 and 10, who have no row in `demo.crm.customers`. I couldn't assign them a segment, so they are left out. They hold 2,750 USD, 812,000 JPY, 9,800 BRL, 1,500 GBP, 7,200.40 CAD and 5,600 USD. This may be a data gap or an access restriction on the customers table. If those customers turn out to be retail, the ranking could change.\n- **Currencies:** Every account I could match is in EUR, so those sums are directly comparable. The data has no exchange-rate table, so I couldn't convert the other currencies.\n\nColumns relied on:\n- demo.crm.customers.segment\n- demo.crm.customers.id\n- demo.crm.accounts.balance\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.currency",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.segment": true,
+        "demo.crm.accounts.balance": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.accounts.currency"
+      ],
+      "seconds": 17.284286435693502,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 8,
+      "first_hit": 1,
+      "all_hit": 8,
+      "right": true,
+      "never_shown": [],
+      "invalid_tools": []
+    },
+    {
+      "question": "Which customer segment holds the largest total account balance?",
+      "expected": [
+        "demo.crm.customers.segment",
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "list_tables",
+        "execute_query",
+        "search_columns",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "customer segment"
+        },
+        {
+          "text": "account balance"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm"
+        },
+        {
+          "sql": "select c.segment, a.currency, sum(a.balance) total, count(*) n from demo.crm.accounts a join demo.crm.customers c on c.id=a.customer_id group by 1,2 order by 1,2"
+        },
+        {
+          "text": "exchange rate"
+        },
+        {
+          "sql": "select a.*, c.segment from demo.crm.accounts a left join demo.crm.customers c on c.id=a.customer_id order by a.id"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.segment": 1,
+        "demo.crm.accounts.balance": 2,
+        "demo.crm.accounts.customer_id": 8
+      },
+      "input_tokens": 38979,
+      "output_tokens": 1139,
+      "answer": "**Business** holds the largest total balance, but only across the accounts I could match to a segment.\n\n| Segment | Total balance (EUR) | Accounts |\n|---|---|---|\n| business | 17,620.75 | 2 |\n| retail | 8,935.80 | 4 |\n\n- **Unmatched accounts:** Six of the 12 accounts could not be matched to a segment. Their customers (IDs 4, 6, 8, 9 and 10) have no row in `customers`, which may be due to access rules. These accounts hold USD, JPY, BRL, GBP and CAD, so they could change the ranking.\n- **No currency conversion:** The tables have no exchange rates, so I could not convert them. The matched accounts are all in EUR, so the comparison above is like for like.\n\nColumns used:\n- demo.crm.customers.segment\n- demo.crm.customers.id\n- demo.crm.accounts.balance\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.currency",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.segment": true,
+        "demo.crm.accounts.balance": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.accounts.currency"
+      ],
+      "seconds": 17.597830224316567,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 8,
+      "first_hit": 1,
+      "all_hit": 8,
+      "right": true,
+      "never_shown": [],
+      "invalid_tools": []
+    },
+    {
+      "question": "Which customer segment holds the largest total account balance?",
+      "expected": [
+        "demo.crm.customers.segment",
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "list_tables",
+        "execute_query",
+        "search_columns",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "customer segment"
+        },
+        {
+          "text": "account balance"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm"
+        },
+        {
+          "sql": "select c.segment, a.currency, sum(a.balance) s, count(*) n from demo.crm.accounts a join demo.crm.customers c on c.id=a.customer_id group by 1,2 order by 1,2"
+        },
+        {
+          "text": "exchange rate"
+        },
+        {
+          "sql": "select a.customer_id, c.segment, a.currency, a.balance from demo.crm.accounts a left join demo.crm.customers c on c.id=a.customer_id order by 1"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.segment": 1,
+        "demo.crm.accounts.balance": 2,
+        "demo.crm.accounts.customer_id": 8
+      },
+      "input_tokens": 38980,
+      "output_tokens": 1197,
+      "answer": "**Business** holds the largest total balance among the customers I can see. It has 17,620.75 EUR across 2 accounts. Retail has 8,935.80 EUR across 4 accounts.\n\n- **Missing customers:** Five customers (IDs 4, 6, 8, 9 and 10) have accounts but no row in `customers`, so they have no segment. This may be a data access restriction or missing data. Their accounts are left out of the totals above.\n- **Mixed currencies:** The left-out accounts are in USD, JPY, BRL, GBP and CAD. There is no exchange-rate table, so I couldn't convert them to a common currency. The EUR figures for the two known segments are directly comparable.\n- **Result could change:** If the excluded accounts were counted, the ranking could differ. For example, customer 6's 812,000 JPY is large, but I can't tell which segment it belongs to.\n\nColumns relied on:\n- demo.crm.customers.segment\n- demo.crm.customers.id\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.balance\n- demo.crm.accounts.currency",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.segment": true,
+        "demo.crm.accounts.balance": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.accounts.currency"
+      ],
+      "seconds": 17.79246690683067,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 8,
+      "first_hit": 1,
+      "all_hit": 8,
+      "right": true,
+      "never_shown": [],
+      "invalid_tools": []
+    },
+    {
+      "question": "How much was spent in each spending category in March 2026?",
+      "expected": [
+        "demo.crm.transactions.category",
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "spending category"
+        },
+        {
+          "text": "category amount"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 8
+        },
+        {
+          "sql": "select category, sum(case when amount<0 then -amount end) spent, sum(amount) net, count(*) n, sum(case when amount<0 then 1 else 0 end) n_out from demo.crm.transactions where booked_at >= date '2026-03-01' and booked_at < date '2026-04-01' group by category order by category"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.category": 1,
+        "demo.crm.transactions.amount": 2
+      },
+      "input_tokens": 33591,
+      "output_tokens": 696,
+      "answer": "Spending in March 2026, by category, counting only outgoing movements (negative amounts, shown as positive totals):\n\n| Category | Spent |\n|---|---|\n| groceries | 17.75 |\n| rent | 127.75 |\n| restaurants | 55.00 |\n| utilities | 90.50 |\n| travel | 0.00 (3 movements in March, all positive, so no spending) |\n\nThe table mixes spending and income in one `amount` column. I took spending to mean negative amounts, which is my assumption. The amounts are in the account currency.\n\nIf you want the net total per category instead (income and spending together), the figures are:\n\n- groceries: 346.75\n- rent: \u221233.75\n- restaurants: 113.50\n- travel: 458.50\n- utilities: 40.75\n\nColumns relied on:\n- demo.crm.transactions.category\n- demo.crm.transactions.amount\n- demo.crm.transactions.booked_at",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.category": true,
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.booked_at": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 10.457535171881318,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 4,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.booked_at"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How much was spent in each spending category in March 2026?",
+      "expected": [
+        "demo.crm.transactions.category",
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "spending category"
+        },
+        {
+          "text": "category amount"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 8
+        },
+        {
+          "sql": "select category, sum(amount) net, sum(case when amount<0 then -amount end) spent, sum(case when amount>0 then amount end) inflow, count(*) n from demo.crm.transactions where booked_at >= date '2026-03-01' and booked_at < date '2026-04-01' group by category order by category"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.category": 1,
+        "demo.crm.transactions.amount": 2
+      },
+      "input_tokens": 33599,
+      "output_tokens": 755,
+      "answer": "In March 2026, spending per category is the sum of the outgoing (negative) movements:\n\n| Category | Spent in March 2026 |\n|---|---|\n| groceries | 17.75 |\n| rent | 127.75 |\n| restaurants | 55.00 |\n| travel | 0.00 (only incoming movements, 458.50) |\n| utilities | 90.50 |\n\nI read \"spent\" as the negative amounts, because the table doesn't say how to tell spending from income. The category column holds both. If you wanted the net of all movements per category instead, the figures are:\n\n- groceries: 346.75\n- rent: \u221233.75\n- restaurants: 113.50\n- travel: 458.50\n- utilities: 40.75\n\nI used only the current transactions table. March 2026 has 12 movements in it, and the archive tables stop at 2025.\n\nColumns relied on:\n- demo.crm.transactions.category\n- demo.crm.transactions.amount\n- demo.crm.transactions.booked_at",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.category": true,
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.booked_at": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 10.812885655090213,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 4,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.booked_at"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How much was spent in each spending category in March 2026?",
+      "expected": [
+        "demo.crm.transactions.category",
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "spending category"
+        },
+        {
+          "text": "category amount"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 8
+        },
+        {
+          "sql": "select category, sum(amount) net, sum(case when amount<0 then -amount end) spent, sum(case when amount>0 then amount end) incoming, count(*) n from demo.crm.transactions where booked_at >= date '2026-03-01' and booked_at < date '2026-04-01' group by category order by category"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.category": 1,
+        "demo.crm.transactions.amount": 2
+      },
+      "input_tokens": 33597,
+      "output_tokens": 803,
+      "answer": "Spending in March 2026 by category, counting only outflows (negative amounts):\n\n| Category | Spent |\n|---|---|\n| groceries | 17.75 |\n| rent | 127.75 |\n| restaurants | 55.00 |\n| travel | 0.00 (no outflows) |\n| utilities | 90.50 |\n\nTotal spent: 291.00.\n\nThe same categories also contain positive amounts, which I treated as income or refunds and left out of the spending figures. Those inflows were groceries 364.50, rent 94.00, restaurants 168.50, travel 458.50 and utilities 131.25. If you want the net of all movements instead, it was groceries 346.75, rent \u221233.75, restaurants 113.50, travel 458.50 and utilities 40.75.\n\nThe figures cover rows with `booked_at` from 2026-03-01 up to but not including 2026-04-01. They come from the current `crm.transactions` table, not the archive tables, which only cover 2014\u20132025.\n\nColumns relied on:\n- demo.crm.transactions.category\n- demo.crm.transactions.amount\n- demo.crm.transactions.booked_at",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.category": true,
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.booked_at": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 12.06228402722627,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 4,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.booked_at"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many accounts are held in each currency?",
+      "expected": [
+        "demo.crm.accounts.currency"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account currency"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "sql": "select currency, count(*) as accounts from demo.crm.accounts group by currency order by accounts desc"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 1
+      },
+      "input_tokens": 27046,
+      "output_tokens": 403,
+      "answer": "The table has 12 accounts in total. Here is how many are held in each currency:\n\n| Currency | Accounts |\n|---|---|\n| EUR | 6 |\n| USD | 2 |\n| CAD | 1 |\n| BRL | 1 |\n| JPY | 1 |\n| GBP | 1 |\n\nI grouped `demo.crm.accounts` by `currency` and counted the rows in each group. Each account has exactly one currency, so no account is counted twice.\n\nColumns relied on:\n- demo.crm.accounts.currency",
+      "last_text": "",
+      "named": {
+        "demo.crm.accounts.currency": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 7.004029358271509,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 3,
+      "first_hit": 1,
+      "all_hit": 1,
+      "right": true,
+      "never_shown": [],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many accounts are held in each currency?",
+      "expected": [
+        "demo.crm.accounts.currency"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account currency"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "sql": "select currency, count(*) as accounts from demo.crm.accounts group by currency order by 2 desc"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 1
+      },
+      "input_tokens": 27046,
+      "output_tokens": 379,
+      "answer": "Here is the number of accounts in each currency:\n\n| Currency | Accounts |\n|---|---|\n| EUR | 6 |\n| USD | 2 |\n| GBP | 1 |\n| CAD | 1 |\n| JPY | 1 |\n| BRL | 1 |\n\nThat makes 12 accounts in total. I got these by counting rows in the accounts table, grouped by the currency column.\n\nColumns relied on:\n- demo.crm.accounts.currency",
+      "last_text": "",
+      "named": {
+        "demo.crm.accounts.currency": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 6.800285727251321,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 3,
+      "first_hit": 1,
+      "all_hit": 1,
+      "right": true,
+      "never_shown": [],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many accounts are held in each currency?",
+      "expected": [
+        "demo.crm.accounts.currency"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account currency"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "sql": "select currency, count(*) as accounts from demo.crm.accounts group by currency order by 2 desc"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 1
+      },
+      "input_tokens": 27046,
+      "output_tokens": 379,
+      "answer": "Here is the number of accounts in each currency:\n\n| Currency | Accounts |\n|---|---|\n| EUR | 6 |\n| USD | 2 |\n| BRL | 1 |\n| CAD | 1 |\n| JPY | 1 |\n| GBP | 1 |\n\nThat makes 12 accounts in total. I counted rows in the accounts table, where each row is one account in a single currency.\n\nColumns relied on:\n- demo.crm.accounts.currency",
+      "last_text": "",
+      "named": {
+        "demo.crm.accounts.currency": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 7.030060953926295,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 3,
+      "first_hit": 1,
+      "all_hit": 1,
+      "right": true,
+      "never_shown": [],
+      "invalid_tools": []
+    },
+    {
+      "question": "What was the total amount of the archived transactions booked in 2019?",
+      "expected": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount",
+        "demo.crm_archive.transactions_2014.amount",
+        "demo.crm_archive.transactions_2015.amount",
+        "demo.crm_archive.transactions_2016.amount",
+        "demo.crm_archive.transactions_2017.amount",
+        "demo.crm_archive.transactions_2018.amount",
+        "demo.crm_archive.transactions_2020.amount",
+        "demo.crm_archive.transactions_2021.amount",
+        "demo.crm_archive.transactions_2022.amount",
+        "demo.crm_archive.transactions_2023.amount",
+        "demo.crm_archive.transactions_2024.amount",
+        "demo.crm_archive.transactions_2025.amount"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "describe_table",
+        "execute_query",
+        "search_columns",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "archived transactions"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm_archive",
+          "table": "transactions_2019",
+          "sample_rows": 3
+        },
+        {
+          "sql": "select count(*), sum(amount), min(booked_at), max(booked_at) from demo.crm_archive.transactions_2019"
+        },
+        {
+          "text": "booked_at"
+        },
+        {
+          "sql": "select count(*), sum(amount), min(booked_at), max(booked_at) from demo.crm.transactions where year(booked_at)=2019"
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 45796,
+      "output_tokens": 754,
+      "answer": "I can't give you a total, because there is nothing to add up. The archive table for 2019, `demo.crm_archive.transactions_2019`, has no rows. Its row count is 0 and the sum of amounts comes back NULL. So the total of archived 2019 transactions is zero, or not recorded.\n\nI also checked the live table `demo.crm.transactions` for 2019 bookings, and it has none either.\n\nColumns used:\n- demo.crm_archive.transactions_2019.amount\n- demo.crm_archive.transactions_2019.booked_at\n- demo.crm.transactions.amount\n- demo.crm.transactions.booked_at",
+      "last_text": "",
+      "named": {
+        "demo.crm_archive.transactions_2019.amount": true
+      },
+      "forbidden_named": [
+        "demo.crm.transactions.amount"
+      ],
+      "other_named": [
+        "demo.crm_archive.transactions_2019.booked_at",
+        "demo.crm.transactions.booked_at"
+      ],
+      "seconds": 11.418435093015432,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": null,
+      "all_hit": null,
+      "right": false,
+      "never_shown": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "What was the total amount of the archived transactions booked in 2019?",
+      "expected": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount",
+        "demo.crm_archive.transactions_2014.amount",
+        "demo.crm_archive.transactions_2015.amount",
+        "demo.crm_archive.transactions_2016.amount",
+        "demo.crm_archive.transactions_2017.amount",
+        "demo.crm_archive.transactions_2018.amount",
+        "demo.crm_archive.transactions_2020.amount",
+        "demo.crm_archive.transactions_2021.amount",
+        "demo.crm_archive.transactions_2022.amount",
+        "demo.crm_archive.transactions_2023.amount",
+        "demo.crm_archive.transactions_2024.amount",
+        "demo.crm_archive.transactions_2025.amount"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "describe_table",
+        "execute_query",
+        "execute_query",
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "archived transactions"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm_archive",
+          "table": "transactions_2019",
+          "sample_rows": 5
+        },
+        {
+          "sql": "select count(*), sum(amount), min(booked_at), max(booked_at) from demo.crm_archive.transactions_2019"
+        },
+        {
+          "sql": "select year(booked_at) y, count(*), sum(amount) from (select booked_at, amount from demo.crm_archive.transactions_2018 union all select booked_at, amount from demo.crm_archive.transactions_2020 union all select booked_at, amount from demo.crm_archive.transactions_2021) group by 1"
+        },
+        {
+          "text": "transactions"
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 36232,
+      "output_tokens": 784,
+      "answer": "The archived transactions for 2019 have no total, because the table is empty. `demo.crm_archive.transactions_2019` has 0 rows, so the sum comes back as NULL. The total is effectively 0 or unavailable.\n\nThe 2018, 2020 and 2021 archive tables are empty as well. If you can only see part of the data, access rules may be hiding rows from you. I didn't check that.\n\nThe columns involved are `demo.crm_archive.transactions_2019.amount` for the total and `demo.crm_archive.transactions_2019.booked_at` for the booking date.",
+      "last_text": "",
+      "named": {
+        "demo.crm_archive.transactions_2019.amount": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm_archive.transactions_2019.booked_at"
+      ],
+      "seconds": 11.098380648065358,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": null,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "What was the total amount of the archived transactions booked in 2019?",
+      "expected": [
+        "demo.crm_archive.transactions_2019.amount"
+      ],
+      "forbidden": [
+        "demo.crm.transactions.amount",
+        "demo.crm_archive.transactions_2014.amount",
+        "demo.crm_archive.transactions_2015.amount",
+        "demo.crm_archive.transactions_2016.amount",
+        "demo.crm_archive.transactions_2017.amount",
+        "demo.crm_archive.transactions_2018.amount",
+        "demo.crm_archive.transactions_2020.amount",
+        "demo.crm_archive.transactions_2021.amount",
+        "demo.crm_archive.transactions_2022.amount",
+        "demo.crm_archive.transactions_2023.amount",
+        "demo.crm_archive.transactions_2024.amount",
+        "demo.crm_archive.transactions_2025.amount"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "execute_query",
+        "search_columns"
+      ],
+      "arguments": [
+        {
+          "text": "archived transactions"
+        },
+        {
+          "text": "archive amount"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm_archive",
+          "table": "transactions_2019",
+          "sample_rows": 3
+        },
+        {
+          "sql": "select count(*), sum(amount), min(booked_at), max(booked_at) from demo.crm_archive.transactions_2019"
+        },
+        {
+          "text": "booked_at"
+        }
+      ],
+      "first_seen": {
+        "demo.crm_archive.transactions_2019.amount": 2
+      },
+      "input_tokens": 42621,
+      "output_tokens": 658,
+      "answer": "The archived 2019 transactions have no amount to total. The table `demo.crm_archive.transactions_2019` has 0 rows, so the sum comes back as NULL, which is effectively 0.\n\nI did not check `demo.crm.transactions`. It holds the live transactions rather than archived ones, so I left it out.\n\nColumns relied on:\n- demo.crm_archive.transactions_2019.amount\n- demo.crm_archive.transactions_2019.booked_at",
+      "last_text": "",
+      "named": {
+        "demo.crm_archive.transactions_2019.amount": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm_archive.transactions_2019.booked_at"
+      ],
+      "seconds": 11.376087221782655,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": 2,
+      "all_hit": 2,
+      "right": true,
+      "never_shown": [],
+      "invalid_tools": []
+    },
+    {
+      "question": "Which column holds the address the company writes to, for each customer?",
+      "expected": [
+        "demo.crm.customers.email"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country",
+        "demo.crm.customers.full_name"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table"
+      ],
+      "arguments": [
+        {
+          "text": "customer address"
+        },
+        {
+          "text": "mailing address"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 3
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 20417,
+      "output_tokens": 323,
+      "answer": "The column is `demo.crm.customers.email`. The data catalogue describes it as \"Address the company writes to\". The `customers` table has no postal address column. Its other columns are `id`, `full_name`, `country` and `segment`.\n\nThe values come back masked in my query (for example `***@example.com`), which is the data access policy.",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.email": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 9.019665378145874,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 3,
+      "first_hit": null,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.customers.email"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "Which column holds the address the company writes to, for each customer?",
+      "expected": [
+        "demo.crm.customers.email"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country",
+        "demo.crm.customers.full_name"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table"
+      ],
+      "arguments": [
+        {
+          "text": "customer address"
+        },
+        {
+          "text": "mailing address"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 5
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 20473,
+      "output_tokens": 323,
+      "answer": "The column is `demo.crm.customers.email`. The data catalogue describes it as the \"Address the company writes to\". The `customers` table has no postal address column. Its only other location field is `country`, which is the country of residence. The sample rows return the email values masked (for example `***@example.com`), which is the data access policy and not an error.",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.email": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 9.213452761992812,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 3,
+      "first_hit": null,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.customers.email"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "Which column holds the address the company writes to, for each customer?",
+      "expected": [
+        "demo.crm.customers.email"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country",
+        "demo.crm.customers.full_name"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table"
+      ],
+      "arguments": [
+        {
+          "text": "customer address"
+        },
+        {
+          "text": "mailing address"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 3
+        }
+      ],
+      "first_seen": {},
+      "input_tokens": 20417,
+      "output_tokens": 320,
+      "answer": "The column is `demo.crm.customers.email`. The data catalogue describes it as \"Address the company writes to\". The `customers` table has no postal address column. Its other columns are `id`, `full_name`, `country` and `segment`. The email values come back masked (for example `***@example.com`), which is the data access policy.",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.email": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 9.39592615980655,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 3,
+      "first_hit": null,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.customers.email"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "What is the Turnover of each month?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "turnover"
+        },
+        {
+          "text": "revenue month"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 8
+        },
+        {
+          "sql": "select date_format(booked_at,'%Y-%m') m, sum(amount) net, sum(case when amount>0 then amount end) inflow, count(*) n from demo.crm.transactions group by 1 order by 1"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.amount": 2
+      },
+      "input_tokens": 28628,
+      "output_tokens": 914,
+      "answer": "Turnover per month is the money coming in, meaning the sum of the positive `amount` values by the month of `booked_at`:\n\n| Month | Turnover |\n|---|---|\n| 2026-01 | 628.25 |\n| 2026-02 | 880.25 |\n| 2026-03 | 1216.75 |\n| 2026-04 | 897.75 |\n| 2026-05 | 1192.75 |\n| 2026-06 | 609.00 |\n| 2026-07 | 1069.25 |\n| 2026-08 | 1231.75 |\n\nThe data catalogue defines Turnover as \"total revenue over a period\". That definition is still a draft. It treats Turnover as a synonym of Revenue, which it defines as \"money that comes in from a sale\". I took that to mean positive amounts only. The negative amounts are spending, such as rent, travel and utilities. I did not check whether every positive amount is actually a sale.\n\nIf you want net movement instead, with spending subtracted, the monthly figures are:\n\n| Month | Net |\n|---|---|\n| 2026-01 | 162.00 |\n| 2026-02 | 560.75 |\n| 2026-03 | 925.75 |\n| 2026-04 | 599.00 |\n| 2026-05 | 871.00 |\n| 2026-06 | -16.25 |\n| 2026-07 | 920.75 |\n| 2026-08 | 811.50 |\n\nColumns used:\n- demo.crm.transactions.amount\n- demo.crm.transactions.booked_at",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.booked_at": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 13.780671636108309,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 4,
+      "first_hit": 2,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.booked_at"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "What is the Turnover of each month?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "turnover"
+        },
+        {
+          "text": "revenue month"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 10
+        },
+        {
+          "sql": "select date_trunc('month', booked_at) m, sum(amount) net, sum(case when amount>0 then amount end) inflow, count(*) n from demo.crm.transactions group by 1 order by 1"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.amount": 2
+      },
+      "input_tokens": 28751,
+      "output_tokens": 1031,
+      "answer": "Turnover per month, taken as the sum of `amount` over each month's transactions:\n\n| Month | Turnover (net sum of `amount`) |\n|---|---|\n| 2026-01 | 162.00 |\n| 2026-02 | 560.75 |\n| 2026-03 | 925.75 |\n| 2026-04 | 599.00 |\n| 2026-05 | 871.00 |\n| 2026-06 | -16.25 |\n| 2026-07 | 920.75 |\n| 2026-08 | 811.50 |\n\nThe data catalogue defines \"Turnover\" as \"total revenue over a period\". It marks Turnover as a draft term and a synonym of Revenue. It also tags `amount` as Revenue, so I summed `amount` for every transaction in the month and grouped by the month of `booked_at`.\n\nThe table has no sales-only flag, and `amount` includes negative movements such as rent and travel. The figures above are therefore net. If you want only money coming in (positive amounts), the monthly figures are:\n\n| Month | Inflow only |\n|---|---|\n| 2026-01 | 628.25 |\n| 2026-02 | 880.25 |\n| 2026-03 | 1216.75 |\n| 2026-04 | 897.75 |\n| 2026-05 | 1192.75 |\n| 2026-06 | 609.00 |\n| 2026-07 | 1069.25 |\n| 2026-08 | 1231.75 |\n\nColumns relied on:\n- `demo.crm.transactions.amount`\n- `demo.crm.transactions.booked_at`",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.booked_at": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 14.364571408834308,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 4,
+      "first_hit": 2,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.booked_at"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "What is the Turnover of each month?",
+      "expected": [
+        "demo.crm.transactions.amount",
+        "demo.crm.transactions.booked_at"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance",
+        "demo.crm.accounts.opened_on"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "search_columns",
+        "list_catalogs",
+        "describe_table",
+        "describe_table",
+        "execute_query",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "turnover"
+        },
+        {
+          "text": "revenue"
+        },
+        {
+          "text": "sales amount"
+        },
+        {},
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm_archive",
+          "table": "transactions_2025",
+          "sample_rows": 3
+        },
+        {
+          "sql": "select category, count(*), sum(amount), min(amount), max(amount), min(booked_at), max(booked_at) from demo.crm.transactions group by 1"
+        },
+        {
+          "sql": "select date_trunc('month', booked_at) month, sum(case when amount>0 then amount end) turnover, sum(amount) net from demo.crm.transactions group by 1 order by 1"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.amount": 2
+      },
+      "input_tokens": 51980,
+      "output_tokens": 1276,
+      "answer": "Turnover by month, from `demo.crm.transactions`. I counted only money coming in (positive amounts). I left out negative amounts, which are spending.\n\n| Month | Turnover | Net of all movements |\n|---|---|---|\n| 2026-01 | 628.25 | 162.00 |\n| 2026-02 | 880.25 | 560.75 |\n| 2026-03 | 1216.75 | 925.75 |\n| 2026-04 | 897.75 | 599.00 |\n| 2026-05 | 1192.75 | 871.00 |\n| 2026-06 | 609.00 | -16.25 |\n| 2026-07 | 1069.25 | 920.75 |\n| 2026-08 | 1231.75 | 811.50 |\n\n- **Definition:** The data catalogue defines Turnover as \"Total revenue over a period\" (status: draft). It treats Turnover as a synonym of Revenue, which it defines as \"money that comes in from a sale\".\n- **Net column:** If you meant the plain sum of all amounts, use the net column instead.\n- **Archive tables:** I did not query the `demo.crm_archive.transactions_*` tables (2014\u20132025). The 2025 sample returned no rows, and the current table only holds 2026 data (January to August).\n\nColumns relied on:\n- demo.crm.transactions.booked_at\n- demo.crm.transactions.amount",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.amount": true,
+        "demo.crm.transactions.booked_at": true
+      },
+      "forbidden_named": [],
+      "other_named": [],
+      "seconds": 21.257388587109745,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 8,
+      "first_hit": 2,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.transactions.booked_at"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many accounts are held by customers of each country of residence?",
+      "expected": [
+        "demo.crm.customers.country",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.currency"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "country"
+        },
+        {
+          "text": "account"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers"
+        },
+        {
+          "sql": "select c.country, count(a.id) accounts from demo.crm.customers c left join demo.crm.accounts a on a.customer_id=c.id group by c.country order by 2 desc"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.country": 1
+      },
+      "input_tokens": 29085,
+      "output_tokens": 590,
+      "answer": "Customers in Spain (ES) hold 2 accounts. Customers in each of France (FR), Germany (DE), Italy (IT) and the Netherlands (NL) hold 1 account. That makes 6 accounts in total.\n\nI joined each account to its holder's country of residence and counted accounts per country. Every country with a customer appears in the result, because I kept customers who hold no account. None of them showed a zero count.\n\nThis answer relies on these columns:\n- demo.crm.customers.country\n- demo.crm.customers.id\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.country": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.accounts.id"
+      ],
+      "seconds": 9.667385249398649,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many accounts are held by customers of each country of residence?",
+      "expected": [
+        "demo.crm.customers.country",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.currency"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "country"
+        },
+        {
+          "text": "account"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers"
+        },
+        {
+          "sql": "select c.country, count(a.id) accounts from demo.crm.customers c left join demo.crm.accounts a on a.customer_id=c.id group by c.country order by 2 desc"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.country": 1
+      },
+      "input_tokens": 29085,
+      "output_tokens": 581,
+      "answer": "Customers in each country of residence hold this many accounts:\n\n| Country | Accounts |\n|---|---|\n| ES | 2 |\n| NL | 1 |\n| DE | 1 |\n| IT | 1 |\n| FR | 1 |\n\nI joined each account to its holding customer and counted accounts per customer country. I used a left join, so a country whose customers hold no accounts would show 0. None did.\n\nColumns relied on:\n- demo.crm.customers.country\n- demo.crm.customers.id\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.country": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.accounts.id"
+      ],
+      "seconds": 9.72144875396043,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many accounts are held by customers of each country of residence?",
+      "expected": [
+        "demo.crm.customers.country",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.currency"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "country"
+        },
+        {
+          "text": "account"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers"
+        },
+        {
+          "sql": "select c.country, count(a.id) accounts from demo.crm.customers c left join demo.crm.accounts a on a.customer_id=c.id group by c.country order by 2 desc"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.customers.country": 1
+      },
+      "input_tokens": 29085,
+      "output_tokens": 577,
+      "answer": "Accounts held, by customer country of residence:\n\n| Country | Accounts |\n|---|---|\n| ES | 2 |\n| NL | 1 |\n| DE | 1 |\n| IT | 1 |\n| FR | 1 |\n\nI joined each account to its customer and counted accounts per country. I used a left join, so a country whose customers hold no accounts would still appear with 0. None did.\n\nColumns relied on:\n- demo.crm.customers.country\n- demo.crm.customers.id\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.country": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.accounts.id"
+      ],
+      "seconds": 9.380824465770274,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "For each account, give the name of its holder and the ISO 4217 code of the account.",
+      "expected": [
+        "demo.crm.customers.full_name",
+        "demo.crm.accounts.currency",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account"
+        },
+        {
+          "text": "currency"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 5
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 5
+        },
+        {
+          "sql": "select a.id, c.full_name, a.currency from demo.crm.accounts a left join demo.crm.customers c on c.id = a.customer_id order by a.id"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 2,
+        "demo.crm.customers.full_name": 5
+      },
+      "input_tokens": 30623,
+      "output_tokens": 891,
+      "answer": "Here is each account with its holder's name and its ISO 4217 currency code:\n\n| Account | Holder | Currency |\n|---|---|---|\n| 101 | Lena Vogel | EUR |\n| 102 | Hugo Martin | EUR |\n| 103 | Sofia Ruiz | EUR |\n| 104 | *(not available)* | USD |\n| 105 | Giulia Conti | EUR |\n| 106 | *(not available)* | JPY |\n| 107 | Emma de Vries | EUR |\n| 108 | *(not available)* | BRL |\n| 109 | *(not available)* | GBP |\n| 110 | *(not available)* | CAD |\n| 111 | Sofia Ruiz | EUR |\n| 112 | *(not available)* | USD |\n\nSix accounts (104, 106, 108, 109, 110 and 112) have no holder name. I used a left join so these accounts stay in the list. Their customers don't come back from the customers table. The likely cause is a row-level access policy on that table, but I didn't confirm it.\n\nColumns used:\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.currency\n- demo.crm.customers.id\n- demo.crm.customers.full_name",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.full_name": true,
+        "demo.crm.accounts.currency": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.accounts.id",
+        "demo.crm.customers.id"
+      ],
+      "seconds": 12.57731581106782,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": 2,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "For each account, give the name of its holder and the ISO 4217 code of the account.",
+      "expected": [
+        "demo.crm.customers.full_name",
+        "demo.crm.accounts.currency",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account holder"
+        },
+        {
+          "text": "currency code"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 3
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 3
+        },
+        {
+          "sql": "select a.id, c.full_name, a.currency from demo.crm.accounts a left join demo.crm.customers c on c.id=a.customer_id order by a.id"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 2,
+        "demo.crm.customers.full_name": 5
+      },
+      "input_tokens": 31117,
+      "output_tokens": 917,
+      "answer": "Here are the 12 accounts, each with its holder's name and its ISO 4217 currency code:\n\n| Account id | Holder name | ISO 4217 code |\n|---|---|---|\n| 101 | Lena Vogel | EUR |\n| 102 | Hugo Martin | EUR |\n| 103 | Sofia Ruiz | EUR |\n| 104 | *(no name returned)* | USD |\n| 105 | Giulia Conti | EUR |\n| 106 | *(no name returned)* | JPY |\n| 107 | Emma de Vries | EUR |\n| 108 | *(no name returned)* | BRL |\n| 109 | *(no name returned)* | GBP |\n| 110 | *(no name returned)* | CAD |\n| 111 | Sofia Ruiz | EUR |\n| 112 | *(no name returned)* | USD |\n\nSix accounts (104, 106, 108, 109, 110 and 112) have no holder name. I used a left join, so they still appear. Their `customer_id` has no matching row in `customers` that I can read. The cause could be missing customer records or an access policy that hides some rows. I didn't check which.\n\nThe query relies on these columns:\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.currency\n- demo.crm.customers.id\n- demo.crm.customers.full_name",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.full_name": true,
+        "demo.crm.accounts.currency": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.accounts.id",
+        "demo.crm.customers.id"
+      ],
+      "seconds": 15.115542866289616,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": 2,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "For each account, give the name of its holder and the ISO 4217 code of the account.",
+      "expected": [
+        "demo.crm.customers.full_name",
+        "demo.crm.accounts.currency",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.customers.country"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account holder"
+        },
+        {
+          "text": "currency code"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts",
+          "sample_rows": 3
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers",
+          "sample_rows": 3
+        },
+        {
+          "sql": "select a.id, c.full_name, a.currency from demo.crm.accounts a left join demo.crm.customers c on c.id=a.customer_id order by a.id"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.accounts.currency": 2,
+        "demo.crm.customers.full_name": 5
+      },
+      "input_tokens": 31117,
+      "output_tokens": 911,
+      "answer": "Here are all 12 accounts with the holder's name and the account's ISO 4217 currency code:\n\n| Account | Holder | Currency |\n|---|---|---|\n| 101 | Lena Vogel | EUR |\n| 102 | Hugo Martin | EUR |\n| 103 | Sofia Ruiz | EUR |\n| 104 | *(no name)* | USD |\n| 105 | Giulia Conti | EUR |\n| 106 | *(no name)* | JPY |\n| 107 | Emma de Vries | EUR |\n| 108 | *(no name)* | BRL |\n| 109 | *(no name)* | GBP |\n| 110 | *(no name)* | CAD |\n| 111 | Sofia Ruiz | EUR |\n| 112 | *(no name)* | USD |\n\nAccounts 104, 106, 108, 109, 110 and 112 have no holder name. Their `customer_id` doesn't match any row in the customers table I can read. The customer may be missing, or the row may be hidden by access rules. I didn't check which.\n\nI joined the two tables on the customer ID and kept every account, so these six still appear.\n\nColumns relied on:\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.accounts.currency\n- demo.crm.customers.id\n- demo.crm.customers.full_name",
+      "last_text": "",
+      "named": {
+        "demo.crm.customers.full_name": true,
+        "demo.crm.accounts.currency": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.accounts.id",
+        "demo.crm.customers.id"
+      ],
+      "seconds": 15.898479299154133,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 5,
+      "first_hit": 2,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many movements were booked on the accounts of each holder?",
+      "expected": [
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 1,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "list_catalogs",
+        "describe_table",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account holder"
+        },
+        {
+          "text": "movement"
+        },
+        {},
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions"
+        },
+        {
+          "sql": "select c.id, c.full_name, count(t.id) as movements from demo.crm.customers c left join demo.crm.accounts a on a.customer_id=c.id left join demo.crm.transactions t on t.account_id=a.id group by c.id, c.full_name order by c.id"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.account_id": 1
+      },
+      "input_tokens": 31196,
+      "output_tokens": 863,
+      "answer": "Five customers (account holders) have accounts with movements, and each has 10 movements booked across their accounts:\n\n| Customer id | Holder | Movements |\n|---|---|---|\n| 1 | Lena Vogel | 10 |\n| 2 | Hugo Martin | 10 |\n| 3 | Sofia Ruiz | 10 |\n| 5 | Giulia Conti | 10 |\n| 7 | Emma de Vries | 10 |\n\nI counted movements per customer by joining customers to their accounts, then to the transactions booked on those accounts. The join is a left join, so a customer with no movements would still appear with 0. Only these five customers came back, so every customer in the table has movements.\n\nColumns relied on:\n- demo.crm.customers.id\n- demo.crm.customers.full_name\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.transactions.id\n- demo.crm.transactions.account_id",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.account_id": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.customers.full_name",
+        "demo.crm.accounts.id",
+        "demo.crm.transactions.id"
+      ],
+      "seconds": 13.16788523690775,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 7,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many movements were booked on the accounts of each holder?",
+      "expected": [
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 2,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "list_catalogs",
+        "describe_table",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account holder"
+        },
+        {
+          "text": "movement"
+        },
+        {},
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions"
+        },
+        {
+          "sql": "SELECT c.id, c.full_name, count(t.id) AS movements\nFROM demo.crm.customers c\nLEFT JOIN demo.crm.accounts a ON a.customer_id = c.id\nLEFT JOIN demo.crm.transactions t ON t.account_id = a.id\nGROUP BY c.id, c.full_name\nORDER BY movements DESC, c.id"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.account_id": 1
+      },
+      "input_tokens": 31271,
+      "output_tokens": 919,
+      "answer": "Five account holders appear in the data, and each has 10 movements booked on their accounts:\n\n| Customer id | Holder | Movements |\n|---|---|---|\n| 1 | Lena Vogel | 10 |\n| 2 | Hugo Martin | 10 |\n| 3 | Sofia Ruiz | 10 |\n| 5 | Giulia Conti | 10 |\n| 7 | Emma de Vries | 10 |\n\nI counted the rows in the transactions table (one row per movement) and linked each one to its holder through the account it is booked on. The query used a left join, so a holder with no movements would still show up with 0. None did.\n\nColumns relied on:\n- demo.crm.customers.id\n- demo.crm.customers.full_name\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.transactions.id\n- demo.crm.transactions.account_id",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.account_id": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.customers.full_name",
+        "demo.crm.accounts.id",
+        "demo.crm.transactions.id"
+      ],
+      "seconds": 12.758040671702474,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 7,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    },
+    {
+      "question": "How many movements were booked on the accounts of each holder?",
+      "expected": [
+        "demo.crm.transactions.account_id",
+        "demo.crm.accounts.customer_id"
+      ],
+      "forbidden": [
+        "demo.crm.accounts.balance"
+      ],
+      "trial": 3,
+      "tools": [
+        "search_columns",
+        "search_columns",
+        "list_catalogs",
+        "describe_table",
+        "describe_table",
+        "describe_table",
+        "execute_query"
+      ],
+      "arguments": [
+        {
+          "text": "account holder"
+        },
+        {
+          "text": "movement"
+        },
+        {},
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "accounts"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "customers"
+        },
+        {
+          "catalog": "demo",
+          "schema": "crm",
+          "table": "transactions"
+        },
+        {
+          "sql": "select c.id, c.full_name, count(t.id) as movements from demo.crm.customers c left join demo.crm.accounts a on a.customer_id=c.id left join demo.crm.transactions t on t.account_id=a.id group by c.id, c.full_name order by c.id"
+        }
+      ],
+      "first_seen": {
+        "demo.crm.transactions.account_id": 1
+      },
+      "input_tokens": 31196,
+      "output_tokens": 865,
+      "answer": "Five customers hold accounts with movements, and each has 10 movements booked across their accounts:\n\n| Customer id | Holder | Movements |\n|---|---|---|\n| 1 | Lena Vogel | 10 |\n| 2 | Hugo Martin | 10 |\n| 3 | Sofia Ruiz | 10 |\n| 5 | Giulia Conti | 10 |\n| 7 | Emma de Vries | 10 |\n\nI counted movements per customer by linking customers to their accounts, and accounts to their transactions. The query kept every customer, so any customer with no accounts or movements would have shown a count of 0. None did. The result has only these five rows, so there are no other customers in the table.\n\nColumns relied on:\n- demo.crm.customers.id\n- demo.crm.customers.full_name\n- demo.crm.accounts.id\n- demo.crm.accounts.customer_id\n- demo.crm.transactions.id\n- demo.crm.transactions.account_id",
+      "last_text": "",
+      "named": {
+        "demo.crm.transactions.account_id": true,
+        "demo.crm.accounts.customer_id": true
+      },
+      "forbidden_named": [],
+      "other_named": [
+        "demo.crm.customers.id",
+        "demo.crm.customers.full_name",
+        "demo.crm.accounts.id",
+        "demo.crm.transactions.id"
+      ],
+      "seconds": 13.1278295381926,
+      "stop": "answered",
+      "announced": [
+        "search_columns",
+        "list_catalogs",
+        "list_schemas",
+        "list_tables",
+        "describe_schema",
+        "describe_table",
+        "profile_table",
+        "explain_query",
+        "execute_query"
+      ],
+      "rate_limited": 0,
+      "calls": 7,
+      "first_hit": 1,
+      "all_hit": null,
+      "right": true,
+      "never_shown": [
+        "demo.crm.accounts.customer_id"
+      ],
+      "invalid_tools": []
+    }
+  ]
+}

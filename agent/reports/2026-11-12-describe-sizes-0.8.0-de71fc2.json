@@ -1,0 +1,18 @@
+{
+  "server": "trino-mcp 0.8.0, 9 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, profile_table, search_columns",
+  "describe_table demo.crm.customers": {
+    "bytes": 1166,
+    "atlas": true
+  },
+  "describe_table demo.crm.accounts": {
+    "bytes": 1192,
+    "atlas": true
+  },
+  "describe_table demo.crm.transactions": {
+    "bytes": 1650,
+    "atlas": true
+  },
+  "describe_schema demo.crm": {
+    "bytes": 1781
+  }
+}
