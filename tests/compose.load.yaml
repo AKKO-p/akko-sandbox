@@ -24,8 +24,8 @@ services:
       ATLAS_CLUSTERS: '{"demo": "sandbox", "wide": "sandbox"}'
       ATLAS_GLOSSARIES: Sales,Generated
       # One page of describe_table holds every column of a wide table, so that its context is
-      # read, and cut, for all 2,000 columns. With the default, 100, the answer lists 100
-      # columns and their context fits whole.
+      # read, and cut, for all 2,000 columns. With the default, 100, the answer listed 100
+      # columns and their context fit whole (LOAD_MAX_ROWS=100).
       TRINO_MAX_ROWS: ${LOAD_MAX_ROWS:-2000}
       # Short lifetimes, so that the run sees the caches expire; the two cache limits, set
       # here and printed by the script. LOAD_* change them for a witness run, and section 7
@@ -45,8 +45,8 @@ services:
       # The server's own response limit (its default, 60,000), for a witness run below it.
       MCP_CONTEXT_RESPONSE_CHARS: ${LOAD_RESPONSE_CHARS:-60000}
     # Above the bound the script checks (the three caches + 256 MiB), so that a server past
-    # it is measured, not killed. The sandbox's own 256 MiB is below the peak measured
-    # during the burst.
+    # it is measured, not killed. The sandbox's own 256 MiB leaves little room: the burst
+    # peaked at 254.8 MiB on e60f915.
     mem_limit: 1024m
 
   # The checks' own clients: the seed of the load catalog, run once by the script; and the
