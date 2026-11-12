@@ -6,6 +6,6 @@ FROM python:3.12.15-slim
 WORKDIR /agent
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY run.py questions.json ./
+COPY run.py questions.json questions-context.json ./
 COPY tests ./tests
 ENTRYPOINT ["python", "/agent/run.py"]

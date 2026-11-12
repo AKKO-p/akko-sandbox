@@ -931,3 +931,138 @@ def test_report_json_holds_the_pair_and_the_summary():
     data = json.loads(run.report_json({"server": "trino-mcp 0.7.2", "model_returned": "m"}, [r]))
     assert data["meta"]["pair"] == {"server": "0.7", "model": "m"}
     assert data["summary"]["right"] == 1 and data["summary"]["wilson95"][1] == 1.0
+
+
+# A 429 from the provider is waited out and counted, never scored.
+
+
+class RateLimited(Exception):
+    def __init__(self, headers=None, status=429):
+        super().__init__("https://user:secret@host")
+        self.status_code = status
+        self.raw_response = SimpleNamespace(headers=headers or {})
+
+
+def test_retry_after_reads_seconds_or_a_date_and_nothing_else():
+    assert run.retry_after(RateLimited({"retry-after": "7"})) == 7.0
+    assert run.retry_after(RateLimited({"Retry-After": "Thu, 12 Nov 2026 10:00:30 GMT"}), now=1794477600.0) == 30.0
+    assert run.retry_after(RateLimited({})) is None
+    assert run.retry_after(RateLimited({"retry-after": "soon"})) is None
+    assert run.retry_after(ValueError()) is None
+
+
+def test_the_wait_honours_retry_after_else_grows_and_is_capped():
+    assert run.rate_limit_wait(RateLimited({"retry-after": "3"}), 0) == 3.0
+    assert [run.rate_limit_wait(RateLimited(), a) for a in (0, 1, 2)] == [5.0, 10.0, 20.0]
+    assert run.rate_limit_wait(RateLimited(), 10) == run.RATE_LIMIT_WAIT_MAX
+    assert run.rate_limit_wait(RateLimited({"retry-after": "900"}), 0) == run.RATE_LIMIT_WAIT_MAX
+    assert run.rate_limit_wait(RateLimited(status=500), 0) is None
+    assert run.rate_limit_wait(ConnectionError(), 0) is None
+
+
+class Flaky(FakeMistralClient):
+    """Answers 429 the first `failures` times, then as FakeMistralClient."""
+
+    def __init__(self, responses, failures, headers=None):
+        super().__init__(responses)
+        self.failures, self.headers, self.sent = failures, headers, 0
+
+    async def complete_async(self, **kw):
+        self.sent += 1
+        if self.failures:
+            self.failures -= 1
+            raise RateLimited(self.headers)
+        return await super().complete_async(**kw)
+
+
+def test_ask_waits_out_429_and_scores_the_same_turn(monkeypatch):
+    import anyio
+
+    waits = []
+
+    async def fake_sleep(seconds):
+        waits.append(seconds)
+
+    monkeypatch.setattr(run, "sleep", fake_sleep)
+    monkeypatch.setattr(run, "mcp_session", fake_mcp(FakeSession({})))
+    chat = mistral_chat([])
+    chat.client = Flaky([mistral_response("demo.crm.transactions.amount")], 2, {"retry-after": "4"})
+    record, _, _ = anyio.run(run.ask, loop_args(), chat, {"question": "q", "expected": [AMOUNT]})
+    assert (record.stop, record.right, record.rate_limited) == ("answered", True, 2)
+    assert waits == [4.0, 4.0] and chat.client.sent == 3
+    assert len(chat.client.requests[0]["messages"]) == 3  # system, question, answer: nothing sent twice
+
+
+def test_pause_comes_before_each_turn(monkeypatch):
+    import anyio
+
+    waits = []
+
+    async def fake_sleep(seconds):
+        waits.append(seconds)
+
+    monkeypatch.setattr(run, "sleep", fake_sleep)
+    monkeypatch.setattr(run, "mcp_session", fake_mcp(FakeSession({"search_columns": "{}"})))
+    chat = mistral_chat([mistral_response("", [("c1", "search_columns", '{"text": "a"}')]), mistral_response(AMOUNT)])
+    args = SimpleNamespace(provider="mistral", max_steps=12, pause=1.5)
+    record, _, _ = anyio.run(run.ask, args, chat, {"question": "q", "expected": [AMOUNT]})
+    assert waits == [1.5, 1.5] and record.rate_limited == 0
+
+
+def test_a_trial_that_ends_on_429_is_run_again_not_scored(monkeypatch):
+    import anyio
+
+    async def fake_sleep(seconds):
+        pass
+
+    monkeypatch.setattr(run, "sleep", fake_sleep)
+    monkeypatch.setattr(run, "mcp_session", fake_mcp(FakeSession({})))
+    chat = mistral_chat([])
+    chat.client = Flaky([mistral_response(AMOUNT)], run.RATE_LIMIT_TRIES)
+    args = SimpleNamespace(
+        provider="mistral",
+        max_steps=12,
+        max_tokens=10,
+        repeat=1,
+        model="m",
+        server_image="img",
+        mcp_url="u",
+        persona="p",
+        questions=["f", "g"],
+    )
+    meta, records = anyio.run(run.run, args, chat, [{"question": "q", "expected": [AMOUNT], "forbidden": []}])
+    assert len(records) == 1 and records[0].right
+    assert records[0].rate_limited == run.RATE_LIMIT_TRIES == meta["rate_limited"]
+    assert meta["questions"] == "f, g"
+
+
+def test_another_error_is_not_retried(monkeypatch):
+    import anyio
+
+    monkeypatch.setattr(run, "mcp_session", fake_mcp(FakeSession({})))
+    chat = mistral_chat([])
+    chat.client = Flaky([mistral_response(AMOUNT)], 1)
+    chat.client.complete_async = None  # any call fails with TypeError
+
+    record, _, _ = anyio.run(run.ask, loop_args(), chat, {"question": "q", "expected": [AMOUNT]})
+    assert (record.stop, record.rate_limited) == ("error: TypeError", 0)
+
+
+def test_several_questions_files_read_as_one_list(tmp_path):
+    a, b = tmp_path / "a.json", tmp_path / "b.json"
+    a.write_text(json.dumps([{"id": "A-1", "question": "qa", "expected": [AMOUNT], "forbidden": []}]))
+    b.write_text(json.dumps([{"id": "B-1", "question": "qb", "expected": [AMOUNT], "forbidden": []}]))
+    assert [q["id"] for q in run.load_questions([str(a), str(b)])] == ["A-1", "B-1"]
+    with pytest.raises(ValueError):
+        run.load_questions([str(a), str(a)])
+    args = run.parse_args(["--provider", "mistral", "--out", "r.md", "--questions", str(a), str(b), "--pause", "2"])
+    assert (args.questions, args.pause) == ([str(a), str(b)], 2.0)
+    with pytest.raises(SystemExit):
+        run.parse_args(["--provider", "mistral", "--out", "r.md", "--pause", "-1"])
+
+
+def test_the_context_questions_file_of_the_sandbox():
+    path = os.path.join(os.path.dirname(QUESTIONS), "questions-context.json")
+    questions = run.load_questions([QUESTIONS, path])
+    assert [q["id"] for q in questions][5:] == ["CTX-01", "CTX-02", "CTX-03", "CTX-04", "CTX-05"]
+    assert all(q["forbidden"] for q in questions)
