@@ -46,13 +46,14 @@ docker run --rm --network akko-sandbox_default --env-file /path/to/agent.env \
 | `--provider` | (required unless `--rescore`) | `mistral` or `anthropic` |
 | `--model` | `codestral-latest`, `claude-sonnet-5-5` | the model id sent to the provider's API |
 | `--persona` | `carol_analyst` | the sandbox user whose token opens the session |
-| `--questions` | `questions.json` | the questions and the columns that answer them |
+| `--questions` | `questions.json` | one or more questions files, read in order as one list: the questions and the columns that answer them |
 | `--mcp-url` | `$MCP_URL`, `http://mcp:3000/mcp` | the MCP endpoint |
 | `--keycloak-url` | `$KEYCLOAK_URL`, `http://keycloak:8080` | where the user's token comes from |
 | `--server-image` | `$MCP_IMAGE` | the server's image, written in the report |
 | `--repeat` | `1` | trials of each question, each in a fresh session (Anthropic: 3) |
 | `--max-steps` | `12` | model turns that may call tools, per trial |
 | `--max-tokens` | `16000` | output tokens per model turn |
+| `--pause` | `0` | seconds to wait before each model turn, to space the calls to a provider that limits their rate |
 | `--out` | (required unless `--dry-run`) | the Markdown report; its JSON is written beside it |
 | `--dry-run` | | list the tools in the provider's format, call no model, need no key |
 | `--rescore` | | score a report's JSON again by the current rules, into `--out`; needs no provider, no key |
@@ -73,6 +74,17 @@ logged nor written to a report.
 The report records every tool call's arguments in its JSON (`arguments`, in
 the order of `tools`), and the first 200 characters of each search text in the
 Markdown table of tools called. Nothing from the environment is recorded.
+
+## Rate limits
+
+A provider that answers 429 (too many requests) is waited out, never scored. The harness
+sends the same turn again after the wait the answer's `Retry-After` header names (seconds or
+a date), or, when it names none, after 5 s, doubled at each new 429; never more than 120 s,
+and at most 8 sends of one turn. A trial that still ends on a 429 is run again from the start,
+in a fresh session, up to 3 times. Each trial records the 429s it waited out (`rate_limited`),
+and the report gives their total. The Mistral client retries nothing by itself, so every 429
+is counted; the Anthropic client retries a 429 twice on its own before the harness sees it, and
+those are not counted.
 
 ## Same settings on both sides
 
@@ -228,3 +240,29 @@ docker compose run --rm --entrypoint python agent -m pytest -q -p no:cacheprovid
 
 Dated reports go in `reports/`, one Markdown file and its JSON per run, named
 `<date>-<provider>-<server>.md`.
+
+## Measurement of 2026-11-12: 0.7.2 against 0.8.0 with Apache Atlas
+
+The ten questions (`questions.json` and `questions-context.json`, whose five questions need a
+meaning only the data catalog holds), three trials each, persona `carol_analyst`, on one stack
+seeded once (`compose.yaml` and `catalogs/compose.atlas.yaml`); only the mcp service changed
+between passes. Script `reports/2026-11-12-measure.sh`, log `reports/2026-11-12-run.log`.
+
+| Pass | Right answers | 95% Wilson interval | Questions of questions.json | Context questions | 429 waited out |
+|---|---|---|---|---|---|
+| 0.7.2, `codestral-latest` | 15/30 | 0.33 to 0.67 | 10/15 | 5/15 | 167 |
+| 0.8.0 (de71fc2) with Atlas, `codestral-latest` | 16/30 | 0.36 to 0.70 | 11/15 | 5/15 | 220 |
+| 0.7.2, `claude-sonnet-5-5` | 28/30 | 0.79 to 0.98 | 14/15 | 14/15 | 0 |
+| 0.8.0 (de71fc2) with Atlas, `claude-sonnet-5-5` | 29/30 | 0.83 to 0.99 | 14/15 | 15/15 | 0 |
+
+0.8.0 is at least as accurate as 0.7.2 for both models. The differences are within the
+intervals: Codestral's answers vary from one trial to the next even at temperature 0, and it
+gained on some questions and lost on others. Claude's answers on 0.8.0 quote the catalog's
+descriptions and terms (the address the company writes to, Turnover as a draft synonym of
+Revenue). `describe_table` as `carol_analyst` grows from 263, 254 and 331 bytes (customers,
+accounts, transactions) to 1166, 1192 and 1650 bytes (`reports/2026-11-12-describe-sizes-*.json`).
+
+The column "First expected column at call" is not comparable across the two versions: the
+rule reads a `table` key as the table's name, and 0.8.0's `describe_table` answer holds an
+object under `table` (its description), so a column it shows is not counted as shown. That
+column, and "Named, never shown", undercount 0.8.0; the verdict of a trial does not read them.

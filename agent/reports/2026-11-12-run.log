@@ -1,0 +1,196 @@
+== start 14:57:05, project akko-agent-v08
+== mcp: akko-mcp-trino 0.7.2 (akkoai/akko-mcp-trino:0.7.2)
+   trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+{
+  "server": "trino-mcp 0.7.2, 8 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, search_columns",
+  "describe_table demo.crm.customers": {
+    "bytes": 263,
+    "atlas": false
+  },
+  "describe_table demo.crm.accounts": {
+    "bytes": 254,
+    "atlas": false
+  },
+  "describe_table demo.crm.transactions": {
+    "bytes": 331,
+    "atlas": false
+  },
+  "describe_schema demo.crm": {
+    "bytes": 1419
+  }
+}
+== mistral 0.7.2: start 15:02:46
+1/10 trial 1/3: 1 calls, answered, right: False, 429 waited out: 0
+1/10 trial 2/3: 1 calls, answered, right: False, 429 waited out: 0
+1/10 trial 3/3: 5 calls, answered, right: False, 429 waited out: 10
+2/10 trial 1/3: 1 calls, answered, right: False, 429 waited out: 2
+2/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 10
+2/10 trial 3/3: 1 calls, answered, right: False, 429 waited out: 2
+3/10 trial 1/3: 4 calls, answered, right: True, 429 waited out: 7
+3/10 trial 2/3: 4 calls, answered, right: True, 429 waited out: 9
+3/10 trial 3/3: 4 calls, answered, right: True, 429 waited out: 7
+4/10 trial 1/3: 3 calls, answered, right: True, 429 waited out: 7
+4/10 trial 2/3: 3 calls, answered, right: True, 429 waited out: 6
+4/10 trial 3/3: 3 calls, answered, right: True, 429 waited out: 6
+5/10 trial 1/3: 4 calls, answered, right: True, 429 waited out: 10
+5/10 trial 2/3: 4 calls, answered, right: True, 429 waited out: 6
+5/10 trial 3/3: 4 calls, answered, right: True, 429 waited out: 10
+6/10 trial 1/3: 2 calls, answered, right: False, 429 waited out: 3
+6/10 trial 2/3: 2 calls, answered, right: False, 429 waited out: 7
+6/10 trial 3/3: 2 calls, answered, right: False, 429 waited out: 2
+7/10 trial 1/3: 1 calls, answered, right: False, 429 waited out: 4
+7/10 trial 2/3: 1 calls, answered, right: False, 429 waited out: 3
+7/10 trial 3/3: 1 calls, answered, right: False, 429 waited out: 3
+8/10 trial 1/3: 5 calls, answered, right: True, 429 waited out: 10
+8/10 trial 2/3: 3 calls, answered, right: False, 429 waited out: 2
+8/10 trial 3/3: 5 calls, answered, right: True, 429 waited out: 10
+9/10 trial 1/3: 3 calls, answered, right: True, 429 waited out: 3
+9/10 trial 2/3: 1 calls, answered, right: False, 429 waited out: 3
+9/10 trial 3/3: 1 calls, answered, right: False, 429 waited out: 4
+10/10 trial 1/3: 3 calls, answered, right: True, 429 waited out: 6
+10/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 8
+10/10 trial 3/3: 4 calls, answered, right: False, 429 waited out: 7
+report: reports/2026-11-12-mistral-0.7.2.md
+== mistral 0.7.2: end 15:56:25, trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+== mcp: akko-mcp-trino 0.8.0 (akko-mcp-trino:0.8.0-de71fc2-measure)
+   trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+{
+  "server": "trino-mcp 0.8.0, 9 tools: describe_schema, describe_table, execute_query, explain_query, list_catalogs, list_schemas, list_tables, profile_table, search_columns",
+  "describe_table demo.crm.customers": {
+    "bytes": 1166,
+    "atlas": true
+  },
+  "describe_table demo.crm.accounts": {
+    "bytes": 1192,
+    "atlas": true
+  },
+  "describe_table demo.crm.transactions": {
+    "bytes": 1650,
+    "atlas": true
+  },
+  "describe_schema demo.crm": {
+    "bytes": 1781
+  }
+}
+context: atlas (timeout 5 s, reserve 0.5 s, 32 reads in flight, retry after 30 s, after a refusal 3600 s, batch 50, ttl 900 s, caches 134217728 + 16777216 bytes, text 500 characters, response 60000 characters, 500 columns)
+atlas: addresses: http://atlas:21000
+atlas: authentication: basic, user mcp_reader
+atlas: catalogs: demo -> sandbox
+atlas: table types: hive_table, iceberg_table
+atlas: timeouts: connect 1 s, read 5 s
+atlas: bulk reads: 6000 characters of query at most
+atlas: term reads: 4 at once at most
+atlas: glossaries: Sales
+atlas: classifications: none
+atlas: business metadata: none
+atlas: owner: not served
+atlas: term status attribute: status
+atlas: CA bundle: the system's
+atlas: proxy: none
+atlas: answers, version 2.4.0
+atlas: does not know the table types iceberg_table
+== mistral 0.8.0-de71fc2: start 15:56:41
+1/10 trial 1/3: 6 calls, answered, right: False, 429 waited out: 12
+1/10 trial 2/3: 5 calls, answered, right: False, 429 waited out: 10
+1/10 trial 3/3: 7 calls, answered, right: True, 429 waited out: 12
+2/10 trial 1/3: 5 calls, answered, right: True, 429 waited out: 10
+2/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 8
+2/10 trial 3/3: 5 calls, answered, right: True, 429 waited out: 10
+3/10 trial 1/3: 2 calls, answered, right: True, 429 waited out: 4
+3/10 trial 2/3: 2 calls, answered, right: False, 429 waited out: 6
+3/10 trial 3/3: 2 calls, answered, right: False, 429 waited out: 2
+4/10 trial 1/3: 3 calls, answered, right: True, 429 waited out: 7
+4/10 trial 2/3: 3 calls, answered, right: True, 429 waited out: 7
+4/10 trial 3/3: 2 calls, answered, right: True, 429 waited out: 6
+5/10 trial 1/3: 4 calls, answered, right: True, 429 waited out: 6
+5/10 trial 2/3: 3 calls, answered, right: True, 429 waited out: 6
+5/10 trial 3/3: 3 calls, answered, right: True, 429 waited out: 7
+6/10 trial 1/3: 2 calls, answered, right: True, 429 waited out: 7
+6/10 trial 2/3: 2 calls, answered, right: True, 429 waited out: 2
+6/10 trial 3/3: 2 calls, answered, right: False, 429 waited out: 6
+7/10 trial 1/3: 12 calls, max_steps, right: False, 429 waited out: 20
+7/10 trial 2/3: 1 calls, answered, right: False, 429 waited out: 3
+7/10 trial 3/3: 7 calls, answered, right: True, 429 waited out: 13
+8/10 trial 1/3: 2 calls, answered, right: False, 429 waited out: 6
+8/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 6
+8/10 trial 3/3: 2 calls, answered, right: False, 429 waited out: 6
+9/10 trial 1/3: 4 calls, answered, right: False, 429 waited out: 6
+9/10 trial 2/3: 3 calls, answered, right: True, 429 waited out: 4
+9/10 trial 3/3: 5 calls, answered, right: False, 429 waited out: 10
+10/10 trial 1/3: 3 calls, answered, right: False, 429 waited out: 6
+10/10 trial 2/3: 3 calls, answered, right: False, 429 waited out: 2
+10/10 trial 3/3: 5 calls, answered, right: False, 429 waited out: 10
+report: reports/2026-11-12-mistral-0.8.0-de71fc2.md
+== mistral 0.8.0-de71fc2: end 17:06:09, trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+== mcp: akko-mcp-trino 0.7.2 (akkoai/akko-mcp-trino:0.7.2)
+   trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+== anthropic 0.7.2: start 17:06:20
+1/10 trial 1/3: 6 calls, answered, right: True, 429 waited out: 0
+1/10 trial 2/3: 6 calls, answered, right: True, 429 waited out: 0
+1/10 trial 3/3: 6 calls, answered, right: True, 429 waited out: 0
+2/10 trial 1/3: 6 calls, answered, right: True, 429 waited out: 0
+2/10 trial 2/3: 7 calls, answered, right: True, 429 waited out: 0
+2/10 trial 3/3: 7 calls, answered, right: True, 429 waited out: 0
+3/10 trial 1/3: 4 calls, answered, right: True, 429 waited out: 0
+3/10 trial 2/3: 4 calls, answered, right: True, 429 waited out: 0
+3/10 trial 3/3: 4 calls, answered, right: True, 429 waited out: 0
+4/10 trial 1/3: 3 calls, answered, right: True, 429 waited out: 0
+4/10 trial 2/3: 3 calls, answered, right: True, 429 waited out: 0
+4/10 trial 3/3: 3 calls, answered, right: True, 429 waited out: 0
+5/10 trial 1/3: 5 calls, answered, right: False, 429 waited out: 0
+5/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 0
+5/10 trial 3/3: 5 calls, answered, right: True, 429 waited out: 0
+6/10 trial 1/3: 4 calls, answered, right: True, 429 waited out: 0
+6/10 trial 2/3: 5 calls, answered, right: False, 429 waited out: 0
+6/10 trial 3/3: 4 calls, answered, right: True, 429 waited out: 0
+7/10 trial 1/3: 5 calls, answered, right: True, 429 waited out: 0
+7/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 0
+7/10 trial 3/3: 6 calls, answered, right: True, 429 waited out: 0
+8/10 trial 1/3: 5 calls, answered, right: True, 429 waited out: 0
+8/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 0
+8/10 trial 3/3: 5 calls, answered, right: True, 429 waited out: 0
+9/10 trial 1/3: 5 calls, answered, right: True, 429 waited out: 0
+9/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 0
+9/10 trial 3/3: 5 calls, answered, right: True, 429 waited out: 0
+10/10 trial 1/3: 6 calls, answered, right: True, 429 waited out: 0
+10/10 trial 2/3: 6 calls, answered, right: True, 429 waited out: 0
+10/10 trial 3/3: 7 calls, answered, right: True, 429 waited out: 0
+report: reports/2026-11-12-anthropic-0.7.2.md
+== anthropic 0.7.2: end 17:12:41, trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+== mcp: akko-mcp-trino 0.8.0 (akko-mcp-trino:0.8.0-de71fc2-measure)
+   trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+== anthropic 0.8.0-de71fc2: start 17:12:52
+1/10 trial 1/3: 7 calls, answered, right: True, 429 waited out: 0
+1/10 trial 2/3: 8 calls, answered, right: True, 429 waited out: 0
+1/10 trial 3/3: 8 calls, answered, right: True, 429 waited out: 0
+2/10 trial 1/3: 8 calls, answered, right: True, 429 waited out: 0
+2/10 trial 2/3: 8 calls, answered, right: True, 429 waited out: 0
+2/10 trial 3/3: 8 calls, answered, right: True, 429 waited out: 0
+3/10 trial 1/3: 4 calls, answered, right: True, 429 waited out: 0
+3/10 trial 2/3: 4 calls, answered, right: True, 429 waited out: 0
+3/10 trial 3/3: 4 calls, answered, right: True, 429 waited out: 0
+4/10 trial 1/3: 3 calls, answered, right: True, 429 waited out: 0
+4/10 trial 2/3: 3 calls, answered, right: True, 429 waited out: 0
+4/10 trial 3/3: 3 calls, answered, right: True, 429 waited out: 0
+5/10 trial 1/3: 5 calls, answered, right: False, 429 waited out: 0
+5/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 0
+5/10 trial 3/3: 5 calls, answered, right: True, 429 waited out: 0
+6/10 trial 1/3: 3 calls, answered, right: True, 429 waited out: 0
+6/10 trial 2/3: 3 calls, answered, right: True, 429 waited out: 0
+6/10 trial 3/3: 3 calls, answered, right: True, 429 waited out: 0
+7/10 trial 1/3: 4 calls, answered, right: True, 429 waited out: 0
+7/10 trial 2/3: 4 calls, answered, right: True, 429 waited out: 0
+7/10 trial 3/3: 8 calls, answered, right: True, 429 waited out: 0
+8/10 trial 1/3: 5 calls, answered, right: True, 429 waited out: 0
+8/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 0
+8/10 trial 3/3: 5 calls, answered, right: True, 429 waited out: 0
+9/10 trial 1/3: 5 calls, answered, right: True, 429 waited out: 0
+9/10 trial 2/3: 5 calls, answered, right: True, 429 waited out: 0
+9/10 trial 3/3: 5 calls, answered, right: True, 429 waited out: 0
+10/10 trial 1/3: 7 calls, answered, right: True, 429 waited out: 0
+10/10 trial 2/3: 7 calls, answered, right: True, 429 waited out: 0
+10/10 trial 3/3: 7 calls, answered, right: True, 429 waited out: 0
+report: reports/2026-11-12-anthropic-0.8.0-de71fc2.md
+== anthropic 0.8.0-de71fc2: end 17:19:16, trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+== end 17:19:16, trino: running=true oom=false restarts=0 started=2026-11-12T14:57:42.438527622Z
+FIN code=0

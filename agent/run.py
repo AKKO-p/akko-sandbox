@@ -20,6 +20,7 @@ chosen provider needs, and is never printed nor written.
 import argparse
 import contextlib
 import datetime
+import email.utils
 import json
 import math
 import os
@@ -238,6 +239,7 @@ class Record:
     seconds: float = 0.0
     stop: str = ""  # answered, max_steps, max_tokens, refusal, error: <kind>
     announced: list[str] = field(default_factory=list)  # the tools the server listed
+    rate_limited: int = 0  # the provider's 429 answers this trial waited out, never scored
 
     @property
     def invalid_tools(self) -> list[str]:
@@ -437,6 +439,8 @@ SETTINGS = (
     "max_steps",
     "max_tokens",
     "sampling",
+    "pause",
+    "rate_limited",
 )
 
 
@@ -566,9 +570,16 @@ def records_from_json(data: dict) -> list[Record]:
     return records
 
 
-def load_questions(path: str) -> list[dict]:
+def load_questions(path: str | list[str]) -> list[dict]:
     """The questions file: a list of {"question", "expected": [catalog.schema.table.column,
-    ...], "forbidden": [...]}; forbidden may be empty, never shared with expected."""
+    ...], "forbidden": [...]}; forbidden may be empty, never shared with expected. Several
+    files are read one after the other, as one list, and no question id may repeat."""
+    if isinstance(path, list):
+        items = [item for p in path for item in load_questions(p)]
+        ids = [item["id"] for item in items if item.get("id")]
+        if len(ids) != len(set(ids)):
+            raise ValueError(f"{', '.join(path)}: a question id repeats")
+        return items
     with open(path, encoding="utf-8") as f:
         items = json.load(f)
     if not isinstance(items, list) or not items:
@@ -799,6 +810,85 @@ def error_kind(exc: BaseException) -> str:
     return f"error: {type(exc).__name__}" + (f" {status}" if status else "")
 
 
+# A 429 from the provider is waited out, never scored: the same turn is sent again after the
+# provider's Retry-After, or after a growing wait when it gives none. A trial that still
+# ends on a 429 is run again from the start, in a fresh session and conversation.
+RATE_LIMIT_TRIES = 8  # sends of one turn, the first included
+RATE_LIMIT_TRIALS = 3  # runs of one trial that ended on a 429, the first included
+RATE_LIMIT_WAIT = 5.0  # seconds before the first resend when the provider names no wait
+RATE_LIMIT_WAIT_MAX = 120.0
+
+
+def status_of(exc: BaseException) -> int | None:
+    """The HTTP status an exception carries, as error_kind reads it."""
+    while isinstance(exc, BaseExceptionGroup) and len(exc.exceptions) == 1:
+        exc = exc.exceptions[0]
+    return getattr(exc, "status_code", None) or getattr(getattr(exc, "response", None), "status_code", None)
+
+
+def retry_after(exc: BaseException, now: float | None = None) -> float | None:
+    """The wait a 429 asks for, in seconds, from its Retry-After header (seconds or an HTTP
+    date); None when it names none. Only the header is read, never the message."""
+    headers = None
+    for name in ("response", "raw_response"):
+        headers = getattr(getattr(exc, name, None), "headers", None)
+        if headers is not None:
+            break
+    if headers is None:
+        return None
+    try:
+        value = headers.get("retry-after") or headers.get("Retry-After")
+    except AttributeError:
+        return None
+    if not value:
+        return None
+    value = str(value).strip()
+    try:
+        return max(0.0, float(value))
+    except ValueError:
+        pass
+    try:
+        when = email.utils.parsedate_to_datetime(value).timestamp()
+    except (TypeError, ValueError):
+        return None
+    return max(0.0, when - (time.time() if now is None else now))
+
+
+def rate_limit_wait(exc: BaseException, attempt: int) -> float | None:
+    """How long to wait before sending a turn again, or None when the error is no 429: the
+    provider's Retry-After when it gives one, else 5 s doubled at each attempt; at most 120 s."""
+    if status_of(exc) != 429:
+        return None
+    asked = retry_after(exc)
+    wait = asked if asked is not None else RATE_LIMIT_WAIT * 2**attempt
+    return min(wait, RATE_LIMIT_WAIT_MAX)
+
+
+async def sleep(seconds: float) -> None:
+    import anyio
+
+    await anyio.sleep(seconds)
+
+
+async def model_turn(chat: Any, messages: list, tools: list[dict], record: Record, pause: float = 0.0) -> Turn:
+    """One model turn, after --pause, with every 429 waited out and counted in the record.
+    The turn appends to the conversation only once it succeeds, so a resend is the same turn."""
+    for attempt in range(RATE_LIMIT_TRIES):
+        if pause:
+            await sleep(pause)
+        try:
+            return await chat.turn(messages, tools)
+        except Exception as exc:
+            wait = rate_limit_wait(exc, attempt)
+            if wait is None or attempt == RATE_LIMIT_TRIES - 1:
+                if wait is not None:
+                    record.rate_limited += 1
+                raise
+            record.rate_limited += 1
+            await sleep(wait)
+    raise AssertionError("unreachable")
+
+
 async def ask(args: argparse.Namespace, chat: Any, item: dict, trial: int = 1) -> tuple[Record, str, str]:
     """One trial of a question, in a fresh session and a fresh conversation."""
     record = Record(
@@ -817,7 +907,7 @@ async def ask(args: argparse.Namespace, chat: Any, item: dict, trial: int = 1) -
             messages = chat.start(item["question"])
             steps = 0
             while True:
-                turn = await chat.turn(messages, tools)
+                turn = await model_turn(chat, messages, tools, record, getattr(args, "pause", 0.0))
                 model = turn.model or model
                 record.input_tokens += turn.input_tokens
                 record.output_tokens += turn.output_tokens
@@ -859,7 +949,13 @@ async def run(args: argparse.Namespace, chat: Any, questions: list[dict]) -> tup
     records, models, servers = [], [], []
     for i, item in enumerate(questions, 1):
         for trial in range(1, args.repeat + 1):
-            record, model, server = await ask(args, chat, item, trial)
+            waited = 0
+            for _ in range(RATE_LIMIT_TRIALS):
+                record, model, server = await ask(args, chat, item, trial)
+                record.rate_limited += waited
+                if not record.stop.endswith(" 429"):
+                    break
+                waited = record.rate_limited
             records.append(record)
             if model and model not in models:
                 models.append(model)
@@ -867,7 +963,7 @@ async def run(args: argparse.Namespace, chat: Any, questions: list[dict]) -> tup
                 servers.append(server)
             print(
                 f"{i}/{len(questions)} trial {trial}/{args.repeat}: {record.calls} calls, {record.stop}, "
-                f"right: {record.right}",
+                f"right: {record.right}, 429 waited out: {record.rate_limited}",
                 flush=True,
             )
     meta = {
@@ -879,11 +975,13 @@ async def run(args: argparse.Namespace, chat: Any, questions: list[dict]) -> tup
         "server_image": args.server_image,
         "mcp_url": args.mcp_url,
         "persona": args.persona,
-        "questions": args.questions,
+        "questions": ", ".join(args.questions) if isinstance(args.questions, list) else args.questions,
         "repeat": args.repeat,
         "max_steps": args.max_steps,
         "max_tokens": args.max_tokens,
         "sampling": chat.sampling,
+        "pause": getattr(args, "pause", 0.0),
+        "rate_limited": sum(r.rate_limited for r in records),
     }
     return meta, records
 
@@ -893,7 +991,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--provider", choices=sorted(PROVIDERS))
     p.add_argument("--model", help="the model id; default: " + ", ".join(f"{k} {v}" for k, v in DEFAULT_MODELS.items()))
     p.add_argument("--persona", default="carol_analyst")
-    p.add_argument("--questions", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "questions.json"))
+    p.add_argument(
+        "--questions",
+        nargs="+",
+        default=[os.path.join(os.path.dirname(os.path.abspath(__file__)), "questions.json")],
+        help="one or more questions files, read in order as one list",
+    )
     p.add_argument("--mcp-url", default=os.environ.get("MCP_URL", "http://mcp:3000/mcp"))
     p.add_argument("--keycloak-url", default=os.environ.get("KEYCLOAK_URL", "http://keycloak:8080"))
     p.add_argument(
@@ -904,6 +1007,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     p.add_argument("--repeat", type=int, default=1, help="trials of each question, each in a fresh session")
     p.add_argument("--max-steps", type=int, default=12, help="model turns that may call tools, per question")
     p.add_argument("--max-tokens", type=int, default=16000, help="output tokens per model turn")
+    p.add_argument(
+        "--pause", type=float, default=0.0, help="seconds to wait before each model turn, to space the calls"
+    )
     p.add_argument("--out", help="the report, Markdown; its JSON is written beside it")
     p.add_argument("--dry-run", action="store_true", help="list the tools in the provider's format, call no model")
     p.add_argument(
@@ -926,6 +1032,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         p.error("--max-steps must be at least 1")
     if args.repeat < 1:
         p.error("--repeat must be at least 1")
+    if args.pause < 0:
+        p.error("--pause cannot be negative")
     if not args.dry_run and not args.out:
         p.error("--out is required unless --dry-run")
     return args
