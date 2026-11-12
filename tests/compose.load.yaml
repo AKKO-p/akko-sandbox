@@ -1,0 +1,84 @@
+# The load test of the context from a data catalog, akko-mcp-trino 0.8 (tests/load.sh).
+# Added to COMPOSE_FILE by the script, after catalogs/compose.atlas.yaml.
+#
+#   MCP_IMAGE=<image> tests/load.sh
+
+services:
+  # The catalogs of tests/load/catalog: demo as it is, and wide, Trino's memory connector,
+  # which holds the tables of 2,000 columns.
+  trino:
+    volumes:
+      - ./tests/load/catalog:/etc/trino/catalog:ro
+
+  # Trino asks OPA to filter the 2,000 columns of each DESCRIBE in one request. With the
+  # sandbox's 64 MiB, an earlier build of the server saw the kernel kill OPA during 50
+  # DESCRIBE at once, and every statement after failed; on d61d669 the burst passed with
+  # 64 MiB. 512 MiB is a margin. LOAD_OPA_MEMORY=64m runs with the sandbox's limit.
+  opa:
+    mem_limit: ${LOAD_OPA_MEMORY:-512m}
+
+  mcp:
+    environment:
+      # The catalog wide is in Atlas's cluster sandbox too, and the glossary Generated is
+      # served next to Sales.
+      ATLAS_CLUSTERS: '{"demo": "sandbox", "wide": "sandbox"}'
+      ATLAS_GLOSSARIES: Sales,Generated
+      # One page of describe_table holds every column of a wide table, so that its context is
+      # read, and cut, for all 2,000 columns. With the default, 100, the answer listed 100
+      # columns and their context fit whole (LOAD_MAX_ROWS=100).
+      TRINO_MAX_ROWS: ${LOAD_MAX_ROWS:-2000}
+      # Short lifetimes, so that the run sees the caches expire; the two cache limits, set
+      # here and printed by the script. LOAD_* change them for a witness run, and section 7
+      # of the script for its own small limits.
+      MCP_CONTEXT_TTL_SECONDS: ${LOAD_TTL_SECONDS:-60}
+      MCP_VISIBILITY_TTL_SECONDS: ${LOAD_TTL_SECONDS:-60}
+      MCP_CONTEXT_CACHE_BYTES: ${LOAD_CACHE_BYTES:-67108864}
+      MCP_CONTEXT_TERMS_CACHE_BYTES: ${LOAD_TERMS_CACHE_BYTES:-16777216}
+      # Room to read a wide table and its 2,000 terms with nothing cached. Atlas's read
+      # timeout covers one request, the read of the table; the context deadline covers the
+      # table and then its terms. Section 3 of the script measures the defaults, 5 s each, and
+      # the README gives the numbers. Both are raised, as the server's docs advise for tables
+      # that wide (Large catalogs). MCP_CONTEXT_MAX_CONCURRENCY keeps its default, 32: a call
+      # that waits on the read in flight takes no read slot.
+      MCP_CONTEXT_TIMEOUT_SECONDS: ${LOAD_CONTEXT_TIMEOUT_SECONDS:-40}
+      ATLAS_TIMEOUT_SECONDS: ${LOAD_ATLAS_TIMEOUT_SECONDS:-20}
+      # The server's own response limit (its default, 60,000), for a witness run below it.
+      MCP_CONTEXT_RESPONSE_CHARS: ${LOAD_RESPONSE_CHARS:-60000}
+    # Above the bound the script checks (the three caches + 256 MiB), so that a server past
+    # it is measured, not killed. The sandbox gives it 384 MiB; the burst peaked at
+    # 254.8 MiB on e60f915, at the edge of the 256 MiB it had before.
+    mem_limit: 1024m
+
+  # The checks' own clients: the seed of the load catalog, run once by the script; and the
+  # clusters themselves, from the back network, as the admin, for their query history; the
+  # same container sends the bursts of calls (tests/load/burst.py).
+  load-seed:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    profiles: ["tools"]
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    user: "1000:1000"
+    entrypoint: ["python", "/seed/seed.py"]
+    environment:
+      ATLAS_URL: http://atlas:21000
+      ATLAS_ADMIN_PASSWORD_FILE: /secrets/admin.secret
+      ATLAS_CLUSTER: sandbox
+      LOAD_TERMS: ${LOAD_TERMS:-50000}
+      LOAD_COLUMNS: ${LOAD_COLUMNS:-2000}
+      LOAD_ATTACHED_TERMS: ${LOAD_ATTACHED_TERMS:-2000}
+      LOAD_TABLES: "3"
+      LOAD_BATCH: ${LOAD_BATCH:-500}
+    volumes:
+      - ./tests/load/seed.py:/seed/seed.py:ro
+      - atlas-secrets:/secrets:ro
+    mem_limit: 256m
+  history:
+    restart: "no"
+    security_opt: ["no-new-privileges:true"]
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.7.2}
+    profiles: ["tools"]
+    entrypoint: ["sleep", "infinity"]
+    volumes:
+      - certs:/certs:ro
+      - ./tests/load/burst.py:/load/burst.py:ro
+    mem_limit: 512m

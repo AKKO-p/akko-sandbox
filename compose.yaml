@@ -161,7 +161,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 30
-    mem_limit: 256m
+    # A burst of 50 describe_table calls on a table of 2,000 columns peaked at 254.8 MiB
+    # (tests/load.sh), at the edge of 256 MiB.
+    mem_limit: 384m
 
   # The official MCP Inspector, to click through the tools without a model.
   # Open http://localhost:6274 and read the access token with
