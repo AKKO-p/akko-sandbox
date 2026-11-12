@@ -33,12 +33,13 @@ services:
       MCP_VISIBILITY_TTL_SECONDS: ${LOAD_TTL_SECONDS:-60}
       MCP_CONTEXT_CACHE_BYTES: ${LOAD_CACHE_BYTES:-67108864}
       MCP_CONTEXT_TERMS_CACHE_BYTES: ${LOAD_TERMS_CACHE_BYTES:-16777216}
-      # Room to read a wide table and its 2,000 terms with nothing cached. Section 3 of the
-      # script measures the defaults, 5 s each, and the README gives the numbers. The two are
-      # raised together, as the server's docs advise for tables that wide (Large catalogs).
-      # MCP_CONTEXT_MAX_CONCURRENCY keeps its default, 32: the 50 calls of the burst wait on
-      # one read, and a call that waits takes no read slot.
-      MCP_CONTEXT_TIMEOUT_SECONDS: ${LOAD_CONTEXT_TIMEOUT_SECONDS:-20}
+      # Room to read a wide table and its 2,000 terms with nothing cached. Atlas's read
+      # timeout covers one request, the read of the table; the context deadline covers the
+      # table and then its terms. Section 3 of the script measures the defaults, 5 s each, and
+      # the README gives the numbers. Both are raised, as the server's docs advise for tables
+      # that wide (Large catalogs). MCP_CONTEXT_MAX_CONCURRENCY keeps its default, 32: the 50
+      # calls of the burst wait on one read, and a call that waits takes no read slot.
+      MCP_CONTEXT_TIMEOUT_SECONDS: ${LOAD_CONTEXT_TIMEOUT_SECONDS:-40}
       ATLAS_TIMEOUT_SECONDS: ${LOAD_ATLAS_TIMEOUT_SECONDS:-20}
       # The server's own response limit (its default, 60,000), for a witness run below it.
       MCP_CONTEXT_RESPONSE_CHARS: ${LOAD_RESPONSE_CHARS:-60000}
