@@ -371,7 +371,7 @@ cache, pour que chaque appel relise Atlas et Trino. Il vérifie ce qui suit :
 Quoi qu'il arrive, la fin d'une exécution retire la policy permissive du contrôle
 du témoin, reprend ou redémarre Atlas et remet le secret du lecteur, avec `KEEP=1`
 et après un Ctrl-C aussi, et elle nomme chaque rétablissement qu'elle a fait.
-[`tests/interrupt.sh`](tests/interrupt.sh) le rejoue{N}: il interrompt
+[`tests/interrupt.sh`](tests/interrupt.sh) le rejoue. Il interrompt
 `tests/context.sh` comme le fait un Ctrl-C, en cinq points, et lit l'état depuis
 l'extérieur.
 
