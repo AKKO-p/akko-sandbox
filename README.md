@@ -66,7 +66,7 @@ The Keycloak console is at <http://localhost:8080> (`admin` / `admin`).
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | the identity provider, realm `sandbox`, with standard token exchange | 768 MB |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | the access policy, [`opa/policy.rego`](opa/policy.rego) | 64 MB |
 | `trino` | `trinodb/trino:482` | the engine, https, JWT authentication, OPA access control | 2048 MB |
-| `mcp` | `akkoai/akko-mcp-trino:0.7.2` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 256 MB |
+| `mcp` | `akkoai/akko-mcp-trino:0.7.2` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 384 MB |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | the official MCP Inspector | 384 MB |
 
 Measured on a Linux host with `docker stats`: about 1.4 GB in use at rest
@@ -453,8 +453,8 @@ The run sets the caches' lifetime to 60 s, the table cache to 64 MiB
 (`MCP_CONTEXT_TERMS_CACHE_BYTES=16777216`). The visibility cache keeps its
 default, 32 MiB. The script reads the three limits back from the server's
 `--check`. The server's container may use 1 GiB, above the bound checked below,
-so that a server past it is measured, not killed. The sandbox's own limit for
-it, 256 MiB, leaves little room: the burst peaked at 254.8 MiB.
+so that a server past it is measured, not killed. The sandbox gives it 384 MiB:
+the burst peaked at 254.8 MiB, at the edge of the 256 MiB it had before.
 
 The run has four steps:
 
@@ -489,6 +489,13 @@ After the 50 calls, the script checks the following:
   says `"context_truncated": true`, lists the columns left out in
   `undescribed_columns`, and gives the source as `partial`.
 
+The server gives a source as `partial` for any of three reasons: it cut the
+context to `MCP_CONTEXT_RESPONSE_CHARS` (`"context_truncated": true`), the page
+of `describe_table` did not list every column of the table (`TRINO_MAX_ROWS`
+below the number of columns), or part of the source's read failed, the table or
+its terms (a call past its deadline, as in step 1). In the burst, the page lists
+all 2,000 columns, and the source is `partial` because the context is cut.
+
 The script also prints how many calls have a window, from their request to
 their answer, that overlaps Atlas's read of the table, and checks that at
 least 45 of the 50 do. A window counts the call's whole time, Trino's
@@ -513,7 +520,7 @@ last one on `e60f915`:
 | `LOAD_MEMORY_MARGIN_MB=0 LOAD_RESPONSE_LIMIT=50000` | The script's bounds are below what was measured: the memory checks and the check of the response limit fail. |
 | `LOAD_RESPONSE_CHARS=30000` | The server's own limit is lower. Every context is 29,760 characters and still cut. Every check passes. |
 | `LOAD_OPA_MEMORY=64m` | OPA has the sandbox's 64 MiB. The burst passed, and the kernel did not kill OPA. |
-| `LOAD_MAX_ROWS=100` | `TRINO_MAX_ROWS` at its default. The answer lists 100 columns, all described, with a context of 33,808 characters, not cut. The checks of 2,000 columns, of the cut and of 2,000 terms fail. |
+| `LOAD_MAX_ROWS=100` | `TRINO_MAX_ROWS` at its default. The answer lists 100 columns, all described, with a context of 33,808 characters, not cut. The source is still `partial`: the page lists 100 of the 2,000 columns. The checks of 2,000 columns, of the cut and of 2,000 terms fail. |
 
 The run raises four settings, as the server's docs advise for large data
 catalogs. The first three have a reason measured on these builds:

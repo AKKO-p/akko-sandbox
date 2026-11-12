@@ -286,6 +286,8 @@ filled=$(rows 'rows[0]["end"]' < "$scratch/first")
 audit_between first-start first-end > "$scratch/audit"
 echo "  describe_table answered in $(rows 'round(rows[0]["end"] - rows[0]["start"], 2)' < "$scratch/first") s, caches empty; Atlas read the table in $(read_times wide_2000 < "$scratch/audit")"
 out=$(rows 'rows[0]["text"]' < "$scratch/first")
+attached=$(field 'len(d["rows"])' <<<"$out")
+attached=${attached:-0}
 check "carol, describe_table wide_2000: 2000 columns, the context of Atlas, cut" "$(field '(len(d["rows"]), d["context_sources"], d["context_truncated"])' <<<"$out")" "(2000, {'atlas': 'partial'}, True)"
 check "  each column described or listed as undescribed, once" "$(field 'sorted(list(d["column_context"]) + d["undescribed_columns"]) == [r[0] for r in d["rows"]]' <<<"$out")" "True"
 check "  each column described carries its description and its own term of Generated" "$(field 'all(c["description"] == "Generated column number %d of the wide table" % int(n[1:]) and [t["name"] for t in c["terms"]] == ["Generated term %05d" % int(n[1:])] for n, c in d["column_context"].items())' <<<"$out")" "True"
@@ -311,11 +313,12 @@ audit_between burst-start burst-end > "$scratch/audit"
 echo "  the burst took $(rows 'round(max(r["end"] for r in rows) - min(r["start"] for r in rows), 2)' < "$scratch/burst") s; each call $(rows '"%.2f s to %.2f s" % (min(r["end"] - r["start"] for r in rows), max(r["end"] - r["start"] for r in rows))' < "$scratch/burst"); the calls started within $(rows '"%.2f s" % (max(r["start"] for r in rows) - min(r["start"] for r in rows))' < "$scratch/burst")"
 misses=$(( $(metric 'mcp_trino_context_cache_lookups_total{provider="atlas",result="miss"}') - misses ))
 hits=$(( $(metric 'mcp_trino_context_cache_lookups_total{provider="atlas",result="hit"}') - hits ))
-# Each call looks up the table and its 2,000 terms once, at its entry into the context: a call
-# that finds the table missing either sends the read or waits on the one in flight; a call that
-# finds it cached is a hit for all of them.
-per_call=$((1 + 2000))
-echo "  the server's cache lookups during the burst: $misses misses, $hits hits, $per_call a call"
+# Each call looks up the table once, then once each term attached to the columns its answer
+# lists: a call that finds the table missing either sends the read or waits on the one in
+# flight; a call that finds it cached is a hit for all of them. Each column of the wide table
+# holds one term (section 2 checks it), so the terms are the columns the first call listed.
+per_call=$((1 + attached))
+echo "  the server's cache lookups during the burst: $misses misses, $hits hits, $per_call a call (the table and $attached terms)"
 echo "  $((misses / per_call)) calls waited on the read in flight or sent it, $((hits / per_call)) served from the cache"
 # Calls that waited on the read take no read slot: the burst tests it only if more calls than
 # the slots met the read in flight.

@@ -45,8 +45,8 @@ services:
       # The server's own response limit (its default, 60,000), for a witness run below it.
       MCP_CONTEXT_RESPONSE_CHARS: ${LOAD_RESPONSE_CHARS:-60000}
     # Above the bound the script checks (the three caches + 256 MiB), so that a server past
-    # it is measured, not killed. The sandbox's own 256 MiB leaves little room: the burst
-    # peaked at 254.8 MiB on e60f915.
+    # it is measured, not killed. The sandbox gives it 384 MiB; the burst peaked at
+    # 254.8 MiB on e60f915, at the edge of the 256 MiB it had before.
     mem_limit: 1024m
 
   # The checks' own clients: the seed of the load catalog, run once by the script; and the

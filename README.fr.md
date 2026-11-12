@@ -69,7 +69,7 @@ La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | l'identity provider (IdP), realm `sandbox`, avec le token exchange standard | 768 Mo |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | la policy d'accès, [`opa/policy.rego`](opa/policy.rego) | 64 Mo |
 | `trino` | `trinodb/trino:482` | le moteur, en https, authentification JWT, contrôle d'accès OPA | 2048 Mo |
-| `mcp` | `akkoai/akko-mcp-trino:0.7.2` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 256 Mo |
+| `mcp` | `akkoai/akko-mcp-trino:0.7.2` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 384 Mo |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | l'Inspector MCP officiel | 384 Mo |
 
 Mesuré sur une machine Linux avec `docker stats` : environ 1,4 Go utilisés au repos
@@ -466,9 +466,9 @@ L'exécution fixe la durée de vie des caches à 60 s, le cache des tables à
 (`MCP_CONTEXT_TERMS_CACHE_BYTES=16777216`). Le cache de visibilité garde sa
 valeur par défaut, 32 Mio. Le script relit les trois limites dans le `--check`
 du serveur. Le conteneur du serveur peut utiliser 1 Gio, au-dessus de la borne
-vérifiée plus bas, pour qu'un serveur qui la dépasse soit mesuré, pas tué. La
-limite propre du sandbox pour ce conteneur, 256 Mio, laisse peu de marge : la
-rafale a culminé à 254,8 Mio.
+vérifiée plus bas, pour qu'un serveur qui la dépasse soit mesuré, pas tué. Le
+sandbox lui donne 384 Mio : la rafale a culminé à 254,8 Mio, à la limite des
+256 Mio qu'il avait avant.
 
 L'exécution compte quatre étapes :
 
@@ -506,6 +506,14 @@ Après les 50 appels, le script vérifie ce qui suit :
   (60 000), indique `"context_truncated": true`, liste les colonnes laissées de
   côté dans `undescribed_columns` et indique la source `partial`.
 
+Le serveur donne une source comme `partial` pour l'une de trois raisons : il a
+coupé le contexte à `MCP_CONTEXT_RESPONSE_CHARS` (`"context_truncated": true`),
+la page de `describe_table` ne listait pas toutes les colonnes de la table
+(`TRINO_MAX_ROWS` sous le nombre de colonnes), ou une partie de la lecture de la
+source a échoué, la table ou ses termes (un appel au-delà de son délai, comme à
+l'étape 1). Pendant la rafale, la page liste les 2 000 colonnes, et la source
+est `partial` parce que le contexte est coupé.
+
 Le script affiche aussi combien d'appels ont une fenêtre, de leur requête à
 leur réponse, qui chevauche la lecture de la table par Atlas, et vérifie qu'au
 moins 45 des 50 le font. Une fenêtre compte tout le temps de l'appel, le
@@ -531,7 +539,7 @@ d'avant `e60f915`, avec les mêmes réglages ; la dernière sur `e60f915` :
 | `LOAD_MEMORY_MARGIN_MB=0 LOAD_RESPONSE_LIMIT=50000` | Les bornes du script sont sous ce qui a été mesuré : les contrôles de mémoire et celui de la limite de réponse échouent. |
 | `LOAD_RESPONSE_CHARS=30000` | La limite du serveur lui-même est plus basse. Chaque contexte fait 29 760 caractères et reste coupé. Tous les contrôles réussissent. |
 | `LOAD_OPA_MEMORY=64m` | OPA a les 64 Mio du sandbox. La rafale a réussi, et le noyau n'a pas tué OPA. |
-| `LOAD_MAX_ROWS=100` | `TRINO_MAX_ROWS` à sa valeur par défaut. La réponse liste 100 colonnes, toutes décrites, avec un contexte de 33 808 caractères, non coupé. Les contrôles des 2 000 colonnes, de la coupe et des 2 000 termes échouent. |
+| `LOAD_MAX_ROWS=100` | `TRINO_MAX_ROWS` à sa valeur par défaut. La réponse liste 100 colonnes, toutes décrites, avec un contexte de 33 808 caractères, non coupé. La source reste `partial` : la page liste 100 des 2 000 colonnes. Les contrôles des 2 000 colonnes, de la coupe et des 2 000 termes échouent. |
 
 L'exécution augmente quatre réglages, comme le conseille la documentation du
 serveur pour les grands catalogues de données. Les trois premiers ont une
