@@ -233,10 +233,11 @@ check "every cluster's history was read" "$(rows 'sorted({r["cluster"] for r in 
 check "his history holds the marker: it covers the section" "$(rows 'sum(1 for r in rows if r.get("user") == "dave_viewer" and "'"$marker"'" in r["query"])' < "$scratch/history")" "1"
 check "  none of his queries names a hidden object" "$(rows '[r["query"] for r in rows if r.get("user") == "dave_viewer" and any(w in r["query"] for w in ("customers", "balance", "full_name", "email", "segment"))]' < "$scratch/history")" "[]"
 # The visibility filter's statements, by their form: the catalogs, the schemas and the tables
-# of a quoted catalog, a quoted DESCRIBE, a select check. The tools' own statements name
-# their catalog unquoted.
+# of a quoted catalog, a quoted DESCRIBE, a select check. The tools quote their names too, so
+# a quoted form alone does not tell a tool from the filter: the tag mcp-gate does.
 gate='^(SHOW CATALOGS|SELECT schema_name FROM "[^"]+"\.information_schema\.schemata|SELECT table_name FROM "[^"]+"\.information_schema\.tables WHERE table_schema = |DESCRIBE "|EXPLAIN \(TYPE VALIDATE\))'
-check "  his statements of the visibility filter carry mcp-gate, and his other statements do not" "$(GATE="$gate" rows 'sorted({(bool(__import__("re").match(__import__("os").environ["GATE"], r["query"])), "mcp-gate" in (r["tags"] or [])) for r in rows if r.get("user") == "dave_viewer"})' < "$scratch/history")" "[(False, False), (True, True)]"
+check "  every statement marked mcp-gate has the form of the visibility filter" "$(GATE="$gate" rows 'sum(1 for r in rows if r.get("user") == "dave_viewer" and "mcp-gate" in (r["tags"] or []) and not __import__("re").match(__import__("os").environ["GATE"], r["query"]))' < "$scratch/history")" "0"
+check "  his other statements were seen, and none carries mcp-gate" "$(GATE="$gate" rows 'sorted({"mcp-gate" in (r["tags"] or []) for r in rows if r.get("user") == "dave_viewer" and not __import__("re").match(__import__("os").environ["GATE"], r["query"])})' < "$scratch/history")" "[False]"
 check "  among them the canary check and the proof of the join's target" "$(rows '(any("'"'"'canary'"'"'" in r["query"] for r in rows if r.get("user") == "dave_viewer" and "mcp-gate" in (r["tags"] or [])), any(r["query"].startswith("DESCRIBE \"") for r in rows if r.get("user") == "dave_viewer" and "mcp-gate" in (r["tags"] or [])))' < "$scratch/history")" "(True, True)"
 docker compose logs --no-color opa 2>/dev/null | sed 's/^[^{]*//' > "$scratch/opa"
 opa_dave=$(python3 -c "
