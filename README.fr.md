@@ -69,7 +69,7 @@ La console Keycloak est sur <http://localhost:8080> (`admin` / `admin`).
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | l'identity provider (IdP), realm `sandbox`, avec le token exchange standard | 768 Mo |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | la policy d'accès, [`opa/policy.rego`](opa/policy.rego) | 64 Mo |
 | `trino` | `trinodb/trino:482` | le moteur, en https, authentification JWT, contrôle d'accès OPA | 2048 Mo |
-| `mcp` | `akkoai/akko-mcp-trino:0.8.0` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 384 Mo |
+| `mcp` | `akkoai/akko-mcp-trino:0.8.1` | le serveur MCP, avec ses valeurs par défaut : mode d'identité `jwt` (token exchange), token valide exigé | 384 Mo |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | l'Inspector MCP officiel | 384 Mo |
 
 Mesuré sur une machine Linux avec `docker stats` : environ 1,4 Go utilisés au repos
@@ -261,7 +261,7 @@ et les colonnes que Trino montre à l'appelant. Le profil `catalogs`
 2.4.0 et active le fournisseur Atlas du serveur.
 
 Atlas est optionnel : le `docker compose up` par défaut ne le démarre pas.
-L'image par défaut, `akkoai/akko-mcp-trino:0.8.0`, contient le fournisseur Atlas. Il
+L'image par défaut, `akkoai/akko-mcp-trino:0.8.1`, contient le fournisseur Atlas. Il
 reste inactif tant que `MCP_CONTEXT_PROVIDERS` ne le nomme pas, ce que fait le
 profil `catalogs`.
 

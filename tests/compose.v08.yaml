@@ -56,7 +56,7 @@ services:
   history:
     restart: "no"
     security_opt: ["no-new-privileges:true"]
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.1}
     profiles: ["tools"]
     entrypoint: ["sleep", "infinity"]
     volumes:

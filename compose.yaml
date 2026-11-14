@@ -129,7 +129,7 @@ services:
   # MCP_IMAGE runs another build of the server, such as a release candidate.
   mcp:
     <<: *defaults
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.1}
     entrypoint: ["/bin/sh", "-c"]
     command: ["TRINO_TOKEN_EXCHANGE_CLIENT_SECRET=$$(cat /certs/mcp-client.secret) exec akko-mcp-trino"]
     environment:
@@ -183,7 +183,7 @@ services:
   # The demo client, started by ./demo.sh: the same image, the official MCP SDK.
   client:
     <<: *defaults
-    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}
+    image: ${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.1}
     profiles: ["tools"]
     entrypoint: ["python", "/demo/demo.py"]
     environment:
