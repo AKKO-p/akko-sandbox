@@ -122,7 +122,7 @@ atlas_customers_reads() { docker compose exec -T atlas cat /data/logs/audit.log 
 # holds the socket any more).
 sockets() { # container id
   docker run --rm --label "com.docker.compose.project=$COMPOSE_PROJECT_NAME" --label com.docker.compose.service=sockets \
-    --network "container:$1" --entrypoint python "${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.0}" -c "
+    --network "container:$1" --entrypoint python "${MCP_IMAGE:-akkoai/akko-mcp-trino:0.8.1}" -c "
 import ipaddress, json, socket, struct
 def address(field):
     raw, port = field.split(':')
