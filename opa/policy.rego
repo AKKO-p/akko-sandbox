@@ -13,6 +13,10 @@ roles := {
 	"alice_admin": "admin",
 	"carol_analyst": "analyst",
 	"dave_viewer": "viewer",
+	# The HR scenario (./demo.sh --hr).
+	"manager": "manager",
+	"hr": "hr",
+	"intern": "intern",
 }
 
 user := input.context.identity.user
@@ -50,6 +54,26 @@ forbidden if {
 	"balance" in t.columns
 }
 
+# 2d. HR scenario: only HR and the managers may open the employees table; it is
+#     hidden from everyone else, listings included.
+forbidden if {
+	not role in {"hr", "manager"}
+	is_employees(input.action.resource.table)
+}
+
+# 2e. HR scenario: nobody writes to the employees table, HR included. The MCP server
+#     already refuses writes; this rule keeps Trino's own policy as a second line.
+write_operations := {
+	"InsertIntoTable", "DeleteFromTable", "TruncateTable", "UpdateTableColumns",
+	"DropTable", "RenameTable", "SetTableComment", "SetColumnComment", "AddColumn",
+	"DropColumn", "RenameColumn", "AlterColumn", "SetTableProperties", "SetTableAuthorization",
+}
+
+forbidden if {
+	input.action.operation in write_operations
+	is_employees(input.action.resource.table)
+}
+
 # 2b. Viewers may not use the tpcds catalog, which tests/v07.sh adds: Trino does
 #     not even list it to them.
 #     The catalog's own operations (AccessCatalog, FilterCatalogs, ShowSchemas,
@@ -81,7 +105,7 @@ forbidden if {
 
 # 3. Everyone but an admin sees e-mail addresses masked: ***@example.com
 columnMask := {"expression": "'***' || substr(email, strpos(email, '@'))"} if {
-	role != "admin"
+	not role in {"admin", "hr"}
 	input.action.resource.column.columnName == "email"
 }
 
@@ -89,6 +113,12 @@ columnMask := {"expression": "'***' || substr(email, strpos(email, '@'))"} if {
 rowFilters contains {"expression": "country IN ('DE', 'ES', 'FR', 'IT', 'NL')"} if {
 	role == "analyst"
 	is_customers(input.action.resource.table)
+}
+
+# 4a. HR scenario: a manager sees her own team only (the sandbox's manager leads Sales).
+rowFilters contains {"expression": "team = 'Sales'"} if {
+	role == "manager"
+	is_employees(input.action.resource.table)
 }
 
 # 5. Batch. Trino filters a listing (catalogs, schemas, tables, columns) with
@@ -133,4 +163,10 @@ is_customers(t) if {
 	t.catalogName == "demo"
 	t.schemaName == "crm"
 	t.tableName == "customers"
+}
+
+is_employees(t) if {
+	t.catalogName == "demo"
+	t.schemaName == "hr"
+	t.tableName == "employees"
 }

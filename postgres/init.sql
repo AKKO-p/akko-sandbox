@@ -84,3 +84,33 @@ BEGIN
                        y, 'Transactions booked in ' || y || ', archived');
     END LOOP;
 END $$;
+
+-- The HR scenario (./demo.sh --hr): fictional employees of a fictional company.
+-- A team manager sees her own team, HR sees everyone, an intern sees nothing.
+CREATE SCHEMA hr;
+
+CREATE TABLE hr.employees (
+    id        integer       PRIMARY KEY,
+    full_name text          NOT NULL,
+    team      text          NOT NULL,
+    job_title text          NOT NULL,
+    salary    numeric(10,2) NOT NULL,
+    email     text          NOT NULL
+);
+
+INSERT INTO hr.employees VALUES
+    (1,  'Maya Lindqvist',  'Sales',       'Sales manager',        61000, 'maya.lindqvist@example.com'),
+    (2,  'Tom Becker',      'Sales',       'Account executive',    46000, 'tom.becker@example.com'),
+    (3,  'Ines Duarte',     'Sales',       'Account executive',    47500, 'ines.duarte@example.org'),
+    (4,  'Ravi Menon',      'Sales',       'Sales assistant',      38000, 'ravi.menon@example.com'),
+    (5,  'Julie Moreau',    'Sales',       'Account executive',    49000, 'julie.moreau@example.org'),
+    (6,  'Erik Nilsen',     'Engineering', 'Software engineer',    62000, 'erik.nilsen@example.com'),
+    (7,  'Amara Okafor',    'Engineering', 'Data engineer',        64000, 'amara.okafor@example.org'),
+    (8,  'Paul Schneider',  'Engineering', 'Engineering manager',  78000, 'paul.schneider@example.com'),
+    (9,  'Lea Fontaine',    'Engineering', 'Software engineer',    58000, 'lea.fontaine@example.org'),
+    (10, 'Victor Hale',     'Executive',   'Chief executive',     210000, 'victor.hale@example.com'),
+    (11, 'Nadia Karim',     'Executive',   'Chief financial officer', 165000, 'nadia.karim@example.org'),
+    (12, 'Oscar Brandt',    'Executive',   'Chief operating officer', 158000, 'oscar.brandt@example.com');
+
+COMMENT ON TABLE hr.employees IS 'Employees, their team and their gross annual salary';
+COMMENT ON COLUMN hr.employees.salary IS 'Gross annual salary in euros';

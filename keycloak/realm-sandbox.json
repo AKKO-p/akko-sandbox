@@ -142,6 +142,51 @@
           "temporary": false
         }
       ]
+    },
+    {
+      "username": "manager",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Sales",
+      "lastName": "Manager",
+      "email": "manager@sandbox.example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "hr",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Human",
+      "lastName": "Resources",
+      "email": "hr@sandbox.example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "username": "intern",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Summer",
+      "lastName": "Intern",
+      "email": "intern@sandbox.example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "demo",
+          "temporary": false
+        }
+      ]
     }
   ]
 }

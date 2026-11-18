@@ -5,6 +5,8 @@
 # request without a valid token. Start the sandbox first: docker compose up -d --wait
 #   ./demo.sh           the demo
 #   ./demo.sh --check   the same, as assertions (used by tests/smoke.sh)
+#   ./demo.sh --hr      the HR scenario: a manager, HR and an intern ask about salaries
+#   ./demo.sh --hr --check   the same, as assertions
 set -euo pipefail
 cd "$(dirname "$0")"
 tty=-T
