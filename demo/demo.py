@@ -196,6 +196,9 @@ def check(r: dict) -> int:
 
 
 def main() -> int:
+    if "--hr" in sys.argv[1:]:  # the HR scenario: manager, hr, intern
+        import hr
+        return hr.main(sys.argv[1:])
     if "--check" in sys.argv[1:]:
         return check(collect())
     print(paint("1", "akko-mcp-trino sandbox: three accounts, one question, three outcomes"))
