@@ -61,6 +61,19 @@ forbidden if {
 	is_employees(input.action.resource.table)
 }
 
+# 2e. HR scenario: nobody writes to the employees table, HR included. The MCP server
+#     already refuses writes; this rule keeps Trino's own policy as a second line.
+write_operations := {
+	"InsertIntoTable", "DeleteFromTable", "TruncateTable", "UpdateTableColumns",
+	"DropTable", "RenameTable", "SetTableComment", "SetColumnComment", "AddColumn",
+	"DropColumn", "RenameColumn", "AlterColumn", "SetTableProperties", "SetTableAuthorization",
+}
+
+forbidden if {
+	input.action.operation in write_operations
+	is_employees(input.action.resource.table)
+}
+
 # 2b. Viewers may not use the tpcds catalog, which tests/v07.sh adds: Trino does
 #     not even list it to them.
 #     The catalog's own operations (AccessCatalog, FilterCatalogs, ShowSchemas,

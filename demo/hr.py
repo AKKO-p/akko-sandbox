@@ -14,6 +14,7 @@ import re
 import sys
 
 import anyio
+import httpx
 
 from demo import TOOLS, door, paint, step, token  # noqa: F401  (token used by door)
 from mcp import ClientSession
@@ -24,6 +25,17 @@ ROWS = "SELECT full_name, team, salary, email FROM demo.hr.employees ORDER BY id
 AVERAGE = "SELECT count(*), round(avg(salary)) FROM demo.hr.employees"
 SEARCH = {"text": "salary", "catalog": "demo"}
 WRITE = "DELETE FROM demo.hr.employees WHERE team = 'Executive'"
+TRINO = "https://trino:8443/v1/statement"
+
+
+def straight_to_trino(user: str, sql: str) -> str:
+    """Send `sql` to Trino directly, without the MCP server, with a token issued for Trino:
+    the policy alone decides. Returns Trino's error message, or "" when the statement ran."""
+    kw = dict(headers={"Authorization": f"Bearer {token(user, client='trino-cli')}"}, verify="/certs/ca.crt", timeout=30)
+    r = httpx.post(TRINO, content=sql, **kw).json()
+    while "error" not in r and r.get("nextUri"):
+        r = httpx.get(r["nextUri"], **kw).json()
+    return r.get("error", {}).get("message", "")
 
 
 async def ask(user: str) -> dict:
@@ -55,7 +67,9 @@ async def ask(user: str) -> dict:
 
 
 def collect() -> dict:
-    return {u: anyio.run(ask, u) for u in ("manager", "hr", "intern")} | {"door": door()}
+    r = {u: anyio.run(ask, u) for u in ("manager", "hr", "intern")} | {"door": door()}
+    r["hr_direct_write"] = straight_to_trino("hr", WRITE)
+    return r
 
 
 def money(v) -> str:
@@ -90,6 +104,9 @@ def show(r: dict) -> None:
     step("6. The intern asks the assistant to remove the executives from the table")
     print(f"   {paint('36', WRITE)}")
     print(f"   {paint('31', i['write'] or 'answered (unexpected)')}")
+    print()
+    step("7. HR sends the same DELETE straight to Trino, without the MCP server")
+    print(f"   {paint('31', r['hr_direct_write'] or 'ran (unexpected)')}")
 
 
 def check(r: dict) -> int:
@@ -106,6 +123,7 @@ def check(r: dict) -> int:
         ("manager: search_columns finds employees.salary", m["found"] == ["demo.hr.employees.salary"] and m["search_complete"] is True),
         ("intern: the same search finds nothing, and is complete", i["found"] == [] and i["search_complete"] is True),
         ("intern: a write is refused by the server before Trino", "Read-only" in i["write"]),
+        ("hr: the same write sent straight to Trino is refused by the policy", "Access Denied" in r["hr_direct_write"]),
         ("no token: 401", gate["no_token"] == 401),
         ("forged token: 401", gate["forged"] == 401),
         ("a token issued for Trino: 401 at the MCP server", gate["for_trino"] == 401),
