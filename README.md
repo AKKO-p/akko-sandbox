@@ -45,6 +45,8 @@ ready in about a minute. Stop it and remove everything with
 
 `./demo.sh --check` plays the same steps as assertions.
 
+A second scenario, `./demo.sh --hr`, asks about salaries: a manager sees her own team, HR sees everyone, an intern is refused, and a `DELETE` is refused by the server and, sent straight to Trino, by the policy. `./demo.sh --hr --check` plays it as assertions.
+
 ## Users
 
 Demo accounts, with a demo password. Never reuse them anywhere.
@@ -66,7 +68,7 @@ The Keycloak console is at <http://localhost:8080> (`admin` / `admin`).
 | `keycloak` | `quay.io/keycloak/keycloak:26.7.5` | the identity provider, realm `sandbox`, with standard token exchange | 768 MB |
 | `opa` | `openpolicyagent/opa:1.21.1-static` | the access policy, [`opa/policy.rego`](opa/policy.rego) | 64 MB |
 | `trino` | `trinodb/trino:482` | the engine, https, JWT authentication, OPA access control | 2048 MB |
-| `mcp` | `akkoai/akko-mcp-trino:0.8.1` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 384 MB |
+| `mcp` | `akkoai/akko-mcp-trino:0.8.2` | the MCP server, with its defaults: identity mode `jwt` (token exchange), a valid token required | 384 MB |
 | `inspector` | `ghcr.io/modelcontextprotocol/inspector:2.9.0` | the official MCP Inspector | 384 MB |
 
 Measured on a Linux host with `docker stats`: about 1.4 GB in use at rest
@@ -260,7 +262,7 @@ that Trino shows the caller. The `catalogs` profile
 2.4.0 and turns on the server's Atlas provider.
 
 Atlas is opt-in: the default `docker compose up` does not start it. The default
-image, `akkoai/akko-mcp-trino:0.8.1`, includes the Atlas provider. It stays
+image, `akkoai/akko-mcp-trino:0.8.2`, includes the Atlas provider. It stays
 inactive until `MCP_CONTEXT_PROVIDERS` lists it, which the `catalogs` profile
 does.
 
