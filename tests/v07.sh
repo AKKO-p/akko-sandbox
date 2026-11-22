@@ -172,8 +172,11 @@ check "dave, 'customer' in demo: accounts only" "$(d search_columns text=custome
 # A table found by its own name or comment is in `tables`, with no list of its columns;
 # its columns come in `matches` only for a word of their own name or comment.
 customer=$(search_all carol_analyst text=customer catalog=demo)
-check "carol, 'customer' in demo: tables accounts and customers, across the cursor" "$(pages 'sorted({t["table"] for p in pages for t in p["tables"]})' <<<"$customer")" "['accounts', 'customers']"
-check "  the columns listed hold the word in their own name or comment: accounts.customer_id, customers.segment" "$(pages 'sorted({(m["table"], m["column"]) for p in pages for m in p["matches"]})' <<<"$customer")" "[('accounts', 'customer_id'), ('customers', 'segment')]"
+# carol also reads support.feedback (the hidden-text scenario, ./demo.sh --hidden): the policy
+# gives that table to her alone (rule 2f), its comment names customers and its column
+# customer_id holds the word. dave does not see it, so his expectations below do not change.
+check "carol, 'customer' in demo: tables accounts, customers and feedback, across the cursor" "$(pages 'sorted({t["table"] for p in pages for t in p["tables"]})' <<<"$customer")" "['accounts', 'customers', 'feedback']"
+check "  the columns listed hold the word in their own name or comment: accounts.customer_id, customers.segment, feedback.customer_id" "$(pages 'sorted({(m["table"], m["column"]) for p in pages for m in p["matches"]})' <<<"$customer")" "[('accounts', 'customer_id'), ('customers', 'segment'), ('feedback', 'customer_id')]"
 check "  the search is complete, with no hint: something was found" "$(pages '(pages[-1]["complete"], any("hint" in p for p in pages))' <<<"$customer")" "(True, False)"
 check "dave, 'customer' in demo: the table accounts only, customers is not his" "$(d search_columns text=customer catalog=demo | field 'sorted(t["table"] for t in d["tables"])')" "['accounts']"
 # A catalog he may not see and one he may, in the same search: the one he may

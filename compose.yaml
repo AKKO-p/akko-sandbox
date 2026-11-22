@@ -149,6 +149,9 @@ services:
       TRINO_TOKEN_EXCHANGE_CLIENT_ID: akko-mcp
       TRINO_TOKEN_EXCHANGE_AUDIENCE: trino
       TRINO_TOKEN_EXCHANGE_VERIFY: /certs/ca.crt
+      # Invisible characters in the text values served (./demo.sh --hidden): kept by
+      # default, removed with MCP_CLEAN_CELLS=true docker compose up -d --wait mcp
+      MCP_CLEAN_CELLS: ${MCP_CLEAN_CELLS:-false}
     volumes:
       - certs:/certs:ro
     ports:
