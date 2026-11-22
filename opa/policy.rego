@@ -74,6 +74,15 @@ forbidden if {
 	is_employees(input.action.resource.table)
 }
 
+# 2f. Hidden-text scenario (./demo.sh --hidden): the customer comments are read by the
+#     analyst who plays it, carol_analyst, and by no one else; the table is hidden from
+#     everyone else, listings included, as the employees table is (2d). Its schema stays
+#     visible, so every user still sees the same schemas.
+forbidden if {
+	role != "analyst"
+	is_feedback(input.action.resource.table)
+}
+
 # 2b. Viewers may not use the tpcds catalog, which tests/v07.sh adds: Trino does
 #     not even list it to them.
 #     The catalog's own operations (AccessCatalog, FilterCatalogs, ShowSchemas,
@@ -163,6 +172,12 @@ is_customers(t) if {
 	t.catalogName == "demo"
 	t.schemaName == "crm"
 	t.tableName == "customers"
+}
+
+is_feedback(t) if {
+	t.catalogName == "demo"
+	t.schemaName == "support"
+	t.tableName == "feedback"
 }
 
 is_employees(t) if {

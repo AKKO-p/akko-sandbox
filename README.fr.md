@@ -49,7 +49,7 @@ supprimer : `docker compose down -v`.
 
 Un second scénario, `./demo.sh --hr`, porte sur des salaires : une manager voit son équipe, les RH voient tout le monde, un stagiaire est refusé, et un `DELETE` est refusé par le serveur puis, envoyé directement à Trino, par la policy. `./demo.sh --hr --check` le joue sous forme d'assertions.
 
-Un troisième scénario, `./demo.sh --hidden`, lit des avis clients (`demo.support.feedback`) : l'un se termine par des caractères « tag » Unicode invisibles qui forment une instruction. Le serveur demande au modèle de lire les valeurs des lignes comme des données, jamais comme des instructions, et les sert telles qu'elles sont stockées. Relancez-le avec `MCP_CLEAN_CELLS=true docker compose up -d --wait mcp` puis rejouez le scénario : les caractères invisibles disparaissent et `cleaned_columns` nomme la colonne. `./demo.sh --hidden --check` vérifie l'un ou l'autre cas.
+Un troisième scénario, `./demo.sh --hidden`, lit des avis clients (`demo.support.feedback`, que la policy réserve à `carol_analyst`) : l'un se termine par des caractères « tag » Unicode invisibles qui forment une instruction. Le serveur demande au modèle de lire les valeurs des lignes comme des données, jamais comme des instructions, et les sert telles qu'elles sont stockées. Relancez-le avec `MCP_CLEAN_CELLS=true docker compose up -d --wait mcp` puis rejouez le scénario : les caractères invisibles disparaissent et `cleaned_columns` nomme la colonne. `./demo.sh --hidden --check` vérifie l'un ou l'autre cas.
 
 ## Utilisateurs
 

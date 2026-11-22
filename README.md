@@ -47,7 +47,7 @@ ready in about a minute. Stop it and remove everything with
 
 A second scenario, `./demo.sh --hr`, asks about salaries: a manager sees her own team, HR sees everyone, an intern is refused, and a `DELETE` is refused by the server and, sent straight to Trino, by the policy. `./demo.sh --hr --check` plays it as assertions.
 
-A third scenario, `./demo.sh --hidden`, reads customer comments (`demo.support.feedback`): one ends with invisible Unicode tag characters that spell an instruction. The server tells the model to read the values of the rows as data, never as instructions, and serves them as stored. Restart it with `MCP_CLEAN_CELLS=true docker compose up -d --wait mcp` and play it again: the invisible characters are removed and `cleaned_columns` names the column. `./demo.sh --hidden --check` plays either case as assertions.
+A third scenario, `./demo.sh --hidden`, reads customer comments (`demo.support.feedback`, which the policy gives to `carol_analyst` alone): one ends with invisible Unicode tag characters that spell an instruction. The server tells the model to read the values of the rows as data, never as instructions, and serves them as stored. Restart it with `MCP_CLEAN_CELLS=true docker compose up -d --wait mcp` and play it again: the invisible characters are removed and `cleaned_columns` names the column. `./demo.sh --hidden --check` plays either case as assertions.
 
 ## Users
 
