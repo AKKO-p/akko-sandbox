@@ -7,6 +7,9 @@
 #   ./demo.sh --check   the same, as assertions (used by tests/smoke.sh)
 #   ./demo.sh --hr      the HR scenario: a manager, HR and an intern ask about salaries
 #   ./demo.sh --hr --check   the same, as assertions
+#   ./demo.sh --hidden  an instruction hidden in a customer comment, served as stored
+#                       or cleaned (MCP_CLEAN_CELLS=true docker compose up -d --wait mcp)
+#   ./demo.sh --hidden --check   the same, as assertions
 set -euo pipefail
 cd "$(dirname "$0")"
 tty=-T
