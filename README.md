@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/AKKO-p/akko-mcp-trino/main/docs/images/logo-dark.svg">
+    <img src="https://raw.githubusercontent.com/AKKO-p/akko-mcp-trino/main/docs/images/logo-light.svg" width="240" alt="akko-mcp-trino">
+  </picture>
+</p>
+
 # akko-sandbox
 
 [![smoke](https://github.com/AKKO-p/akko-sandbox/actions/workflows/smoke.yml/badge.svg)](https://github.com/AKKO-p/akko-sandbox/actions/workflows/smoke.yml)
